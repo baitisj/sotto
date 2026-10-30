@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 results_*.json
 *.wav
+wave_results_*.json
+vw_results_*.json
