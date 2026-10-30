@@ -7,6 +7,7 @@ Usage: python sim/audio_race.py [--quick] [--samples DIR] [--out FILE] [--render
   --samples  directory of 8 kHz clips: *.flac, or <clip>__original.wav (default: $SAMPLES)
   --render   also write decoded speech for each condition and scheme as FLAC into DIR
 Env:   C2BIN    directory with c2enc/c2dec (default build/codec2/src)
+       HAMFLAC  hamflac binary for writing FLAC (default: on PATH, else soundfile)
 """
 import argparse, glob, json, os, subprocess, sys, tempfile, time
 import numpy as np
@@ -18,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 import waveforms as wf
+from audio_io import write_flac
 import c4fm_sim as cs
 from modem.link import Transmitter, Receiver
 from modem.payload import SCHEMES
@@ -115,7 +117,7 @@ def main(quick=False, seeds=(1, 2, 3), samples=SAMPLES, render=None):
                         p, e = score(v["ref"], y, v["lag"])
                         if render and conceal and sd == seeds[0]:
                             tag = cond["name"].replace(" ", "_").replace("/", "")
-                            sf.write(os.path.join(render, f"{c}__{tag}__{name}.flac"), y, 8000, subtype="PCM_16")
+                            write_flac(os.path.join(render, f"{c}__{tag}__{name}.flac"), y, 8000)
                         rows.append(dict(clip=c, seed=sd, conceal=conceal, pesq=p, estoi=e,
                                          fer=float((fr != v["bits"]).any(1).mean()) if not conceal else None))
             agg = {}
@@ -146,9 +148,9 @@ if __name__ == "__main__":
     if a.render:
         os.makedirs(a.render, exist_ok=True)
         for c, x in load_clips(a.samples).items():
-            sf.write(os.path.join(a.render, f"{c}__original.flac"), x, 8000, subtype="PCM_16")
-            sf.write(os.path.join(a.render, f"{c}__codec2_2400_no_channel.flac"),
-                     c2dec(c2enc(np.round(x * 32767))), 8000, subtype="PCM_16")
+            write_flac(os.path.join(a.render, f"{c}__original.flac"), x, 8000)
+            write_flac(os.path.join(a.render, f"{c}__codec2_2400_no_channel.flac"),
+                       c2dec(c2enc(np.round(x * 32767))), 8000)
     res = main(a.quick, samples=a.samples, render=a.render)
     out = a.out or os.path.join(os.path.dirname(HERE), "docs", "results",
                                 "audio_race_quick.json" if a.quick else "audio_race.json")

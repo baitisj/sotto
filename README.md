@@ -23,6 +23,7 @@ target: the TI C5517 in the Yaesu FTM-300D).
 - No third-party code with incompatible licenses (for example the STANAG 4591
   reference code). No Yaesu firmware or images.
 - Python dependencies: numpy, scipy, soundfile, pesq, pystoi, pytest (pesq needs Python 3.11 or older to build).
+- Audio is stored as 16-bit FLAC. `sim/` writes it with [HamFLAC](https://github.com/baitisj/hamflac) when the `hamflac` binary is on PATH or in `$HAMFLAC`, and with soundfile otherwise.
 
 ## License
 
