@@ -1,8 +1,8 @@
-# (working name)
+# sotto
 
-An open, low-bitrate (2400 bps) voice codec and channel-coding study aimed at
-fixed-point DSPs such as the TI C5517 in the Yaesu FTM-300D. The target is
-AMBE+2-class quality with better behaviour under bit errors.
+Open 2400 bps digital voice for FM radios: a vocoder, channel coding and a
+constant-envelope modem path, built to run on small fixed-point DSPs (first
+target: the TI C5517 in the Yaesu FTM-300D).
 
 ## Contents
 
