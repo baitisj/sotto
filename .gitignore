@@ -4,3 +4,4 @@ results_*.json
 *.wav
 wave_results_*.json
 vw_results_*.json
+build/

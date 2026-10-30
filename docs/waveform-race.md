@@ -2,6 +2,10 @@
 
 *Written 2026-10-30. Code: `sim/waveforms.py`, `sim/waveform_race.py` and `sim/vw_race.py`. Results: `docs/results/wave_race_results.json`.*
 
+> **Corrections (2026-10-30, after building the softmodem):**
+> 1. A real DN voice slot is **104 bits per 20 ms** (52 of 96 symbols), not the 72 bits modelled below. With the true slot and a proper code, VW still wins, but by **about 2–3 dB, not 6 dB** (see `audio-race.md`).
+> 2. Argument 3 below is wrong as written: **MMDVM hotspots and repeaters regenerate the voice FEC** of every frame they relay, so a sotto payload would be corrupted unless MMDVMHost is patched to skip sotto frames (see `softmodem.md`).
+
 ## Short answer
 
 **There's no clear win from a new waveform. The big win is giving voice more of the C4FM channel.** If we keep Yaesu's C4FM framing but carry sotto in the **VW (full-rate) voice slot** with a rate-1/3 code, we beat every custom waveform I tried on noise and fading. Against today's DN slot it gains about **6 dB** at the same transmit power. The only place a custom waveform wins is large delay spread (100 µs and up), where slow 4FSK holds on longer. Delay spread that large is rare on 2 m and 70 cm outside simulcast systems.
@@ -58,7 +62,7 @@ All 25 conditions, with class-B BER, are in the JSON.
 Arguments **for** keeping Yaesu's C4FM framing (sync, FICH, VW slot):
 1. **It's also the best performer** (above). Compatibility costs nothing in link quality.
 2. **The modem already exists.** If WS3 lets us patch only the vocoder inside Yaesu's DSP image, the proven sync, timing, AFC and FICH handling stay. That's the smallest change that gets sotto on the air.
-3. **Open networking for free.** MMDVM hotspots, Pi-Star, YSFReflector and similar demodulate C4FM to bits and relay frames *without decoding the voice*. sotto-in-YSF frames should cross those networks unchanged. (I haven't checked this for Yaesu's own WIRES-X servers or HRI-200 nodes, which may handle voice differently.)
+3. **Open networking, with a patch.** YSFReflector forwards frames as they are, but MMDVMHost (Pi-Star and most hotspots) regenerates the voice FEC of every frame, which would corrupt sotto. *(Corrected: the first version of this doc said frames would pass unchanged.)* A small MMDVMHost change keyed on the sotto flag fixes it, and the softmodem can also talk to reflectors directly. Yaesu's own WIRES-X and HRI-200 are unchecked.
 4. **Coexistence.** Other Fusion radios read the FICH and DG-ID, so they stay muted, and repeaters recognise the signal as digital. A foreign waveform sounds like noise to everyone else and may trigger AMS repeaters into odd states.
 5. **Open tools for testing.** The same open C4FM demodulators (MMDVM, SDR decoders) can capture off-air frames and measure bit errors using the known sync and FICH CRC. That gives us the real burst-error data we're missing.
 
