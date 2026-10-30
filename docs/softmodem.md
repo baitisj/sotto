@@ -14,8 +14,8 @@ It is plain Python (numpy and scipy). It is a reference implementation and test 
 ```sh
 ./tools/build_codec2.sh                               # c2enc / c2dec into build/codec2/src
 build/codec2/src/c2enc 2400 speech.raw voice.bit      # 8 kHz 16-bit raw speech in
-python -m modem tx voice.bit tx.wav --src N0CALL      # baseband audio for the radio's data input
-python -m modem rx rx.wav back.bit                    # discriminator audio from the data output
+python -m modem tx voice.bit tx.flac --src N0CALL     # baseband audio (FLAC or WAV) for the data input
+python -m modem rx rx.flac back.bit                   # discriminator audio from the data output
 build/codec2/src/c2dec 2400 back.bit out.raw
 python -m modem tx voice.bit tx.cf32 --iq 240000      # FM-modulated IQ for an SDR transmitter
 python -m modem rx rx.cf32 back.bit --iq 240000       # IQ from an SDR receiver

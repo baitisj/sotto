@@ -6,3 +6,4 @@ wave_results_*.json
 vw_results_*.json
 build/
 .pytest_cache/
+*.flac

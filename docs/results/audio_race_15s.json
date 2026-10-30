@@ -1,0 +1,3651 @@
+{
+ "codec_only": {
+  "female_libri198_14s": [
+   2.15519380569458,
+   0.7265127232156142
+  ],
+  "male_libri3436_15s": [
+   2.907118558883667,
+   0.7494758805595316
+  ],
+  "male_ve9qrp_15s": [
+   2.854776382446289,
+   0.673072723188097
+  ]
+ },
+ "runs": [
+  {
+   "cond": "AWGN 46 dB-Hz",
+   "scheme": "sotto_vw",
+   "raw": {
+    "pesq": 2.1855490340126886,
+    "estoi": 0.6744318475149454
+   },
+   "conceal": {
+    "pesq": 2.013130135006375,
+    "estoi": 0.6649731227117
+   },
+   "fer": 0.04466187050359713,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.6173370679219563,
+     "estoi": 0.6548257619395806
+    },
+    "male_libri3436_15s": {
+     "pesq": 2.151560147603353,
+     "estoi": 0.6985655007592264
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 2.270493189493815,
+     "estoi": 0.6415281054362931
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.8209543228149414,
+     "estoi": 0.6945549157018998,
+     "fer": 0.0460431654676259
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.6161471605300903,
+     "estoi": 0.6538087079151964,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.76154363155365,
+     "estoi": 0.6665068053563894,
+     "fer": 0.04460431654676259
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.635479211807251,
+     "estoi": 0.6720871128957129,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.7015440464019775,
+     "estoi": 0.6549669479327712,
+     "fer": 0.06330935251798561
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.6003848314285278,
+     "estoi": 0.6385814650078327,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.1353039741516113,
+     "estoi": 0.6915972030263822,
+     "fer": 0.048
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.944281816482544,
+     "estoi": 0.6766240279768934,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.7362303733825684,
+     "estoi": 0.7388238063431788,
+     "fer": 0.034666666666666665
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.3660976886749268,
+     "estoi": 0.7234726390489215,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.2857329845428467,
+     "estoi": 0.7047941761001976,
+     "fer": 0.04933333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.144300937652588,
+     "estoi": 0.6955998352518643,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.4559082984924316,
+     "estoi": 0.637677615178411,
+     "fer": 0.030666666666666665
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.315406084060669,
+     "estoi": 0.6452592479918606,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.383192300796509,
+     "estoi": 0.6431913488730446,
+     "fer": 0.042666666666666665
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.2612016201019287,
+     "estoi": 0.6481682023844298,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.389531373977661,
+     "estoi": 0.6377738091222344,
+     "fer": 0.042666666666666665
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.2348718643188477,
+     "estoi": 0.6311568659325889,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "AWGN 46 dB-Hz",
+   "scheme": "dn_rep",
+   "raw": {
+    "pesq": 1.3902415831883748,
+    "estoi": 0.4630358954313457
+   },
+   "conceal": {
+    "pesq": 1.2636845509211223,
+    "estoi": 0.39453146809446177
+   },
+   "fer": 0.8368206767918998,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.1414227883021038,
+     "estoi": 0.3438607738312706
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.305365761121114,
+     "estoi": 0.40486858690658384
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.344265103340149,
+     "estoi": 0.43486504354553096
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.2054827213287354,
+     "estoi": 0.42795427594776625,
+     "fer": 0.8158273381294964
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.1253738403320312,
+     "estoi": 0.35477640552247836,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.2832601070404053,
+     "estoi": 0.4788185766163543,
+     "fer": 0.8316546762589928
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.1642361879348755,
+     "estoi": 0.3608500762364797,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.1653189659118652,
+     "estoi": 0.4024449252065925,
+     "fer": 0.8532374100719424
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.1346583366394043,
+     "estoi": 0.3159558397348537,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.3912043571472168,
+     "estoi": 0.4861220381246108,
+     "fer": 0.8413333333333334
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.3091706037521362,
+     "estoi": 0.4377621542466838,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.3808194398880005,
+     "estoi": 0.4871230802694727,
+     "fer": 0.8346666666666667
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.2319508790969849,
+     "estoi": 0.3813063940257901,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.3715696334838867,
+     "estoi": 0.4715493956907834,
+     "fer": 0.864
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.3749758005142212,
+     "estoi": 0.3955372124472777,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.5673346519470215,
+     "estoi": 0.46788211694433335,
+     "fer": 0.8253333333333334
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.2165907621383667,
+     "estoi": 0.4336010944153476,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.5817136764526367,
+     "estoi": 0.47157312546006647,
+     "fer": 0.84
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.3074634075164795,
+     "estoi": 0.4082339790075608,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.5654706954956055,
+     "estoi": 0.47385552462213215,
+     "fer": 0.8253333333333334
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.5087411403656006,
+     "estoi": 0.46276005721368446,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "AWGN 46 dB-Hz",
+   "scheme": "dn_conv",
+   "raw": {
+    "pesq": 1.4168748590681288,
+    "estoi": 0.5236948554067814
+   },
+   "conceal": {
+    "pesq": 1.3905956877602472,
+    "estoi": 0.503047133750459
+   },
+   "fer": 0.20047215560884624,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.2157957951227825,
+     "estoi": 0.44778364757848926
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.4841769138971965,
+     "estoi": 0.5272029363994234
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.4718143542607625,
+     "estoi": 0.5341548172734641
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.3036472797393799,
+     "estoi": 0.5282093724673921,
+     "fer": 0.19136690647482013
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.2720340490341187,
+     "estoi": 0.4651687408714135,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.1944520473480225,
+     "estoi": 0.4835579352813211,
+     "fer": 0.2143884892086331
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.22182035446167,
+     "estoi": 0.4596145076895217,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.221549391746521,
+     "estoi": 0.4959404344207499,
+     "fer": 0.2158273381294964
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.1535329818725586,
+     "estoi": 0.41856769417453243,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.5900355577468872,
+     "estoi": 0.5902504975514454,
+     "fer": 0.16133333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.7195496559143066,
+     "estoi": 0.5837990496742776,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.4321352243423462,
+     "estoi": 0.5834626099105555,
+     "fer": 0.20266666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.375360369682312,
+     "estoi": 0.49596532944139954,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.378187656402588,
+     "estoi": 0.5443312144621313,
+     "fer": 0.19866666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.3576207160949707,
+     "estoi": 0.501844430082593,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.5523359775543213,
+     "estoi": 0.5157803260782092,
+     "fer": 0.208
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.384812593460083,
+     "estoi": 0.5429859906201479,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.407307505607605,
+     "estoi": 0.46170378349127883,
+     "fer": 0.224
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.3501098155975342,
+     "estoi": 0.5045848228097635,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.6722230911254883,
+     "estoi": 0.5100175249979498,
+     "fer": 0.188
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.6805206537246704,
+     "estoi": 0.5548936383904813,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "AWGN 48 dB-Hz",
+   "scheme": "sotto_vw",
+   "raw": {
+    "pesq": 2.639029582341512,
+    "estoi": 0.7163537756544143
+   },
+   "conceal": {
+    "pesq": 2.639029582341512,
+    "estoi": 0.7163537756544144
+   },
+   "fer": 0.0,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156141
+    },
+    "male_libri3436_15s": {
+     "pesq": 2.907118558883667,
+     "estoi": 0.7494758805595317
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156141,
+     "fer": 0.0
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": 0.0
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156141,
+     "fer": 0.0
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156141,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.907118558883667,
+     "estoi": 0.7494758805595316,
+     "fer": 0.0
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.907118558883667,
+     "estoi": 0.7494758805595316,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.907118558883667,
+     "estoi": 0.7494758805595316,
+     "fer": 0.0
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.907118558883667,
+     "estoi": 0.7494758805595316,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.907118558883667,
+     "estoi": 0.7494758805595316,
+     "fer": 0.0
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.907118558883667,
+     "estoi": 0.7494758805595316,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097,
+     "fer": 0.0
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097,
+     "fer": 0.0
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097,
+     "fer": 0.0
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "AWGN 48 dB-Hz",
+   "scheme": "dn_rep",
+   "raw": {
+    "pesq": 2.077268057399326,
+    "estoi": 0.6499342029639382
+   },
+   "conceal": {
+    "pesq": 1.9715501467386882,
+    "estoi": 0.6364247992387565
+   },
+   "fer": 0.44540261124433783,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.5798261165618896,
+     "estoi": 0.6227712272516992
+    },
+    "male_libri3436_15s": {
+     "pesq": 2.1195605595906577,
+     "estoi": 0.6741996656788091
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 2.215263764063517,
+     "estoi": 0.6123035047857616
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.5079659223556519,
+     "estoi": 0.6285152780081323,
+     "fer": 0.460431654676259
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.3489073514938354,
+     "estoi": 0.5779091822193959,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.9400475025177002,
+     "estoi": 0.6777712458362228,
+     "fer": 0.43597122302158275
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.703407645225525,
+     "estoi": 0.6518567749099241,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.7401092052459717,
+     "estoi": 0.6484365060014685,
+     "fer": 0.45755395683453237
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.6871633529663086,
+     "estoi": 0.6385477246257776,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.1061830520629883,
+     "estoi": 0.6720729781605169,
+     "fer": 0.464
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.08090877532959,
+     "estoi": 0.6717409821260675,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.3782341480255127,
+     "estoi": 0.6958902685319187,
+     "fer": 0.432
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.175319194793701,
+     "estoi": 0.6855363673180883,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.297332763671875,
+     "estoi": 0.6870931838667337,
+     "fer": 0.45866666666666667
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.1024537086486816,
+     "estoi": 0.6653216475922712,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.192486047744751,
+     "estoi": 0.5979615653504649,
+     "fer": 0.4186666666666667
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.2543232440948486,
+     "estoi": 0.5987961435875004,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.3819541931152344,
+     "estoi": 0.6217510309064009,
+     "fer": 0.448
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.274862051010132,
+     "estoi": 0.6209374112496895,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.151099681854248,
+     "estoi": 0.6199157700135856,
+     "fer": 0.43333333333333335
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.1166059970855713,
+     "estoi": 0.6171769595200948,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "AWGN 48 dB-Hz",
+   "scheme": "dn_conv",
+   "raw": {
+    "pesq": 2.570760382546319,
+    "estoi": 0.7112643105144517
+   },
+   "conceal": {
+    "pesq": 2.4968478679656982,
+    "estoi": 0.706686582500142
+   },
+   "fer": 0.005029576338928856,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.9944664637247722,
+     "estoi": 0.7099677709285802
+    },
+    "male_libri3436_15s": {
+     "pesq": 2.79245932896932,
+     "estoi": 0.7435873608341376
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 2.703617811203003,
+     "estoi": 0.6665046157377083
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.1749701499938965,
+     "estoi": 0.7260148461633408,
+     "fer": 0.004316546762589928
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.0302209854125977,
+     "estoi": 0.7143524805512995,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.0860540866851807,
+     "estoi": 0.7198990172098938,
+     "fer": 0.010071942446043165
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.9934070110321045,
+     "estoi": 0.7027266248769787,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.1381192207336426,
+     "estoi": 0.722023823386638,
+     "fer": 0.0028776978417266188
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.9597713947296143,
+     "estoi": 0.7128242073574622,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.716920852661133,
+     "estoi": 0.7383610252062052,
+     "fer": 0.004
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.830796241760254,
+     "estoi": 0.7494146911984926,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.9124324321746826,
+     "estoi": 0.749463757382503,
+     "fer": 0.005333333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.8780040740966797,
+     "estoi": 0.7418630139875427,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.9024882316589355,
+     "estoi": 0.7489350585263728,
+     "fer": 0.004
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.6685776710510254,
+     "estoi": 0.7394843773163775,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.766723155975342,
+     "estoi": 0.6600226383273818,
+     "fer": 0.004
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.8044581413269043,
+     "estoi": 0.6637020669003434,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.7882308959960938,
+     "estoi": 0.673075508052459,
+     "fer": 0.005333333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.6765363216400146,
+     "estoi": 0.6685102122389709,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.650904417037964,
+     "estoi": 0.6635831203752703,
+     "fer": 0.005333333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.62985897064209,
+     "estoi": 0.6673015680738104,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "146 MHz 30 km/h 52 dB-Hz",
+   "scheme": "sotto_vw",
+   "raw": {
+    "pesq": 1.5986762973997328,
+    "estoi": 0.5523348563361061
+   },
+   "conceal": {
+    "pesq": 1.37409065829383,
+    "estoi": 0.4991224854637994
+   },
+   "fer": 0.14655369038102853,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.2993321021397908,
+     "estoi": 0.5125631252778864
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.410294493039449,
+     "estoi": 0.4799823945932098
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.4126453797022502,
+     "estoi": 0.504821936520302
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.7403361797332764,
+     "estoi": 0.6414036828623194,
+     "fer": 0.09784172661870504
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.3609557151794434,
+     "estoi": 0.5670379843565613,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.371842622756958,
+     "estoi": 0.555779705123697,
+     "fer": 0.14532374100719425
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.2803637981414795,
+     "estoi": 0.5083264180497725,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.4425421953201294,
+     "estoi": 0.5499112608388067,
+     "fer": 0.16115107913669063
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.2566767930984497,
+     "estoi": 0.46232497342732537,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.6003719568252563,
+     "estoi": 0.5457777945450168,
+     "fer": 0.16933333333333334
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.5377388000488281,
+     "estoi": 0.5204490510593368,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.4198378324508667,
+     "estoi": 0.5024278581961528,
+     "fer": 0.18666666666666668
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.270586371421814,
+     "estoi": 0.4122446121342959,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.6087286472320557,
+     "estoi": 0.5639116416693589,
+     "fer": 0.156
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.422558307647705,
+     "estoi": 0.5072535205859968,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.7022666931152344,
+     "estoi": 0.5315798053993218,
+     "fer": 0.13333333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.3869107961654663,
+     "estoi": 0.49788710968548533,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.64884614944458,
+     "estoi": 0.5303037043608212,
+     "fer": 0.14133333333333334
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.3389003276824951,
+     "estoi": 0.4725982679789827,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.8533143997192383,
+     "estoi": 0.5499182540294605,
+     "fer": 0.128
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.512125015258789,
+     "estoi": 0.5439804318964381,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "146 MHz 30 km/h 52 dB-Hz",
+   "scheme": "dn_rep",
+   "raw": {
+    "pesq": 1.3580265177620783,
+    "estoi": 0.47746895482444995
+   },
+   "conceal": {
+    "pesq": 1.258639759487576,
+    "estoi": 0.4401116412481726
+   },
+   "fer": 0.35241779909405807,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.1912193695704143,
+     "estoi": 0.41534359917736685
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.2609613339106243,
+     "estoi": 0.4410071114283198
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.3237385749816895,
+     "estoi": 0.4639842131388312
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.384033203125,
+     "estoi": 0.5462115857042612,
+     "fer": 0.32661870503597124
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.1991983652114868,
+     "estoi": 0.4273861331212569,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.2226872444152832,
+     "estoi": 0.48276962414189856,
+     "fer": 0.3381294964028777
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.1829057931900024,
+     "estoi": 0.4028854786087749,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.162406325340271,
+     "estoi": 0.43271159086742034,
+     "fer": 0.3683453237410072
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.1915539503097534,
+     "estoi": 0.41575918580206883,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.3944711685180664,
+     "estoi": 0.48229163222757826,
+     "fer": 0.372
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.3480730056762695,
+     "estoi": 0.47490631694388746,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.353956699371338,
+     "estoi": 0.4868693534950033,
+     "fer": 0.356
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.209774136543274,
+     "estoi": 0.4558113583572493,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.3198037147521973,
+     "estoi": 0.4650174184108309,
+     "fer": 0.36
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.225036859512329,
+     "estoi": 0.3923036589838224,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.4770245552062988,
+     "estoi": 0.4563247875668751,
+     "fer": 0.3586666666666667
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.4593400955200195,
+     "estoi": 0.48332992070963154,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.3915088176727295,
+     "estoi": 0.44525312589089805,
+     "fer": 0.34
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.225619912147522,
+     "estoi": 0.4298283230482453,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.5163469314575195,
+     "estoi": 0.49977147511528347,
+     "fer": 0.352
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.2862557172775269,
+     "estoi": 0.47879439565861676,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "146 MHz 30 km/h 52 dB-Hz",
+   "scheme": "dn_conv",
+   "raw": {
+    "pesq": 1.3618306583828397,
+    "estoi": 0.4859363354468498
+   },
+   "conceal": {
+    "pesq": 1.2644418080647786,
+    "estoi": 0.42894212748114946
+   },
+   "fer": 0.20025259792166267,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.2300328413645427,
+     "estoi": 0.4398237278042731
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.2866426308949788,
+     "estoi": 0.4127630353333552
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.2766499519348145,
+     "estoi": 0.43423961930582
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.340564489364624,
+     "estoi": 0.5348208254124448,
+     "fer": 0.1510791366906475
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.285891056060791,
+     "estoi": 0.49234057952993404,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.2102787494659424,
+     "estoi": 0.4501676367903783,
+     "fer": 0.21294964028776978
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.2048512697219849,
+     "estoi": 0.38757585591470045,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.3217506408691406,
+     "estoi": 0.49175060667153264,
+     "fer": 0.19424460431654678
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.199356198310852,
+     "estoi": 0.4395547479681847,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.266516089439392,
+     "estoi": 0.4558180746897097,
+     "fer": 0.232
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.320826768875122,
+     "estoi": 0.44173002321089055,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.3719136714935303,
+     "estoi": 0.4939095533650089,
+     "fer": 0.22133333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.2503669261932373,
+     "estoi": 0.37135126288528547,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.3660423755645752,
+     "estoi": 0.5137841878330739,
+     "fer": 0.19333333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.2887341976165771,
+     "estoi": 0.42520781990388967,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.4411557912826538,
+     "estoi": 0.46367649281849604,
+     "fer": 0.21333333333333335
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.2983250617980957,
+     "estoi": 0.4243177304204902,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.371483325958252,
+     "estoi": 0.4747315726501683,
+     "fer": 0.18933333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.2387499809265137,
+     "estoi": 0.4246509252817365,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.5667707920074463,
+     "estoi": 0.494768068790835,
+     "fer": 0.19466666666666665
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.292874813079834,
+     "estoi": 0.4537502022152333,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "146 MHz 30 km/h 56 dB-Hz",
+   "scheme": "sotto_vw",
+   "raw": {
+    "pesq": 2.108693758646647,
+    "estoi": 0.6654513589511699
+   },
+   "conceal": {
+    "pesq": 1.950604173872206,
+    "estoi": 0.6479779640118092
+   },
+   "fer": 0.04219344524380496,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.8163639307022095,
+     "estoi": 0.6582228131270753
+    },
+    "male_libri3436_15s": {
+     "pesq": 2.0974305470784507,
+     "estoi": 0.6709877561628659
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.9380180438359578,
+     "estoi": 0.6147233227454866
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.9842066764831543,
+     "estoi": 0.691124535624954,
+     "fer": 0.033093525179856115
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.8417690992355347,
+     "estoi": 0.6678807125813646,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.810582160949707,
+     "estoi": 0.6778262371250023,
+     "fer": 0.04028776978417266
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.6715290546417236,
+     "estoi": 0.6455401272708782,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.041658639907837,
+     "estoi": 0.6818205230227846,
+     "fer": 0.050359712230215826
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.9357936382293701,
+     "estoi": 0.6612475995289832,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.098249912261963,
+     "estoi": 0.6693841110436306,
+     "fer": 0.04666666666666667
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.0498876571655273,
+     "estoi": 0.658742782213092,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.103855848312378,
+     "estoi": 0.6747146646956643,
+     "fer": 0.05733333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.82362699508667,
+     "estoi": 0.6488029800519673,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.5929503440856934,
+     "estoi": 0.7252883260751776,
+     "fer": 0.03333333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.4187769889831543,
+     "estoi": 0.7054175062235385,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.1733522415161133,
+     "estoi": 0.624335235936996,
+     "fer": 0.032
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.9786078929901123,
+     "estoi": 0.6130958242941951,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.0180091857910156,
+     "estoi": 0.617377444391659,
+     "fer": 0.04133333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.9236928224563599,
+     "estoi": 0.6192747885331066,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.155378818511963,
+     "estoi": 0.6271911526446609,
+     "fer": 0.04533333333333334
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.9117534160614014,
+     "estoi": 0.611799355409158,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "146 MHz 30 km/h 56 dB-Hz",
+   "scheme": "dn_rep",
+   "raw": {
+    "pesq": 1.6447780132293701,
+    "estoi": 0.5948035947377233
+   },
+   "conceal": {
+    "pesq": 1.6059575610690646,
+    "estoi": 0.5808282059670248
+   },
+   "fer": 0.1628830269118039,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.3958202600479126,
+     "estoi": 0.5773880158373212
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.5937364896138508,
+     "estoi": 0.5851567948219499
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.8283159335454304,
+     "estoi": 0.5799398072418036
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.521427869796753,
+     "estoi": 0.6319797970176868,
+     "fer": 0.14676258992805755
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.5466928482055664,
+     "estoi": 0.6276076485110045,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.3947269916534424,
+     "estoi": 0.6012048498920791,
+     "fer": 0.17841726618705037
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.2737071514129639,
+     "estoi": 0.5316158042661423,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.4359136819839478,
+     "estoi": 0.5790015575497299,
+     "fer": 0.17410071942446043
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.3670607805252075,
+     "estoi": 0.5729405947348168,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.5759578943252563,
+     "estoi": 0.5999229417249492,
+     "fer": 0.17466666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.595790982246399,
+     "estoi": 0.5841952328315626,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.5958129167556763,
+     "estoi": 0.6162765975016983,
+     "fer": 0.17066666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.7104203701019287,
+     "estoi": 0.606137019234581,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.6994328498840332,
+     "estoi": 0.6303506509723055,
+     "fer": 0.16533333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.474998116493225,
+     "estoi": 0.565138132399706,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.9335169792175293,
+     "estoi": 0.56564753584319,
+     "fer": 0.16266666666666665
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.7941501140594482,
+     "estoi": 0.5802011654578348,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.6918280124664307,
+     "estoi": 0.551996048121265,
+     "fer": 0.15466666666666667
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.8846707344055176,
+     "estoi": 0.5725233239878915,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.9543849229812622,
+     "estoi": 0.5768523740166047,
+     "fer": 0.13866666666666666
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.8061269521713257,
+     "estoi": 0.5870949322796845,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "146 MHz 30 km/h 56 dB-Hz",
+   "scheme": "dn_conv",
+   "raw": {
+    "pesq": 1.9037691089842055,
+    "estoi": 0.6335129763260073
+   },
+   "conceal": {
+    "pesq": 1.7151900397406683,
+    "estoi": 0.6110768717618079
+   },
+   "fer": 0.06371116440181189,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.593736211458842,
+     "estoi": 0.6260726442953654
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.7398748795191448,
+     "estoi": 0.612812786968732
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.8119590282440186,
+     "estoi": 0.5943451840213264
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.6801975965499878,
+     "estoi": 0.6462515850360896,
+     "fer": 0.050359712230215826
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.6875636577606201,
+     "estoi": 0.6322086857563746,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.7356762886047363,
+     "estoi": 0.6495776619122702,
+     "fer": 0.060431654676258995
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.5527992248535156,
+     "estoi": 0.6313565700550514,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.7428269386291504,
+     "estoi": 0.6428092959936389,
+     "fer": 0.07194244604316546
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.5408457517623901,
+     "estoi": 0.6146526770746702,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.7316632270812988,
+     "estoi": 0.6203787409914484,
+     "fer": 0.08666666666666667
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.5927708148956299,
+     "estoi": 0.6129066225020116,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.7882463932037354,
+     "estoi": 0.6318184778719104,
+     "fer": 0.07866666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.452379584312439,
+     "estoi": 0.5749386534479753,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.235244035720825,
+     "estoi": 0.6787679376145838,
+     "fer": 0.058666666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.1744742393493652,
+     "estoi": 0.6505930849562093,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.1224634647369385,
+     "estoi": 0.6185664385676453,
+     "fer": 0.05466666666666667
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.9508798122406006,
+     "estoi": 0.604262985218577,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.0856337547302246,
+     "estoi": 0.6139340806165617,
+     "fer": 0.050666666666666665
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.809863567352295,
+     "estoi": 0.5848142330148464,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.011970281600952,
+     "estoi": 0.5995125683299172,
+     "fer": 0.06133333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.6751337051391602,
+     "estoi": 0.593958333830556,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 48 dB-Hz",
+   "scheme": "sotto_vw",
+   "raw": {
+    "pesq": 1.2374174329969618,
+    "estoi": 0.4166592839378778
+   },
+   "conceal": {
+    "pesq": 1.2127826876110501,
+    "estoi": 0.3375950356968306
+   },
+   "fer": 0.31520383693045567,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.1959559917449951,
+     "estoi": 0.29803301170133417
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.2114245494206746,
+     "estoi": 0.3781839422144369
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.2309675216674805,
+     "estoi": 0.33656815317472066
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.153433084487915,
+     "estoi": 0.40609646669439986,
+     "fer": 0.2906474820143885
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.2221194505691528,
+     "estoi": 0.3427779496153962,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.1298466920852661,
+     "estoi": 0.38892835856011043,
+     "fer": 0.3381294964028777
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.1963138580322266,
+     "estoi": 0.29592906715232864,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.161190152168274,
+     "estoi": 0.38243803214658134,
+     "fer": 0.32805755395683456
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.169434666633606,
+     "estoi": 0.2553920183362777,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.3240275382995605,
+     "estoi": 0.4753332530055123,
+     "fer": 0.32133333333333336
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.1923984289169312,
+     "estoi": 0.3724956463979226,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.2413575649261475,
+     "estoi": 0.4219742234204562,
+     "fer": 0.2813333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.2272050380706787,
+     "estoi": 0.3676193380313396,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.3248648643493652,
+     "estoi": 0.45469647818692005,
+     "fer": 0.2693333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.214670181274414,
+     "estoi": 0.39443684221404846,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.2392024993896484,
+     "estoi": 0.4280188463748746,
+     "fer": 0.332
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.2002694606781006,
+     "estoi": 0.35271364457601057,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.2767857313156128,
+     "estoi": 0.40381582904939056,
+     "fer": 0.33066666666666666
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.362854242324829,
+     "estoi": 0.3598870580092355,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.2860487699508667,
+     "estoi": 0.3886320680026548,
+     "fer": 0.3453333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.1297788619995117,
+     "estoi": 0.29710375693891583,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 48 dB-Hz",
+   "scheme": "dn_rep",
+   "raw": {
+    "pesq": 1.1907851033740573,
+    "estoi": 0.3119493708804465
+   },
+   "conceal": {
+    "pesq": 1.1601841979556613,
+    "estoi": 0.2743428611454999
+   },
+   "fer": 0.7601257660538236,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.1431254545847576,
+     "estoi": 0.22515518250817132
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.1965477069218953,
+     "estoi": 0.29021175846634467
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.1408794323603313,
+     "estoi": 0.30766164246198363
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.1555718183517456,
+     "estoi": 0.3103017998564681,
+     "fer": 0.7410071942446043
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.1065404415130615,
+     "estoi": 0.246314350844219,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.123313546180725,
+     "estoi": 0.28242777899466975,
+     "fer": 0.758273381294964
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.1530309915542603,
+     "estoi": 0.22076393936464647,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.1599187850952148,
+     "estoi": 0.27752025666339886,
+     "fer": 0.7525179856115108
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.1698049306869507,
+     "estoi": 0.20838725731564847,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.206910490989685,
+     "estoi": 0.3198921235841141,
+     "fer": 0.7546666666666667
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.2043100595474243,
+     "estoi": 0.31934216945831256,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.1638315916061401,
+     "estoi": 0.3021343760975181,
+     "fer": 0.764
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.207427740097046,
+     "estoi": 0.22110322233506136,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.2267014980316162,
+     "estoi": 0.3835092558952761,
+     "fer": 0.7373333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.1779053211212158,
+     "estoi": 0.33018988360566015,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.247649073600769,
+     "estoi": 0.30827864712589875,
+     "fer": 0.7813333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.148975133895874,
+     "estoi": 0.32421961321475196,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.2671183347702026,
+     "estoi": 0.3094027337648235,
+     "fer": 0.7786666666666666
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.13025963306427,
+     "estoi": 0.3233649072545069,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.1660507917404175,
+     "estoi": 0.31407736594185115,
+     "fer": 0.7733333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.1434035301208496,
+     "estoi": 0.2754004069166921,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 48 dB-Hz",
+   "scheme": "dn_conv",
+   "raw": {
+    "pesq": 1.1296484073003132,
+    "estoi": 0.27639985988841115
+   },
+   "conceal": {
+    "pesq": 1.131618168618944,
+    "estoi": 0.15812729452237653
+   },
+   "fer": 0.5074212629896083,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.1745386918385823,
+     "estoi": 0.12686226129427516
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.1413909594217937,
+     "estoi": 0.1728209784507496
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.0789248545964558,
+     "estoi": 0.1746986438221048
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.122159481048584,
+     "estoi": 0.2778235417091709,
+     "fer": 0.5035971223021583
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.2142900228500366,
+     "estoi": 0.14467277032747222,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.1240456104278564,
+     "estoi": 0.24910115402365957,
+     "fer": 0.5035971223021583
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.0965533256530762,
+     "estoi": 0.10936768346953062,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.0984771251678467,
+     "estoi": 0.2511765121741645,
+     "fer": 0.5035971223021583
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.2127727270126343,
+     "estoi": 0.1265463300858227,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.1426239013671875,
+     "estoi": 0.2978663474529477,
+     "fer": 0.5386666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.164755940437317,
+     "estoi": 0.15891811768893158,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.119036316871643,
+     "estoi": 0.2960971483915914,
+     "fer": 0.476
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.1577486991882324,
+     "estoi": 0.16872773105064373,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.1543103456497192,
+     "estoi": 0.29587607754243994,
+     "fer": 0.4653333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.1016682386398315,
+     "estoi": 0.1908170866126735,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.1060621738433838,
+     "estoi": 0.2851368624107596,
+     "fer": 0.5293333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.0484776496887207,
+     "estoi": 0.15956846414642664,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.180622935295105,
+     "estoi": 0.2858425387005035,
+     "fer": 0.48533333333333334
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.118969202041626,
+     "estoi": 0.24891986600850124,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.1194977760314941,
+     "estoi": 0.24867855659046334,
+     "fer": 0.5613333333333334
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.069327712059021,
+     "estoi": 0.11560760131138649,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 52 dB-Hz",
+   "scheme": "sotto_vw",
+   "raw": {
+    "pesq": 2.1946895784801908,
+    "estoi": 0.6783198740570016
+   },
+   "conceal": {
+    "pesq": 2.1555722422069974,
+    "estoi": 0.6668309817904176
+   },
+   "fer": 0.03549586997069012,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.6873335440953572,
+     "estoi": 0.6573522215654759
+    },
+    "male_libri3436_15s": {
+     "pesq": 2.282667318979899,
+     "estoi": 0.6979928383169615
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 2.496715863545736,
+     "estoi": 0.6451478854888156
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.7765476703643799,
+     "estoi": 0.6763002366400349,
+     "fer": 0.03597122302158273
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.6508705615997314,
+     "estoi": 0.653843487173932,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.7381811141967773,
+     "estoi": 0.6703142890553184,
+     "fer": 0.053237410071942444
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.6828811168670654,
+     "estoi": 0.6488903805665768,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.6496790647506714,
+     "estoi": 0.6804060740483127,
+     "fer": 0.04892086330935252
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.728248953819275,
+     "estoi": 0.669322796955919,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.329611301422119,
+     "estoi": 0.715714486774119,
+     "fer": 0.037333333333333336
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.1043097972869873,
+     "estoi": 0.6859768920724957,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.1547610759735107,
+     "estoi": 0.6868361974784959,
+     "fer": 0.04133333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.047210216522217,
+     "estoi": 0.6903503155496976,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.765181064605713,
+     "estoi": 0.7310695954124294,
+     "fer": 0.016
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.696481943130493,
+     "estoi": 0.7176513073286914,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.6749682426452637,
+     "estoi": 0.6653859251043444,
+     "fer": 0.010666666666666666
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.7314417362213135,
+     "estoi": 0.6612196808875039,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.423396110534668,
+     "estoi": 0.6431739037503736,
+     "fer": 0.029333333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.4000308513641357,
+     "estoi": 0.6391670987963274,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.2398805618286133,
+     "estoi": 0.635678158249585,
+     "fer": 0.04666666666666667
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.358675003051758,
+     "estoi": 0.6350568767826155,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 52 dB-Hz",
+   "scheme": "dn_rep",
+   "raw": {
+    "pesq": 1.3241813977559407,
+    "estoi": 0.45135521094297393
+   },
+   "conceal": {
+    "pesq": 1.3411576218075223,
+    "estoi": 0.46499490605291527
+   },
+   "fer": 0.4511217692512657,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.193217356999715,
+     "estoi": 0.4259273741160216
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.3542742729187012,
+     "estoi": 0.48211243155378253
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.4759812355041504,
+     "estoi": 0.4869449124889418
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.1866952180862427,
+     "estoi": 0.4288083600575985,
+     "fer": 0.4446043165467626
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.156218409538269,
+     "estoi": 0.3968294981329649,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.151764154434204,
+     "estoi": 0.421824589076242,
+     "fer": 0.45755395683453237
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.210439682006836,
+     "estoi": 0.4095034581584557,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.2118340730667114,
+     "estoi": 0.4473097457829738,
+     "fer": 0.4446043165467626
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.2129939794540405,
+     "estoi": 0.47144916605664433,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.2874183654785156,
+     "estoi": 0.4644701861439727,
+     "fer": 0.48
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.3760511875152588,
+     "estoi": 0.4612104703964564,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.2858080863952637,
+     "estoi": 0.4740644775283368,
+     "fer": 0.452
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.297755479812622,
+     "estoi": 0.4577075443800386,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.3946418762207031,
+     "estoi": 0.5064916424652849,
+     "fer": 0.42533333333333334
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.3890161514282227,
+     "estoi": 0.5274192798848524,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.494291067123413,
+     "estoi": 0.4387763890285618,
+     "fer": 0.46
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.3942484855651855,
+     "estoi": 0.47275174556067967,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.4898667335510254,
+     "estoi": 0.4341977337915452,
+     "fer": 0.456
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.4783885478973389,
+     "estoi": 0.4749561224550528,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.4153130054473877,
+     "estoi": 0.44625377461224924,
+     "fer": 0.44
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.5553066730499268,
+     "estoi": 0.5131268694510929,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 52 dB-Hz",
+   "scheme": "dn_conv",
+   "raw": {
+    "pesq": 1.6847693125406902,
+    "estoi": 0.598316630015669
+   },
+   "conceal": {
+    "pesq": 1.6358879407246907,
+    "estoi": 0.5709604101637864
+   },
+   "fer": 0.10382414068745004,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.345453103383382,
+     "estoi": 0.521644916777347
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.7260377804438274,
+     "estoi": 0.5983999403792605
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.8361729383468628,
+     "estoi": 0.5928363733347517
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.4027901887893677,
+     "estoi": 0.5944503664514642,
+     "fer": 0.10647482014388489
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.4063090085983276,
+     "estoi": 0.5352456344215974,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.3899943828582764,
+     "estoi": 0.5845386358687802,
+     "fer": 0.13956834532374102
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.351771354675293,
+     "estoi": 0.5343811851829898,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.4408713579177856,
+     "estoi": 0.5856183719189602,
+     "fer": 0.13237410071942446
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.2782789468765259,
+     "estoi": 0.49530793072745394,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.7388575077056885,
+     "estoi": 0.6197324299960297,
+     "fer": 0.09866666666666667
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.7304065227508545,
+     "estoi": 0.605300553636462,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.6652443408966064,
+     "estoi": 0.613113370621539,
+     "fer": 0.10133333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.5674679279327393,
+     "estoi": 0.5488973305396658,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.9997599124908447,
+     "estoi": 0.647051430425542,
+     "fer": 0.08
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.8802388906478882,
+     "estoi": 0.6410019369616539,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.044477701187134,
+     "estoi": 0.6130988991294776,
+     "fer": 0.064
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.966231346130371,
+     "estoi": 0.6249784894402924,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.8691987991333008,
+     "estoi": 0.5857592682683884,
+     "fer": 0.08266666666666667
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.0079216957092285,
+     "estoi": 0.609138596279715,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.611729621887207,
+     "estoi": 0.54148689746084,
+     "fer": 0.12933333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.5343657732009888,
+     "estoi": 0.5443920342842478,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 56 dB-Hz",
+   "scheme": "sotto_vw",
+   "raw": {
+    "pesq": 2.5708168082767062,
+    "estoi": 0.7123076853276475
+   },
+   "conceal": {
+    "pesq": 2.546516259511312,
+    "estoi": 0.7118991571955297
+   },
+   "fer": 0.002666666666666666,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142
+    },
+    "male_libri3436_15s": {
+     "pesq": 2.7086497942606607,
+     "estoi": 0.7391020535464591
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 2.775705178578695,
+     "estoi": 0.6700826948245152
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": 0.0
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": 0.0
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": 0.0
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.15519380569458,
+     "estoi": 0.7265127232156142,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.9049136638641357,
+     "estoi": 0.748486418348691,
+     "fer": 0.0013333333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.901671886444092,
+     "estoi": 0.7491589570784972,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.5446999073028564,
+     "estoi": 0.7283007047352841,
+     "fer": 0.012
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.4765360355377197,
+     "estoi": 0.7291502525586047,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.8267853260040283,
+     "estoi": 0.7463717183712706,
+     "fer": 0.004
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.747741460800171,
+     "estoi": 0.7389969510022755,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097,
+     "fer": 0.0
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.854776382446289,
+     "estoi": 0.673072723188097,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.84468150138855,
+     "estoi": 0.6700088391532638,
+     "fer": 0.0013333333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.8351666927337646,
+     "estoi": 0.6722671324146735,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.695913076400757,
+     "estoi": 0.6649905945053791,
+     "fer": 0.005333333333333333
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.6371724605560303,
+     "estoi": 0.6649082288707753,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 56 dB-Hz",
+   "scheme": "dn_rep",
+   "raw": {
+    "pesq": 1.6170751651128132,
+    "estoi": 0.5741076192593307
+   },
+   "conceal": {
+    "pesq": 1.6022632122039795,
+    "estoi": 0.5802292963082579
+   },
+   "fer": 0.24376019184652278,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.2809511820475261,
+     "estoi": 0.5587121816450964
+    },
+    "male_libri3436_15s": {
+     "pesq": 1.6573117971420288,
+     "estoi": 0.6125782727268342
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 1.8685266574223836,
+     "estoi": 0.5693974345528433
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.2608836889266968,
+     "estoi": 0.5614114810402158,
+     "fer": 0.2273381294964029
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.2470027208328247,
+     "estoi": 0.5407108595915464,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.3568705320358276,
+     "estoi": 0.5951261721065304,
+     "fer": 0.22158273381294963
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.3552199602127075,
+     "estoi": 0.596223123989481,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.3373734951019287,
+     "estoi": 0.5620421301163964,
+     "fer": 0.2489208633093525
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.240630865097046,
+     "estoi": 0.5392025613542619,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.4946367740631104,
+     "estoi": 0.5696626789840181,
+     "fer": 0.26266666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.5456303358078003,
+     "estoi": 0.5734906793902481,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.5467475652694702,
+     "estoi": 0.605962625044115,
+     "fer": 0.24666666666666667
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.6053495407104492,
+     "estoi": 0.6135601597786801,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.9479899406433105,
+     "estoi": 0.6576888319104839,
+     "fer": 0.25066666666666665
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.820955514907837,
+     "estoi": 0.6506839790115745,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.941803216934204,
+     "estoi": 0.5317607074285844,
+     "fer": 0.26666666666666666
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.8402490615844727,
+     "estoi": 0.5579253473804496,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.9065892696380615,
+     "estoi": 0.5515368362895017,
+     "fer": 0.25333333333333335
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.943743109703064,
+     "estoi": 0.5746245359348404,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 1.76078200340271,
+     "estoi": 0.5317771104141307,
+     "fer": 0.216
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.8215878009796143,
+     "estoi": 0.5756424203432396,
+     "fer": null
+    }
+   ]
+  },
+  {
+   "cond": "446 MHz 60 km/h 56 dB-Hz",
+   "scheme": "dn_conv",
+   "raw": {
+    "pesq": 2.3933024406433105,
+    "estoi": 0.6983050773108445
+   },
+   "conceal": {
+    "pesq": 2.3161597119437323,
+    "estoi": 0.6921340102245938
+   },
+   "fer": 0.012386890487609914,
+   "per_clip": {
+    "female_libri198_14s": {
+     "pesq": 1.9234426418940227,
+     "estoi": 0.6985424343119483
+    },
+    "male_libri3436_15s": {
+     "pesq": 2.419581492741903,
+     "estoi": 0.7156148959892197
+    },
+    "male_ve9qrp_15s": {
+     "pesq": 2.605455001195272,
+     "estoi": 0.6622447003726133
+    }
+   },
+   "rows": [
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 1.9826042652130127,
+     "estoi": 0.7086263373415087,
+     "fer": 0.017266187050359712
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 1.9296033382415771,
+     "estoi": 0.6945518989427459,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 1.9138493537902832,
+     "estoi": 0.7044623882959815,
+     "fer": 0.011510791366906475
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 1.956283450126648,
+     "estoi": 0.7056699226932585,
+     "fer": null
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.142591953277588,
+     "estoi": 0.7054284813844401,
+     "fer": 0.01870503597122302
+    },
+    {
+     "clip": "female_libri198_14s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 1.8844411373138428,
+     "estoi": 0.6954054812998406,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.868145704269409,
+     "estoi": 0.7410270769149875,
+     "fer": 0.010666666666666666
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.5443522930145264,
+     "estoi": 0.7290258274194854,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.2062106132507324,
+     "estoi": 0.6999956729517034,
+     "fer": 0.021333333333333333
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.1442761421203613,
+     "estoi": 0.6900002701554847,
+     "fer": null
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.713437080383301,
+     "estoi": 0.7377043651253897,
+     "fer": 0.004
+    },
+    {
+     "clip": "male_libri3436_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.5701160430908203,
+     "estoi": 0.7278185903926889,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": false,
+     "pesq": 2.7917253971099854,
+     "estoi": 0.6721579534961573,
+     "fer": 0.0026666666666666666
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 1,
+     "conceal": true,
+     "pesq": 2.7317795753479004,
+     "estoi": 0.6693329639012656,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": false,
+     "pesq": 2.47601318359375,
+     "estoi": 0.6509824357382616,
+     "fer": 0.014666666666666666
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 2,
+     "conceal": true,
+     "pesq": 2.478776693344116,
+     "estoi": 0.6579474874993254,
+     "fer": null
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": false,
+     "pesq": 2.4451444149017334,
+     "estoi": 0.6643609845491697,
+     "fer": 0.010666666666666666
+    },
+    {
+     "clip": "male_ve9qrp_15s",
+     "seed": 3,
+     "conceal": true,
+     "pesq": 2.605808734893799,
+     "estoi": 0.6594536497172487,
+     "fer": null
+    }
+   ]
+  }
+ ]
+}

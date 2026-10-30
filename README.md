@@ -6,7 +6,7 @@ target: the TI C5517 in the Yaesu FTM-300D).
 
 ## Contents
 
-- `modem/`: the **softmodem**. It sends and receives YSF frames carrying sotto voice through a radio's 9600 data port and a sound card, or through an SDR (IQ). `python -m modem tx voice.bit tx.wav`, then `python -m modem rx rx.wav voice.bit`. See `docs/softmodem.md`.
+- `modem/`: the **softmodem**. It sends and receives YSF frames carrying sotto voice through a radio's 9600 data port and a sound card, or through an SDR (IQ). `python -m modem tx voice.bit tx.flac`, then `python -m modem rx rx.flac voice.bit`. See `docs/softmodem.md`.
 - `tests/`: `python -m pytest tests`.
 - `tools/build_codec2.sh`: builds c2enc, c2dec and c2sim into `build/codec2/src`.
 - `sim/`: a C4FM (4-level FSK over FM) link simulator with Rayleigh and two-path

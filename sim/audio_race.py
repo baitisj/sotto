@@ -3,11 +3,12 @@
 
 Every run goes through the real receiver (sync search, flywheel, level fit), not a genie.
 
-Usage: python sim/audio_race.py [--quick]
+Usage: python sim/audio_race.py [--quick] [--samples DIR] [--out FILE] [--render DIR]
+  --samples  directory of 8 kHz clips: *.flac, or <clip>__original.wav (default: $SAMPLES)
+  --render   also write decoded speech for each condition and scheme as FLAC into DIR
 Env:   C2BIN    directory with c2enc/c2dec (default build/codec2/src)
-       SAMPLES  directory with <clip>__original.wav at 8 kHz
 """
-import json, os, subprocess, sys, tempfile, time
+import argparse, glob, json, os, subprocess, sys, tempfile, time
 import numpy as np
 import soundfile as sf
 from pesq import pesq
@@ -24,6 +25,19 @@ from modem.payload import SCHEMES
 C2BIN = os.environ.get("C2BIN", os.path.join(os.path.dirname(HERE), "build", "codec2", "src"))
 SAMPLES = os.environ.get("SAMPLES", "/mnt/project-files/vocoder/samples")
 CLIPS = ["hts1a", "hts2a", "kristoff", "ve9qrp_10s"]
+
+
+def load_clips(d):
+    """-> {name: 8 kHz float array}. FLAC files if any, else the <clip>__original.wav set."""
+    flac = sorted(glob.glob(os.path.join(d, "*.flac")))
+    paths = {os.path.splitext(os.path.basename(f))[0]: f for f in flac} or \
+        {c: os.path.join(d, f"{c}__original.wav") for c in CLIPS}
+    out = {}
+    for name, f in paths.items():
+        x, fs = sf.read(f)
+        assert fs == 8000, f"{f}: need 8 kHz"
+        out[name] = x
+    return out
 LEAD = 2400                      # modulator lead-in (samples at 48 kHz)
 
 
@@ -73,11 +87,9 @@ def conditions(quick=False):
     return c[::3] if quick else c
 
 
-def main(quick=False, seeds=(1, 2, 3)):
+def main(quick=False, seeds=(1, 2, 3), samples=SAMPLES, render=None):
     clips = {}
-    for c in CLIPS:
-        x, fs = sf.read(f"{SAMPLES}/{c}__original.wav")
-        assert fs == 8000
+    for c, x in load_clips(samples).items():
         bits = c2enc(np.round(x * 32767))
         clean = c2dec(bits)
         lag = best_lag(x, clean)
@@ -99,7 +111,11 @@ def main(quick=False, seeds=(1, 2, 3)):
                     for conceal in (False, True):
                         fr = rx["frames"] if conceal else rx["raw_frames"]
                         fr = np.concatenate([fr, np.zeros((max(0, n - len(fr)), 48), np.int8)])[:n]
-                        p, e = score(v["ref"], c2dec(fr), v["lag"])
+                        y = c2dec(fr)
+                        p, e = score(v["ref"], y, v["lag"])
+                        if render and conceal and sd == seeds[0]:
+                            tag = cond["name"].replace(" ", "_").replace("/", "")
+                            sf.write(os.path.join(render, f"{c}__{tag}__{name}.flac"), y, 8000, subtype="PCM_16")
                         rows.append(dict(clip=c, seed=sd, conceal=conceal, pesq=p, estoi=e,
                                          fer=float((fr != v["bits"]).any(1).mean()) if not conceal else None))
             agg = {}
@@ -108,6 +124,10 @@ def main(quick=False, seeds=(1, 2, 3)):
                 agg["conceal" if conceal else "raw"] = dict(
                     pesq=float(np.mean([r["pesq"] for r in rr])), estoi=float(np.mean([r["estoi"] for r in rr])))
             agg["fer"] = float(np.mean([r["fer"] for r in rows if r["fer"] is not None]))
+            agg["per_clip"] = {c: dict(
+                pesq=float(np.mean([r["pesq"] for r in rows if r["clip"] == c and r["conceal"]])),
+                estoi=float(np.mean([r["estoi"] for r in rows if r["clip"] == c and r["conceal"]])))
+                for c in clips}
             results["runs"].append(dict(cond=cond["name"], scheme=name, **agg, rows=rows))
             print(json.dumps(dict(cond=cond["name"], scheme=name, sec=round(time.time() - t, 1),
                                   fer=round(agg["fer"], 4),
@@ -117,9 +137,21 @@ def main(quick=False, seeds=(1, 2, 3)):
 
 
 if __name__ == "__main__":
-    quick = "--quick" in sys.argv
-    res = main(quick)
-    out = os.path.join(os.path.dirname(HERE), "docs", "results", "audio_race_quick.json" if quick else "audio_race.json")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--samples", default=SAMPLES)
+    ap.add_argument("--out")
+    ap.add_argument("--render")
+    a = ap.parse_args()
+    if a.render:
+        os.makedirs(a.render, exist_ok=True)
+        for c, x in load_clips(a.samples).items():
+            sf.write(os.path.join(a.render, f"{c}__original.flac"), x, 8000, subtype="PCM_16")
+            sf.write(os.path.join(a.render, f"{c}__codec2_2400_no_channel.flac"),
+                     c2dec(c2enc(np.round(x * 32767))), 8000, subtype="PCM_16")
+    res = main(a.quick, samples=a.samples, render=a.render)
+    out = a.out or os.path.join(os.path.dirname(HERE), "docs", "results",
+                                "audio_race_quick.json" if a.quick else "audio_race.json")
     with open(out, "w") as f:
         json.dump(res, f, indent=1)
     print("wrote", out)

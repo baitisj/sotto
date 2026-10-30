@@ -49,3 +49,33 @@ They are in the project folder, `vocoder/softmodem/samples/`. The clip is ve9qrp
 - The receiver is real, but the channel is the same simplified model as before: a plain discriminator with no AFC and no impulse noise. The absolute dB-Hz values are approximate.
 - PESQ is a rough guide for speech with channel errors, and the clips are short (21 s). Differences under about 0.1 are noise.
 - The vocoder is stock Codec 2 2400. The improved sotto vocoder would move every column up by the same amount.
+
+## Second run: 15 s male and female voices, FLAC (2026-10-30)
+
+The same test was run on longer clips, stored and rendered as 16-bit FLAC: `python sim/audio_race.py --samples DIR --out docs/results/audio_race_15s.json --render OUT`. The clips:
+
+- **Male 1:** 15 s of ve9qrp, from the long Codec 2 test recording.
+- **Male 2:** 15 s of LibriSpeech reader 3436.
+- **Female:** LibriSpeech reader 198, 13.9 s. It is the longest clean female clip reachable from the sandbox. The LibriSpeech clips are CC BY 4.0, taken from Ogg copies.
+
+Each point averages 3 seeds. The table shows PESQ after concealment, with ESTOI in brackets.
+
+| Condition | Scheme | FER | Female | Male (mean) |
+|---|---|---:|---:|---:|
+| No channel | Codec 2 2400 | – | **2.16** (0.73) | **2.88** (0.71) |
+| AWGN 48 dB-Hz | sotto VW | 0.0% | 2.16 (0.73) | 2.88 (0.71) |
+| | DN conv | 0.5% | 1.99 (0.71) | 2.75 (0.71) |
+| | DN rep | 45% | 1.58 (0.62) | 2.17 (0.64) |
+| 446 MHz 60 km/h, 52 dB-Hz | sotto VW | 3.5% | 1.69 (0.66) | 2.39 (0.67) |
+| | DN conv | 10% | 1.35 (0.52) | 1.79 (0.60) |
+| | DN rep | 45% | 1.19 (0.43) | 1.42 (0.48) |
+| 446 MHz 60 km/h, 56 dB-Hz | sotto VW | 0.3% | 2.16 (0.73) | 2.75 (0.70) |
+| | DN conv | 1.2% | 1.92 (0.70) | 2.52 (0.69) |
+| | DN rep | 24% | 1.28 (0.56) | 1.77 (0.59) |
+| 146 MHz 30 km/h, 56 dB-Hz | sotto VW | 4.2% | 1.82 (0.66) | 2.02 (0.64) |
+| | DN conv | 6.4% | 1.59 (0.63) | 1.78 (0.60) |
+
+All 7 conditions, with per-clip values, are in `docs/results/audio_race_15s.json`.
+
+- **The channel ranking is the same for both voices.** sotto VW is best everywhere, and it reaches no-channel quality at 48 dB-Hz without fading and at 56 dB-Hz at UHF.
+- **The female voice loses about 0.7 PESQ in Codec 2 itself, before any channel.** Her ESTOI (intelligibility) is as good as the male voices', so this is a quality gap, not an intelligibility gap. It matches Codec 2's known weakness on higher-pitched voices, where few harmonics carry the spectral envelope. It is a target for the improved vocoder (better spectral envelope at high pitch, MBE-style band voicing). This rests on one female clip from a lossy source, so it needs more female voices to confirm.

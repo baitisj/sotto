@@ -158,7 +158,7 @@ def test_iq_path():
 def test_cli_roundtrip(tmp_path):
     bit = tmp_path / "v.bit"
     np.packbits(CODEC.astype(np.uint8).reshape(-1)).tofile(bit)
-    wav, back = tmp_path / "v.wav", tmp_path / "back.bit"
+    wav, back = tmp_path / "v.flac", tmp_path / "back.bit"
     assert cli(["tx", str(bit), str(wav), "--rate", "44100", "--src", "K1ABC"]) == 0
     assert cli(["rx", str(wav), str(back)]) == 0
     got = np.unpackbits(np.fromfile(back, np.uint8)).reshape(-1, 48)

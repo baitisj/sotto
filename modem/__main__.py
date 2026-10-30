@@ -1,7 +1,7 @@
 """sotto softmodem command line.
 
-  python -m modem tx voice.bit out.wav          Codec 2 2400 bits -> baseband audio
-  python -m modem rx in.wav voice.bit           baseband audio -> Codec 2 2400 bits
+  python -m modem tx voice.bit out.flac         Codec 2 2400 bits -> baseband audio (.flac or .wav)
+  python -m modem rx in.flac voice.bit          baseband audio -> Codec 2 2400 bits
   python -m modem tx voice.bit out.cf32 --iq 240000   ... or FM-modulated IQ for an SDR
   python -m modem rx in.cf32 voice.bit --iq 240000    ... or IQ from an SDR
 
