@@ -148,3 +148,43 @@ def test_v34_conceals_lost_frames():
     assert np.allclose(m["A"][:59], m0["A"][:59])         # frames before the gap untouched
     assert e[2 * 31] > e[2 * 34] + 5                      # level falls through the gap
     assert e[2 * 36] < e[58] - 60                         # silent after max_lost frames
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "c", "sotto_enc")),
+                    reason="C port not built (make -C c)")
+def test_c_port_matches_python():
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import check_c_port as cc
+    x16 = np.round(_ve9qrp(4.0) * 32767).astype(np.int16)
+    x16 = x16[:len(x16) // 160 * 160]
+    vl.TRACK2["lag"] = 8
+    try:
+        v = vl.SottoV36()                                 # the C build's default variant
+        bp = v.encode(x16 / 32767.0)
+    finally:
+        vl.TRACK2.pop("lag")
+    bc = cc.c_encode(x16)
+    assert bc.shape == bp.shape
+    assert np.mean(np.all(bp == bc, 1)) > 0.97            # rare pitch near-ties may differ
+    good = np.ones(len(bp), bool)
+    good[60:64] = False
+    yp = vl.synthesise(v.decode(bp, good))
+    yc = cc.c_decode(bp, good)
+    assert len(yc) == len(yp)
+    assert cc.snr_db(yp, yc) > 60
+
+
+def test_header_level_constants_match_energy_field():
+    """c/sotto.h documents the energy field's scale; check it against the analysis."""
+    import re
+    h = open(os.path.join(ROOT, "c", "sotto.h")).read()
+    const = {k: float(v) for k, v in re.findall(r"#define (SOTTO_\w+_DB\w*) \(?(-?[\d.]+)\)?", h)}
+    a = 10 ** ((-23.0 + 3.0) / 20)                        # a sine at -23 dBFS RMS
+    x = a * np.sin(2 * np.pi * 440 * np.arange(FS) / FS) * 32767 / 32768
+    e = vl.frame_energy_db(vl.analyse(x))[20:-5].mean()
+    assert abs(e - (-23.0 + const["SOTTO_ENERGY_OFFSET_DB"])) < 0.3
+    lo, hi = vl.SottoV0.E_LO, vl.SottoV0.E_HI
+    assert (lo, hi) == (const["SOTTO_ENERGY_MIN_DB"], const["SOTTO_ENERGY_MAX_DB"])
+    step = (hi - lo) / 31
+    assert abs(const["SOTTO_LEVEL_SILENT_DBFS"] - (lo + step / 2 - const["SOTTO_ENERGY_OFFSET_DB"])) < 0.1
+    assert abs(const["SOTTO_LEVEL_MAX_DBFS"] - (hi - const["SOTTO_ENERGY_OFFSET_DB"])) < 0.1

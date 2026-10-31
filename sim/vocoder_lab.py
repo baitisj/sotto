@@ -308,6 +308,7 @@ class SottoV0:
     E_LO, E_HI = 10.0, 80.0
     WO_HI = WO_MAX
     SILENT0 = False             # energy code 0 decodes as silence (v3 on)
+    ENERGY_RK = False           # energy field from the rate-K envelope only (v3.6 on)
 
     def __init__(self, shapeq=None, pf=1.5, pitch="c2"):
         self.pitch = pitch
@@ -346,7 +347,9 @@ class SottoV0:
         if len(m) % 2:
             m = np.concatenate([m, m[-1:]])
         rk = to_rate_k(m)
-        en = frame_energy_db(m)
+        # v3.6: code the energy the decoder can rebuild (the envelope starts at 200 Hz), so a
+        # strong component below it isn't spread over the whole band
+        en = frame_energy_db(from_rate_k(m, rk) if self.ENERGY_RK else m)
         frames = []
         for i in range(0, len(m), 2):
             v = [int(m[i]["voiced"] > 0), int(m[i + 1]["voiced"] > 0)]
@@ -813,6 +816,31 @@ class SottoV35(SottoV34):
     def __init__(self, vq=None, pf=1.35, quiet=None, hold=2, slope=6.0, mix_after=99, max_lost=4):
         super().__init__(vq=vq, pf=pf, quiet=quiet, hold=hold, slope=slope,
                          mix_after=mix_after, max_lost=max_lost)
+
+
+def round_codebook(vq, bits=8):
+    """Copy of a ShapeMSVQ with each stage's values rounded to signed `bits`-bit integers
+    times one scale per stage, as a fixed-point DSP would store them."""
+    q = ShapeMSVQ.__new__(ShapeMSVQ)
+    q.bits, q.m = vq.bits, vq.m
+    lim = 2 ** (bits - 1) - 1
+    q.cb = [(np.round(c / (np.abs(c).max() / lim)) * (np.abs(c).max() / lim)).astype(np.float32).astype(float)
+            for c in vq.cb]
+    return q
+
+
+class SottoV36(SottoV35):
+    """v3.5 for the C5517: the 9+9+8+8 shape codebook (sim/data/shape_msvq_9988.npz) in
+    8-bit values, 29 KB instead of 152 KB (listening round 9: 5 ties of 5), and the energy
+    field measured on the rate-K envelope (200-3700 Hz) rather than on all harmonics. The
+    second change fixes a buzz where a strong hum below 200 Hz had its energy spread over
+    the whole band; over 19 voices PESQ 2.917 -> 2.939, ESTOI 0.800 -> 0.818. Same frame."""
+
+    ENERGY_RK = True
+
+    def __init__(self, vq=None, **kw):
+        vq = vq or round_codebook(ShapeMSVQ.load(os.path.join(HERE, "data", "shape_msvq_9988.npz")))
+        super().__init__(vq=vq, **kw)
 
 
 class _VQAdapter:

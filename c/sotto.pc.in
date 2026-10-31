@@ -1,0 +1,11 @@
+prefix=@PREFIX@
+libdir=@LIBDIR@
+includedir=@INCDIR@
+
+Name: sotto
+Description: sotto 2400 bit/s speech codec
+Version: @VERSION@
+Requires.private: codec2
+Libs: -L${libdir} -lsotto
+Libs.private: -lm
+Cflags: -I${includedir}

@@ -1,0 +1,67 @@
+# sotto in C
+
+A C port of the sotto codec (`sim/vocoder_lab.py`), floating point. It builds v3.6 (`SottoV36`, the
+29 KB codebook for the radio's DSP) by default, and v3.5 (`SottoV35`) with `make VARIANT=v3.5`.
+It encodes 8 kHz speech into 48-bit frames every 20 ms (2400 bit/s) and decodes them back,
+with the same bits as the Python model.
+
+The port reuses Codec 2's sinusoidal analysis and synthesis by linking `libcodec2` (LGPL-2.1,
+built from `codec/codec2/` by `tools/build_codec2.sh`). The code in this directory is MIT.
+
+## Build and run
+
+```sh
+tools/build_codec2.sh          # once: builds build/codec2/src/libcodec2.so
+make -C c                      # needs python3 + numpy to generate the codebook source
+make -C c check                # API test against libsotto.so
+c/sotto_enc in.raw out.bit     # 8 kHz, 16-bit mono raw in; 6 bytes per frame out
+c/sotto_dec out.bit dec.raw [good.u8]
+make -C c install PREFIX=/usr/local
+```
+
+The build produces `libsotto.so` (soname `libsotto.so.0`, version 0.1.0), `libsotto.a`, the
+header `sotto.h` and a pkg-config file (`pkg-config --cflags --libs sotto`). The shared
+library exports only the `sotto_*` functions in `sotto.h`. It needs `libcodec2` at run time:
+the build-tree copy is found through an rpath, and an installed copy through the system's
+library path. `sotto_format()` names the bitstream the library speaks, for example
+`sotto v3.6, shape 9-9-8-8`. A library built with another codebook can't decode its frames.
+
+## Input level
+
+`sotto.h` documents the level scale and gives it as constants. Samples are 16-bit, and
+levels are dBFS of RMS, so a full-scale sine is −3 dBFS. The 5-bit energy field covers
+frames from −76 dBFS (quieter frames decode as silence) to −7.3 dBFS (louder frames
+saturate). Aim for an active speech level near −26 dBFS (`SOTTO_LEVEL_TARGET_DBFS`): the test
+voices sit at −22 to −27 dBFS, and their loudest 10 ms are 3 to 8 dB below saturation. The
+decoder reproduces the coded level. A pytest case checks the constants against the encoder.
+
+`good.u8` is optional: one byte per frame, 0 for a frame that failed its CRC. The decoder
+conceals those frames as v3.5 and v3.6 do (hold 40 ms, fade 6 dB per 20 ms, silent after 80 ms).
+
+## API
+
+See `sotto.h`. The encoder takes 160 samples per call and returns a frame once its pitch
+tracker has 80 ms of look-ahead (the first frame comes on the 6th call); `sotto_enc_flush`
+returns the rest at the end of the stream. The decoder returns 160 samples per frame, 20 ms
+late, because each odd 10 ms half is interpolated with the next frame.
+
+## Checked against Python
+
+`tools/check_c_port.py` encodes clips with both, and decodes the same bits with both (with a
+random 10% frame loss). On 19 voices with v3.5 (`docs/results/c_port_check.json`):
+
+- encoder: 11,170 of 11,173 frames (99.97%) bit-exact. The 3 others are near-ties where the
+  pitch tracker can go either way between two octaves: the C side computes spectra with
+  Codec 2's float FFT, the Python side in double precision. Mean PESQ is 2.472 for the C
+  encoder against 2.475 for Python (with the 10% loss).
+- decoder: given the same bits, the C output matches the Python output to about 100 dB SNR,
+  concealment included.
+- v3.6 (`docs/results/c_port_check_v36.json`): the same 11,170 of 11,173 frames bit-exact,
+  decoders within 96 dB.
+
+## Speed
+
+On one x86 core, the encoder runs at 3% of real time and the decoder at 0.1%. The shape
+vector quantizer's M-best search is 90% of the encoder (about 700,000 multiply-adds per
+frame with the 12+11+11 codebook). See `docs/c-port.md` for the memory and cycle budget on
+the radio's TI C5517 DSP.

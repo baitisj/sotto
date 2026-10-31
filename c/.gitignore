@@ -1,0 +1,8 @@
+sotto_codebook.c
+*.o
+libsotto.a
+libsotto.so*
+sotto.pc
+sotto_enc
+sotto_dec
+test_api

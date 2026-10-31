@@ -305,6 +305,57 @@ The encoder race (3 voices; v3.4 → v3.5 PESQ) shows v3.5 ahead of v3.4 in ever
 
 Against v3, the version on the public listening page, the VHF fading scores are up by 0.13 to 0.29.
 
+## Longer interleaving: two YSF frames (200 ms)
+
+On 2 m at 30 to 60 km/h, about 40% of lost frames came in runs of exactly five: one whole YSF frame (100 ms) wiped out by a fade. `modem/interleave.py` spreads each 100 ms codeword over two consecutive YSF frames. Even payload positions of YSF frame k carry codeword k, and odd positions carry codeword k−1. A fade over one YSF frame now costs two codewords half their bits each, and the convolutional code (rate 0.39) can often rebuild both. The cost is 100 ms more delay, plus one extra voice frame at the end of each transmission.
+
+`tools/interleave_race.py`: 146 MHz, 5 voices × 3 fading seeds, decoded with v3.5. The same channel realisation is used for both depths. Results are in `docs/results/interleave_2m.json`.
+
+| speed | C/N0 (dB-Hz) | PESQ, depth 1 | PESQ, depth 2 | change | frames lost, depth 1 | frames lost, depth 2 |
+|---|---|---|---|---|---|---|
+| 5 km/h | 52 | 1.72 | 1.66 | −0.06 | 19.2% | 19.5% |
+| 5 km/h | 56 | 2.21 | 2.13 | −0.08 | 8.9% | 9.5% |
+| 30 km/h | 52 | 2.02 | 2.19 | +0.16 | 13.5% | 11.3% |
+| 30 km/h | 56 | 2.69 | 2.83 | +0.13 | 3.7% | 2.5% |
+| 60 km/h | 52 | 2.29 | 2.52 | +0.23 | 9.2% | 6.8% |
+| 60 km/h | 56 | 2.91 | 2.94 | +0.04 | 1.7% | 1.0% |
+| 100 km/h | 52 | 2.49 | 2.79 | +0.30 | 6.2% | 3.9% |
+| 100 km/h | 56 | 3.01 | 3.03 | +0.02 | 1.0% | 0.3% |
+
+Depth 2 cuts lost frames by a quarter to two thirds from 30 km/h up, and gains up to 0.30 PESQ where the channel is weak. At walking pace a 2 m fade lasts longer than 200 ms, so spreading doesn't help. Losses then hit two codewords at once, which costs 0.06 to 0.08. Over all eight conditions the mean goes from 2.42 to 2.51. **Depth 2 is the better default for mobile use.** Longer depths would add another 100 ms each for the walking case, which is the case they can't fix.
+
+**Listening round 9** (Jeff, 6 pairs, both sides through the same fades):
+
+| Pair | Channel | Pick | PESQ (depth 1 / depth 2) |
+|---|---|---|---|
+| 1 | 30 km/h, fair | tie | 2.62 / 2.74 |
+| 2 | 60 km/h, weak | depth 2 | 2.04 / 2.42 |
+| 3 | 30 km/h, weak | depth 2 | 2.01 / 1.94 |
+| 8 | 100 km/h, weak | depth 1 | 2.39 / 2.48 |
+| 10 | 60 km/h, weak, "depth 1 has more distortion" | depth 2 | 1.81 / 1.88 |
+| 12 | 5 km/h, weak, "depth 2 drops 'white' less but it sounds like 'wolf'" | depth 1 | 1.90 / 2.00 |
+
+That makes 3 wins for depth 2, 2 for depth 1 and 1 tie. Ears and PESQ disagree on three of the pairs. Depth 2 loses fewer frames, but it changes which words break, and a half-rebuilt word can sound wrong rather than missing. This is a lean towards depth 2, not a clear win. Keep it as an option and test more pairs at 60 to 100 km/h before making it the default.
+
+## v3.6: the DSP codebook and envelope-band energy
+
+**Start-up buzz (round 9, pair 5).** Jeff heard a high-frequency "chirp" in the first second of EARS p020, in both codebooks. The clip opens with a ~95 Hz hum: H1 is 33 dB above H2, and nearly all of the energy is below 200 Hz. The rate-K envelope starts at 200 Hz, so the decoder can't place that energy where it belongs. Meanwhile the energy field still carried it, so `set_energy` spread it over 200-3700 Hz. The result was a buzz with 25 dB too much energy above 2.5 kHz. Weaker versions of the same thing happen in low male voices: in 40% of frames, most of the energy is in harmonics below 200 Hz.
+
+**Fix (encoder only, same frame).** Code the energy of the envelope the decoder can rebuild, `frame_energy_db(from_rate_k(m, to_rate_k(m)))`, instead of all harmonics. Over 19 voices, no channel, 80 ms tracker:
+
+| Energy field | PESQ | ESTOI |
+|---|---|---|
+| All harmonics (v3.5) | 2.917 | 0.800 |
+| Envelope band only | 2.939 | 0.818 |
+
+ESTOI improves on 14 of 19 voices, most on the EARS studio voices. PESQ drops on one voice (EARS p047, 2.90 to 2.77).
+
+**`SottoV36`** = v3.5 + the 9 + 9 + 8 + 8 codebook in 8-bit values (round 9: 5 ties of 5) + envelope-band energy. The C port builds it (now by default; `make -C c VARIANT=v3.5` for the old one). Listening round 10 put v3.5 against v3.6 on 10 voices, including p020 and p047. Jeff picked v3.6 twice: LibriSpeech 652, and p020, where v3.6 "has much better sound as the speaker inhales" and the opening buzz is gone. The other 8 were ties, including p047, and the null pair was answered correctly. **v3.6 is now the C port's default.**
+
+Still open from round 10:
+- Faint high-frequency "squeaks" in p020's first second in both versions.
+- A rough rendering of background noise in LibriSpeech 3081, in both versions.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC. (Partly solved later with Speech Commands, see above.)
@@ -312,7 +363,8 @@ The shape quantizer is trained on about 2 minutes of speech, nearly all from one
 ## Next
 
 1. Done: the public listening page uses v3.5 (rounds 7 and 8).
-2. The C port of v3.5 for the C5517 (deferred at Jeff's request). Use a fixed tracker look-ahead of 8 frames (80 ms).
-3. Longer interleaving across two YSF frames (200 ms) for 30 to 60 km/h. At walking pace, fades outlast any usable interleaver, so concealment carries that case.
-4. Retrain the codebook on VCTK or more LibriSpeech (train-clean-100) when someone can upload it.
-5. Still open by ear: the 390 Hz voice (Codec 2 preferred twice, though v3 is closer to that band-limited original).
+2. Done: float C port of v3.5 in `c/`, bit-exact with Python on 99.97% of frames (`docs/c-port.md`). Next is fixed point for the C5517, starting with Codec 2's analysis and synthesis.
+3. Done: depth-2 interleaving (200 ms): +0.02 to +0.30 PESQ from 30 km/h up (most on weak signals), −0.07 at walking pace. Round 9 by ear: depth 2 won 3, lost 2, tied 1. Test more fast-mobile pairs before making it the default.
+4. Done: v3.6 (29 KB codebook + envelope-band energy) won round 10 (2 wins, 8 ties) and is the C default. Next: the public page, and background noise (LibriSpeech 3081 in round 10).
+5. Retrain the codebook on VCTK or more LibriSpeech (train-clean-100) when someone can upload it.
+6. Still open by ear: the 390 Hz voice (Codec 2 preferred twice, though v3 is closer to that band-limited original).
