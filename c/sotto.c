@@ -64,6 +64,14 @@
 
 #define MBEST 8
 
+/* v3.6: energy field from the rate-K envelope (vocoder_lab.SottoV36). Build with
+   make VARIANT=v3.6, which also picks the 9+9+8+8 codebook in 8-bit values. */
+#ifdef SOTTO_V36
+#define SOTTO_ENERGY_RK 1
+#else
+#define SOTTO_ENERGY_RK 0
+#endif
+
 static const double PI_D = 3.14159265358979323846;
 #define WO_MIN (2 * PI_D / 160)
 #define WO_HI (2 * PI_D / 16)
@@ -125,7 +133,7 @@ static int n_harm(float wo) {
 const char *sotto_format(void) {
   static char buf[64];
   if (!buf[0]) {
-    int n = snprintf(buf, sizeof buf, "sotto v3.5, shape ");
+    int n = snprintf(buf, sizeof buf, "sotto %s, shape ", SOTTO_ENERGY_RK ? "v3.6" : "v3.5");
     for (int s = 0; s < sotto_cb_stages && n < (int)sizeof buf; s++)
       n += snprintf(buf + n, sizeof buf - n, s ? "-%d" : "%d", sotto_cb_bits[s]);
   }
@@ -450,6 +458,14 @@ static void decide(struct sotto_enc *e, long t, int k) {
     }
     msvq_search(c, e->idx_e);
     e->wo_e = wo;
+    if (SOTTO_ENERGY_RK) {   /* energy of from_rate_k(m, rk), as SottoV36 codes it */
+      float s2 = 0;
+      for (int h = 1; h <= m.L; h++) {
+        float a = (float)pow(10, interp(h * (double)m.Wo * FS / (2 * PI_D), kfreq, rk, K) / 20);
+        s2 += a * a;
+      }
+      en = 10.0f * log10f(s2 + 1e-9f);
+    }
     e->en_e = en;
     e->cls_e = cls;
   } else {

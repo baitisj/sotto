@@ -337,6 +337,21 @@ Depth 2 cuts lost frames by a quarter to two thirds from 30 km/h up, and gains u
 
 That makes 3 wins for depth 2, 2 for depth 1 and 1 tie. Ears and PESQ disagree on three of the pairs. Depth 2 loses fewer frames, but it changes which words break, and a half-rebuilt word can sound wrong rather than missing. This is a lean towards depth 2, not a clear win. Keep it as an option and test more pairs at 60 to 100 km/h before making it the default.
 
+## v3.6: the DSP codebook and envelope-band energy
+
+**Start-up buzz (round 9, pair 5).** Jeff heard a high-frequency "chirp" in the first second of EARS p020, in both codebooks. The clip opens with a ~95 Hz hum: H1 is 33 dB above H2, and nearly all of the energy is below 200 Hz. The rate-K envelope starts at 200 Hz, so the decoder can't place that energy where it belongs. Meanwhile the energy field still carried it, so `set_energy` spread it over 200-3700 Hz. The result was a buzz with 25 dB too much energy above 2.5 kHz. Weaker versions of the same thing happen in low male voices: in 40% of frames, most of the energy is in harmonics below 200 Hz.
+
+**Fix (encoder only, same frame).** Code the energy of the envelope the decoder can rebuild, `frame_energy_db(from_rate_k(m, to_rate_k(m)))`, instead of all harmonics. Over 19 voices, no channel, 80 ms tracker:
+
+| Energy field | PESQ | ESTOI |
+|---|---|---|
+| All harmonics (v3.5) | 2.917 | 0.800 |
+| Envelope band only | 2.939 | 0.818 |
+
+ESTOI improves on 15 of 19 voices, most on the EARS studio voices. PESQ drops on one voice (EARS p047, 2.90 to 2.77).
+
+**`SottoV36`** = v3.5 + the 9 + 9 + 8 + 8 codebook in 8-bit values (round 9: 5 ties of 5) + envelope-band energy. The C port builds it with `make -C c VARIANT=v3.6`, and the check against Python is bit-exact on 2 voices apart from one tracker near-tie frame. Listening round 10 puts v3.5 against v3.6 on 10 voices, including p020 and p047.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC. (Partly solved later with Speech Commands, see above.)

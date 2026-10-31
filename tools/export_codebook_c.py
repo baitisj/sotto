@@ -1,14 +1,16 @@
 """Write the shape codebook (sim/data/shape_msvq_34.npz) as C source for c/.
 
-Usage: python tools/export_codebook_c.py [CODEBOOK.npz] OUT.c
+Usage: python tools/export_codebook_c.py [--round BITS] [CODEBOOK.npz] OUT.c
 
 The float32 values are written with 9 significant digits, so the C codebook is bit-exact.
+--round 8 first rounds each stage to 8-bit integers times a scale, as
+vocoder_lab.round_codebook does for v3.6.
 """
 import sys
 import numpy as np
 
 
-def main(src, out):
+def main(src, out, round_bits=0):
     d = np.load(src)
     bits = [int(b) for b in d["bits"]]
     with open(out, "w") as f:
@@ -18,7 +20,11 @@ def main(src, out):
         f.write("const int sotto_cb_stages = %d;\n" % len(bits))
         f.write("const int sotto_cb_bits[] = {%s};\n\n" % ", ".join(map(str, bits)))
         for s, b in enumerate(bits):
-            cb = d[f"stage{s}"].astype(np.float32)
+            cb = d[f"stage{s}"].astype(np.float32).astype(float)
+            if round_bits:
+                lim = 2 ** (round_bits - 1) - 1
+                cb = np.round(cb / (np.abs(cb).max() / lim)) * (np.abs(cb).max() / lim)
+            cb = cb.astype(np.float32)
             assert cb.shape == (2 ** b, 19)
             f.write("static const float stage%d[%d] = {\n" % (s, cb.size))
             for row in cb:
@@ -30,4 +36,7 @@ def main(src, out):
 
 if __name__ == "__main__":
     a = sys.argv[1:]
-    main(a[0] if len(a) > 1 else "sim/data/shape_msvq_34.npz", a[-1])
+    rb = 0
+    if a and a[0] == "--round":
+        rb, a = int(a[1]), a[2:]
+    main(a[0] if len(a) > 1 else "sim/data/shape_msvq_34.npz", a[-1], rb)

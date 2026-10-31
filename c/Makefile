@@ -3,11 +3,20 @@
 #   make check           API test against the shared library
 #   make install PREFIX=/usr/local   library, header and pkg-config file
 #   make CODEC2_SRC=... CODEC2_LIB=...   to use another Codec 2 tree
+#   make clean all VARIANT=v3.6   for v3.6 (the C5517 codebook)
 #   make clean all CODEBOOK=sim/data/shape_msvq_9988.npz   for another codebook
 CODEC2_SRC ?= ../codec/codec2/src
 CODEC2_LIB ?= ../build/codec2/src
 PYTHON ?= python3
+# VARIANT=v3.6: 9+9+8+8 codebook in 8-bit values, energy from the rate-K envelope
+VARIANT ?= v3.5
+ifeq ($(VARIANT),v3.6)
+CODEBOOK ?= sim/data/shape_msvq_9988.npz
+CBROUND = --round 8
+CFLAGS_VARIANT = -DSOTTO_V36
+else
 CODEBOOK ?= sim/data/shape_msvq_34.npz
+endif
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
 INCDIR ?= $(PREFIX)/include
@@ -17,14 +26,14 @@ VERSION = 0.1.0
 SONAME = libsotto.so.$(MAJOR)
 
 CFLAGS ?= -O2 -g -Wall -Wextra -Wno-unused-parameter
-CFLAGS += -std=c99 -ffp-contract=off -fPIC -fvisibility=hidden -I$(CODEC2_SRC) -I$(CODEC2_LIB)/.. -I.
+CFLAGS += $(CFLAGS_VARIANT) -std=c99 -ffp-contract=off -fPIC -fvisibility=hidden -I$(CODEC2_SRC) -I$(CODEC2_LIB)/.. -I.
 # the build-tree Codec 2 is found through an rpath; installed copies use the system path
 C2LIBS = -L$(CODEC2_LIB) -Wl,-rpath,$(abspath $(CODEC2_LIB)) -lcodec2 -lm
 
 all: libsotto.so libsotto.a sotto_enc sotto_dec
 
 sotto_codebook.c: ../$(CODEBOOK) ../tools/export_codebook_c.py
-	cd .. && $(PYTHON) tools/export_codebook_c.py $(CODEBOOK) c/sotto_codebook.c
+	cd .. && $(PYTHON) tools/export_codebook_c.py $(CBROUND) $(CODEBOOK) c/sotto_codebook.c
 
 sotto.o: sotto.c sotto.h sotto_codebook.h
 sotto_codebook.o: sotto_codebook.c sotto_codebook.h
