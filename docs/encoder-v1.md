@@ -324,6 +324,19 @@ On 2 m at 30 to 60 km/h, about 40% of lost frames came in runs of exactly five: 
 
 Depth 2 cuts lost frames by a quarter to two thirds from 30 km/h up, and gains up to 0.30 PESQ where the channel is weak. At walking pace a 2 m fade lasts longer than 200 ms, so spreading doesn't help. Losses then hit two codewords at once, which costs 0.06 to 0.08. Over all eight conditions the mean goes from 2.42 to 2.51. **Depth 2 is the better default for mobile use.** Longer depths would add another 100 ms each for the walking case, which is the case they can't fix.
 
+**Listening round 9** (Jeff, 6 pairs, both sides through the same fades):
+
+| Pair | Channel | Pick | PESQ (depth 1 / depth 2) |
+|---|---|---|---|
+| 1 | 30 km/h, fair | tie | 2.62 / 2.74 |
+| 2 | 60 km/h, weak | depth 2 | 2.04 / 2.42 |
+| 3 | 30 km/h, weak | depth 2 | 2.01 / 1.94 |
+| 8 | 100 km/h, weak | depth 1 | 2.39 / 2.48 |
+| 10 | 60 km/h, weak, "depth 1 has more distortion" | depth 2 | 1.81 / 1.88 |
+| 12 | 5 km/h, weak, "depth 2 drops 'white' less but it sounds like 'wolf'" | depth 1 | 1.90 / 2.00 |
+
+That makes 3 wins for depth 2, 2 for depth 1 and 1 tie. Ears and PESQ disagree on three of the pairs. Depth 2 loses fewer frames, but it changes which words break, and a half-rebuilt word can sound wrong rather than missing. This is a lean towards depth 2, not a clear win. Keep it as an option and test more pairs at 60 to 100 km/h before making it the default.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC. (Partly solved later with Speech Commands, see above.)
@@ -332,7 +345,7 @@ The shape quantizer is trained on about 2 minutes of speech, nearly all from one
 
 1. Done: the public listening page uses v3.5 (rounds 7 and 8).
 2. Done: float C port of v3.5 in `c/`, bit-exact with Python on 99.97% of frames (`docs/c-port.md`). Next is fixed point for the C5517, starting with Codec 2's analysis and synthesis.
-3. Done: depth-2 interleaving (200 ms): +0.02 to +0.30 PESQ from 30 km/h up (most on weak signals), −0.07 at walking pace. Make it the default for mobile use.
-4. v3.6: the 9 + 9 + 8 + 8 codebook (29 KB as 8-bit values, a quarter of the search) scores the same as the shipped one by PESQ. Check by ear, then switch so the PC tools and the DSP share it.
+3. Done: depth-2 interleaving (200 ms): +0.02 to +0.30 PESQ from 30 km/h up (most on weak signals), −0.07 at walking pace. Round 9 by ear: depth 2 won 3, lost 2, tied 1. Test more fast-mobile pairs before making it the default.
+4. v3.6: the 9 + 9 + 8 + 8 codebook (29 KB as 8-bit values, a quarter of the search) scores the same as the shipped one by PESQ, and round 9 heard no difference (5 ties out of 5). Switch to it so the PC tools and the DSP share it.
 5. Retrain the codebook on VCTK or more LibriSpeech (train-clean-100) when someone can upload it.
 6. Still open by ear: the 390 Hz voice (Codec 2 preferred twice, though v3 is closer to that band-limited original).

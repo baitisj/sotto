@@ -80,6 +80,9 @@ beats another.
 - Switching codebooks changes the bitstream, so the radio and the PC tools must use the
   same one. The Python default (`SottoV35`) still uses the 12 + 11 + 11 book. The switch
   should be a named version, v3.6, after a listening check.
+- **Listening round 9:** v3.5 against the 9 + 9 + 8 + 8 codebook in 8-bit values gave
+  5 ties out of 5, on held-out voices with no radio channel (Jeff). The null pair was
+  answered correctly. The small codebook can become v3.6.
 - Rounding to 8 bits costs about 0.01 PESQ. Rounding to 6 bits costs about 0.02.
 
 ## Fixed point: the plan
