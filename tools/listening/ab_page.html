@@ -1,0 +1,178 @@
+<title>sotto Listening Test {{ROUND}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: one narrow answer sheet, a row per pair, the answer string pinned at the end. */
+  :root {
+    --bg: #f6f7f4; --surface: #ffffff; --fg: #1c211e; --muted: #5f6862; --line: #dde2dc;
+    --accent: #2c6a55; --accent-ink: #ffffff; --accent-soft: #e2efe9; --same: #6b6150; --same-soft: #efebe2;
+    --body: "Atkinson Hyperlegible", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141816; --surface: #1c211e; --fg: #e8ece8; --muted: #9ba59f; --line: #2d3430;
+      --accent: #7cc7aa; --accent-ink: #0f1a15; --accent-soft: #1f3129; --same: #c9bb9c; --same-soft: #2c2820;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141816; --surface: #1c211e; --fg: #e8ece8; --muted: #9ba59f; --line: #2d3430;
+    --accent: #7cc7aa; --accent-ink: #0f1a15; --accent-soft: #1f3129; --same: #c9bb9c; --same-soft: #2c2820;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body); }
+  main { max-width: 760px; margin: 0 auto; padding-block: 32px 64px;
+         padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+         display: grid; gap: 20px; }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0; text-wrap: balance; }
+  p { margin: 0; max-width: 65ch; }
+  .muted { color: var(--muted); }
+  .how { display: grid; gap: 8px; }
+  .how ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+  .pairs { display: grid; gap: 12px; }
+  .pair { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+          display: grid; gap: 12px; }
+  .pair header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .pair h2 { font-size: 1rem; margin: 0; }
+  .pair h2 span { color: var(--muted); font-weight: 400; }
+  .state { font: 500 0.8rem var(--mono); color: var(--muted); letter-spacing: 0.02em; }
+  .state.done { color: var(--accent); }
+  .players { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .player { display: grid; gap: 6px; min-width: 0; }
+  .player b { font: 500 0.85rem var(--mono); letter-spacing: 0.06em; }
+  .player.orig b { color: var(--muted); font-weight: 400; }
+  audio { width: 100%; height: 36px; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; }
+  .choices button { font: inherit; font-size: 0.95rem; padding: 9px 10px; border-radius: 8px; cursor: pointer;
+                    border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+  .choices button:hover { border-color: var(--accent); }
+  .choices button:focus-visible, .copy:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .choices button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .choices button.same[aria-pressed="true"] { background: var(--same-soft); color: var(--same); border-color: var(--same); }
+  .answer { display: grid; gap: 8px; background: var(--accent-soft); border-radius: 10px; padding: 16px; }
+  .answer h2 { font-size: 1.05rem; margin: 0; }
+  label { font-size: 0.9rem; color: var(--muted); }
+  input[type=text] { font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+                     background: var(--surface); color: var(--fg); }
+  textarea { font: 0.92rem/1.45 var(--mono); width: 100%; min-height: 4.5em; padding: 10px; border-radius: 8px;
+             border: 1px solid var(--line); background: var(--surface); color: var(--fg); resize: vertical; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .copy { font: inherit; font-weight: 700; padding: 9px 16px; border-radius: 8px; border: 0; cursor: pointer;
+          background: var(--accent); color: var(--accent-ink); }
+  .note { font-size: 0.85rem; color: var(--muted); }
+  @media (max-width: 520px) {
+    .players { grid-template-columns: 1fr; }
+    .choices { grid-template-columns: 1fr 1fr; }
+    .choices .same { grid-column: 1 / -1; }
+  }
+</style>
+
+<main>
+  <header class="how">
+    <h1>sotto listening test {{ROUND}}: blind A/B, {{TITLE}}</h1>
+    {{INTRO}}
+    <ul class="muted">
+      <li>Headphones help. Listen for warbling or "springy" sounds, buzziness, muffled or hoarse vowels, and anything that makes words harder to follow.</li>
+      <li>Play each clip as often as you like. Only one plays at a time. Tapping or dragging on a progress bar starts that clip from there.</li>
+      <li>"No significant difference" is a useful answer, not a skip.</li>
+    </ul>
+  </header>
+
+  <section class="pairs" id="pairs" aria-label="Listening pairs"></section>
+
+  <section class="answer" aria-labelledby="answer-h">
+    <h2 id="answer-h">Your answers</h2>
+    <label for="notes">Anything you noticed (optional)</label>
+    <input type="text" id="notes" placeholder="e.g. pair 5: A pops in the dropouts">
+    <label for="out">Copy this and paste it back in the thread</label>
+    <textarea id="out" readonly></textarea>
+    <div class="row">
+      <button class="copy" id="copy" type="button">Copy answers</button>
+      <span class="note" id="copied" aria-live="polite"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+  const TRIALS = {{TRIALS}};
+  const KEY = "sotto-ab-{{ROUND}}";
+  let picks = {};
+  try { picks = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { picks = {}; }
+
+  const host = document.getElementById("pairs");
+  const out = document.getElementById("out");
+  const notes = document.getElementById("notes");
+  try { notes.value = localStorage.getItem(KEY + "-notes") || ""; } catch (e) {}
+
+  const LABEL = { A: "A is better", B: "B is better", "=": "No significant difference" };
+
+  function render() {
+    const parts = TRIALS.map(t => `${t.n}:${picks[t.n] || "-"}`);
+    const done = TRIALS.filter(t => picks[t.n]).length;
+    let s = `sotto-ab-{{ROUND}} ${parts.join(" ")}`;
+    if (notes.value.trim()) s += ` | ${notes.value.trim()}`;
+    out.value = s;
+    for (const t of TRIALS) {
+      const st = document.getElementById(`st${t.n}`);
+      st.textContent = picks[t.n] ? LABEL[picks[t.n]] : "not answered";
+      st.classList.toggle("done", !!picks[t.n]);
+      for (const b of document.querySelectorAll(`[data-n="${t.n}"]`)) b.setAttribute("aria-pressed", String(picks[t.n] === b.dataset.v));
+    }
+    document.getElementById("answer-h").textContent = `Your answers (${done} of ${TRIALS.length})`;
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(picks)); localStorage.setItem(KEY + "-notes", notes.value); } catch (e) {}
+  }
+
+  for (const t of TRIALS) {
+    const card = document.createElement("article");
+    card.className = "pair";
+    card.innerHTML = `
+      <header><h2>Pair ${t.n} <span>· ${t.voice}</span></h2><span class="state" id="st${t.n}"></span></header>
+      <div class="players">
+        <div class="player orig"><b>Original</b><audio controls preload="metadata" src="audio/t${t.n}o.wav"></audio></div>
+        <div class="player"><b>A</b><audio controls preload="metadata" src="audio/t${t.n}a.wav"></audio></div>
+        <div class="player"><b>B</b><audio controls preload="metadata" src="audio/t${t.n}b.wav"></audio></div>
+      </div>
+      <div class="choices" role="group" aria-label="Pair ${t.n} choice">
+        <button type="button" id="p${t.n}a" data-n="${t.n}" data-v="A" aria-pressed="false">A is better</button>
+        <button type="button" id="p${t.n}b" data-n="${t.n}" data-v="B" aria-pressed="false">B is better</button>
+        <button type="button" id="p${t.n}s" class="same" data-n="${t.n}" data-v="=" aria-pressed="false">No significant difference</button>
+      </div>`;
+    host.append(card);
+  }
+
+  host.addEventListener("click", e => {
+    const b = e.target.closest("button[data-n]");
+    if (!b) return;
+    const n = b.dataset.n;
+    picks[n] = picks[n] === b.dataset.v ? undefined : b.dataset.v;
+    if (!picks[n]) delete picks[n];
+    save(); render();
+  });
+  notes.addEventListener("input", () => { save(); render(); });
+
+  // a tap or drag on a progress bar plays from there
+  document.addEventListener("seeked", e => {
+    const a = e.target;
+    if (a.tagName === "AUDIO" && a.paused && !a.ended) a.play().catch(() => {});
+  }, true);
+
+  document.addEventListener("play", e => {
+    for (const a of document.querySelectorAll("audio")) if (a !== e.target) a.pause();
+  }, true);
+
+  document.getElementById("copy").addEventListener("click", () => {
+    const msg = document.getElementById("copied");
+    const fallback = () => { out.focus(); out.select(); msg.textContent = "Selected. Press Ctrl+C or Cmd+C to copy."; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(out.value).then(() => { msg.textContent = "Copied."; }, fallback);
+    } else fallback();
+  });
+
+  render();
+</script>

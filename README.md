@@ -13,6 +13,7 @@ Compare sotto with Fusion-style protection over a simulated weak mobile signal, 
 - `modem/`: the **softmodem**. It sends and receives YSF frames carrying sotto voice through a radio's 9600 data port and a sound card, or through an SDR (IQ). `python -m modem tx voice.bit tx.flac`, then `python -m modem rx rx.flac voice.bit`. See `docs/softmodem.md`.
 - `tests/`: `python -m pytest tests`.
 - `c/`: the **C port** of the sotto v3.5 encoder and decoder (float, links Codec 2). `make -C c`, then `c/sotto_enc in.raw out.bit` and `c/sotto_dec out.bit out.raw`. See `c/README.md` and `docs/c-port.md` for the plan to run it on the radio's DSP.
+- `tools/listening/` and `docs/listening-tests.md`: the blind A/B listening-test pages used to check each codec change by ear.
 - `tools/build_codec2.sh`: builds c2enc, c2dec and c2sim into `build/codec2/src`.
 - `sim/`: a C4FM (4-level FSK over FM) link simulator with Rayleigh and two-path
   fading; an FEC race (`fec_race.py`); a waveform race (`waveform_race.py`, `vw_race.py`); and an
