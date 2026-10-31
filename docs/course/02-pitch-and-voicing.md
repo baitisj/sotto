@@ -44,7 +44,7 @@ In the code, the number of harmonics is called **L**, and their loudnesses are c
 
 ## Pitch tracking
 
-A **pitch tracker** (or pitch estimator) is the part of the encoder that measures the pitch. sotto v0 borrows Codec 2's tracker, called **NLP** ("non-linear pitch"). Roughly, it:
+A **pitch tracker** (or pitch estimator) is the part of the encoder that measures the pitch. sotto starts from Codec 2's tracker, called **NLP** ("non-linear pitch"). Roughly, it:
 
 1. squares the signal, which makes the buzz rate stand out even when the lowest harmonic is weak (as it is on a phone line),
 2. looks for the strongest repeating rate between 50 and 400 Hz,
@@ -54,7 +54,25 @@ A **pitch tracker** (or pitch estimator) is the part of the encoder that measure
 
 The top two pictures are **spectrograms**: time goes across, frequency goes up, and darker means louder. You can see the harmonics as thin parallel stripes. They're closer together for the man (low pitch) and further apart for the woman (higher pitch). When the stripes bend, the pitch is changing.
 
-The bottom graph is what the pitch tracker reported. For the man it is smooth, around 95 Hz. For the woman it **jumps**: sometimes to about 350 Hz, sometimes down near 60 Hz. Her real pitch doesn't do that. These are **pitch errors**, often *octave errors*, where the tracker locks onto double or half the true pitch. A wrong pitch puts the harmonics in the wrong places, and it is one reason sotto currently sounds worse on women's voices. Better pitch tracking is on sotto's to-do list.
+The third graph shows the pitch that sotto measured. For the man it is smooth, around 95 Hz.
+
+### Octave errors, and how sotto v1 catches them
+
+The bottom graph shows the woman's pitch two ways. Codec 2's tracker (gray) **jumps**: sometimes up near 350 Hz for a moment, sometimes down near 60 Hz. Her real pitch doesn't move like that. These are **octave errors**, where the tracker locks onto double or half the true pitch. Doubling and halving fit the harmonics almost as well as the truth: if the true pitch is 180 Hz, a "pitch" of 90 Hz also has a harmonic at 180, 360, 540 Hz and so on.
+
+How common is it? Compared with a careful offline pitch tracker (pYIN), Codec 2's pitch was off by more than 20% on about 32% of the woman's voiced frames, against 14% and 6% for the two men. A wrong pitch puts the harmonics in the wrong places, and this was a main reason sotto v0 sounded worse on her voice.
+
+**sotto v1's tracker** (orange) starts from Codec 2's answer and fixes the jumps. For every frame in a stretch of voiced speech it considers three candidates: Codec 2's pitch, double it, and half it, each fine-tuned. Then it picks one candidate per frame, choosing the path through the whole stretch that scores best on three things:
+
+1. **Fit**: how well the harmonics at that pitch match the spectrum, up to 2,500 Hz.
+2. **A slight preference for the higher pitch**, because half the true pitch fits almost as well as the truth (the 90 Hz example above).
+3. **A penalty for jumping** between neighboring frames, because real pitch glides smoothly.
+
+Finding the best path through all those choices is done with the **Viterbi algorithm**, the same method the radio receiver uses to fix bit errors (chapter 6). One extra rule: the doubled and halved candidates must stay above 70 Hz, so it doesn't halve a low man's voice.
+
+It isn't perfect. Around 3.0–3.5 seconds both trackers put her near 330 Hz, and a simple check there can't tell whether that's right or an octave too high. And because the tracker looks at the whole voiced stretch before deciding, it needs to see ahead. A real-time version will have to decide after seeing only 40 to 60 ms ahead.
+
+It does help. With only the tracker changed (nothing rounded yet), the woman's score rose from 2.77 to 3.10, and the men's went up a little too (scores are PESQ, chapter 7).
 
 ## Voicing
 
@@ -67,7 +85,7 @@ It then double-checks with a simple rule: buzzes have most of their energy at lo
 
 sotto sends one voicing decision (1 bit: yes or no) for each 10 ms half of a frame, so 2 bits per 20 ms frame.
 
-Real speech isn't always one or the other. A "z" or a "v" is a buzz *and* a hiss at the same time. A single yes/no can't describe that. Some vocoders (called MBE and MELP) send a separate voicing decision for different frequency bands. That's another idea on sotto's to-do list.
+Real speech isn't always one or the other. A "z" or a "v" is a buzz *and* a hiss at the same time. A single yes/no can't describe that. Some vocoders (called MBE and MELP) send a separate voicing decision for different frequency bands. The team tried a version of this ("band voicing") for v1. It made no difference to the computer scores, so it's waiting until people can listen to it.
 
 ## How pitch is written in the code
 
@@ -87,7 +105,8 @@ So 95 Hz is Wo ≈ 0.075 radians per sample. The number of harmonics is L = ⌊�
 
 - `codec/codec2/src/nlp.c`: the NLP pitch tracker.
 - `codec/codec2/src/sine.c`: `est_voicing_mbe()`, the voicing detector.
-- `sim/vocoder_lab.py`: `analyse()` runs Codec 2's analysis (`c2sim --modelout`) and returns one record per 10 ms with `Wo`, `L`, `A`, `phi` and `voiced`.
+- `sim/sinusoid.py`: `track_pitch()`, sotto v1's octave-correcting tracker, and a Python copy of Codec 2's analysis.
+- `sim/vocoder_lab.py`: `analyse()` runs Codec 2's analysis (`c2sim --modelout`) and returns one record per 10 ms with `Wo`, `L`, `A`, `phi` and `voiced`. `analyse(x, "tracked")` uses sotto's tracker instead.
 
 <details markdown="1"><summary>Answers</summary>
 

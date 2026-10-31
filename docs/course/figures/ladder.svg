@@ -133,7 +133,7 @@ L 0 3.5
       </g>
      </g>
      <g id="text_8">
-      <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; fill: #52514e" transform="translate(540.76685 291.650963)">sotto v0</text>
+      <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; fill: #52514e" transform="translate(540.76685 291.650963)">sotto v1</text>
       <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; fill: #52514e" transform="translate(540.25021 301.853287)">(48 bits)</text>
      </g>
     </g>
@@ -325,12 +325,12 @@ z
 " style="stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
     </defs>
     <g clip-path="url(#pb35410007d)">
-     <use xlink:href="#m751312ebd2" x="558.084272" y="164.003621" style="fill: #2a78d6; stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
+     <use xlink:href="#m751312ebd2" x="558.084272" y="170.110122" style="fill: #2a78d6; stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
     </g>
    </g>
    <g id="line2d_29">
     <path d="M 489.240116 166.664447 
-L 558.084272 164.003621 
+L 558.084272 170.110122 
 " clip-path="url(#pb35410007d)" style="fill: none; stroke-dasharray: 3.6,3.6; stroke-dashoffset: 0; stroke: #2a78d6; stroke-width: 1.2"/>
    </g>
    <g id="line2d_30">
@@ -375,12 +375,12 @@ z
 " style="stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
     </defs>
     <g clip-path="url(#pb35410007d)">
-     <use xlink:href="#ma005720304" x="558.084272" y="133.042179" style="fill: #1baf7a; stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
+     <use xlink:href="#ma005720304" x="558.084272" y="117.324577" style="fill: #1baf7a; stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
     </g>
    </g>
    <g id="line2d_32">
     <path d="M 489.240116 160.596942 
-L 558.084272 133.042179 
+L 558.084272 117.324577 
 " clip-path="url(#pb35410007d)" style="fill: none; stroke-dasharray: 3.6,3.6; stroke-dashoffset: 0; stroke: #1baf7a; stroke-width: 1.2"/>
    </g>
    <g id="line2d_33">
@@ -425,12 +425,12 @@ z
 " style="stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
     </defs>
     <g clip-path="url(#pb35410007d)">
-     <use xlink:href="#m44a49db203" x="558.084272" y="207.419866" style="fill: #eb6834; stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
+     <use xlink:href="#m44a49db203" x="558.084272" y="186.473308" style="fill: #eb6834; stroke: #fcfcfb; stroke-width: 1.5; stroke-linejoin: miter"/>
     </g>
    </g>
    <g id="line2d_35">
     <path d="M 489.240116 247.760059 
-L 558.084272 207.419866 
+L 558.084272 186.473308 
 " clip-path="url(#pb35410007d)" style="fill: none; stroke-dasharray: 3.6,3.6; stroke-dashoffset: 0; stroke: #eb6834; stroke-width: 1.2"/>
    </g>
    <g id="patch_4">
@@ -448,7 +448,7 @@ L 582.179727 277.342125
     <text style="font-size: 9px; font-family: 'DejaVu Sans'; fill: #6250d6" transform="translate(251.513508 46.656059)">down for men</text>
    </g>
    <g id="text_20">
-    <text style="font-weight: 700; font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #0b0b0b" x="52.079727" y="16.318125" transform="rotate(-0 52.079727 16.318125)">The quantization ladder: one simplification per rung</text>
+    <text style="font-weight: 700; font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #0b0b0b" x="52.079727" y="16.318125" transform="rotate(-0 52.079727 16.318125)">The quantization ladder for Codec 2: one simplification per rung</text>
    </g>
    <g id="legend_1">
     <g id="line2d_36">

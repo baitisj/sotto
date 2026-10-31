@@ -53,7 +53,7 @@ It makes two choices.
 
 **1. How many bits does each wave get?** The early waves (slow tilts and humps) matter most and vary the most. The late waves (fine wiggles) are small. sotto hands out the 34 bits **one at a time**. Each bit goes to whichever wave it would help most at that moment, measured by how much it shrinks the average error. This is called **greedy bit allocation**. The result, shown on the right of the DCT figure in chapter 3, is:
 
-| Wave | 1 | 2 | 3 | 4 | 5–10 | 11–16 | 17 | 18 | 19 |
+| Wave | 1 | 2 | 3 | 4 | 5–11 | 12–15 | 16–17 | 18 | 19 |
 |---|---|---|---|---|---|---|---|---|---|
 | Bits | 5 | 4 | 3 | 3 | 2 each | 1 each | 0 | 1 | 0 |
 
@@ -73,7 +73,7 @@ The bits go out in order of importance: voicing first, then pitch, then energy, 
 
 **Sending half the frames.** The encoder analyzes the voice every 10 ms, but it only sends every second analysis (once per 20 ms). The decoder fills in the missing 10 ms in between by **interpolation**, which just means taking values halfway between the frames on either side. The voicing for both halves *is* sent, because a voicing change is too important to guess.
 
-**Memoryless frames.** Each 48-bit frame can be decoded on its own, without knowing the frame before. The team tried *predicting* each frame's shape from the previous one and sending only the difference. That was a bit better (about +0.1 to +0.3 PESQ on two clips), but if one frame is lost to radio noise, the error would carry into the next frames. So v0 stays **memoryless**.
+**Memoryless frames.** Each 48-bit frame can be decoded on its own, without knowing the frame before. The team tried *predicting* each frame's shape from the previous one and sending only the difference. With no radio noise that was a little better (+0.1 to +0.3 PESQ in v0's first try, +0.0 to +0.1 in v1's). But in v1's tests over fading radio channels it was *worse* (−0.1 to −0.26), because when one frame is lost, the decoder's prediction stays out of step for several frames afterwards. So sotto stays **memoryless**. (In the code, that predictive experiment is the class `SottoV1`; the real v1 is `SottoV0` with the new pitch tracker.)
 
 ## Try it
 
