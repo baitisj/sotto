@@ -2,6 +2,8 @@
 
 *Written 2026-10-31. Code: `sim/oracle_ladder.py`, `sim/vocoder_lab.py`, `sim/encoder_race.py`. Results: `docs/results/oracle_ladder_15s.json` and `docs/results/encoder_race.json`. Samples: `docs/samples/encoder/`.*
 
+*Update: v1 (octave-corrected pitch) is in [encoder-v1.md](encoder-v1.md); the listening page now uses v1.*
+
 ## Where Codec 2 2400 loses quality
 
 `c2sim` was run on the three 15 s clips with one simplification added at each rung:

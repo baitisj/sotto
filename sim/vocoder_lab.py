@@ -38,8 +38,19 @@ DCT[0] /= np.sqrt(2)                                     # orthonormal DCT-II
 
 
 # ---------------------------------------------------------------- c2sim I/O
-def analyse(x):
-    """8 kHz float speech -> MODEL records, one per 10 ms."""
+TRACK = {}
+
+
+def analyse(x, pitch="c2"):
+    """8 kHz float speech -> MODEL records, one per 10 ms. pitch="tracked" corrects
+    Codec 2's octave errors with sinusoid.track_pitch and re-estimates the amplitudes."""
+    if pitch == "tracked":
+        import sinusoid as sn
+        m = analyse(x)
+        xi = np.round(x * 32767)
+        Sw = sn.spectra(xi)
+        wo = sn.track_pitch(Sw, m["Wo"], m["voiced"], **TRACK)
+        return sn.analyse(xi, wo, voicing=m["voiced"], do_refine=False)[:len(m)]
     with tempfile.TemporaryDirectory() as d:
         np.round(x * 32767).astype("<i2").tofile(f"{d}/in.raw")
         subprocess.run([f"{ar.C2BIN}/c2sim", f"{d}/in.raw", "--modelout", f"{d}/m.bin"],
@@ -201,7 +212,7 @@ def sotto_v0(m, shapeq, e_lo=0.0, e_hi=80.0, pf=0.0, alpha=0.0):
     return from_rate_k(set_wo(m, wo, voiced), rkq)
 
 
-def training_set():
+def training_set(pitch="c2"):
     """Rate-K shapes from Codec 2's test recordings, excluding the 15 s ve9qrp test window."""
     raw = os.path.join(os.path.dirname(HERE), "codec", "codec2", "raw")
     xs = []
@@ -210,7 +221,7 @@ def training_set():
         if f == "ve9qrp.raw":
             x = np.concatenate([x[:int(6.4 * FS)], x[int(21.4 * FS):]])
         xs.append(x)
-    rk = np.concatenate([to_rate_k(analyse(x)) for x in xs])
+    rk = np.concatenate([to_rate_k(analyse(x, pitch)) for x in xs])
     rk = rk[rk.mean(1) > np.percentile(rk.mean(1), 20)]          # drop silence
     return rk - rk.mean(1, keepdims=True)
 
@@ -281,8 +292,9 @@ class SottoV0:
 
     E_LO, E_HI = 10.0, 80.0
 
-    def __init__(self, shapeq=None, pf=1.5):
-        self.sq = shapeq or ShapeQ(training_set())
+    def __init__(self, shapeq=None, pf=1.5, pitch="c2"):
+        self.pitch = pitch
+        self.sq = shapeq or ShapeQ(training_set(pitch))
         self.pf = pf
         self.fields = [b for b in self.sq.bits if b]
 
@@ -313,7 +325,7 @@ class SottoV0:
         return out
 
     def encode(self, x):
-        m = analyse(x)
+        m = analyse(x, self.pitch)
         if len(m) % 2:
             m = np.concatenate([m, m[-1:]])
         rk = to_rate_k(m)
@@ -360,3 +372,90 @@ class SottoV0:
 
     def decode_audio(self, bits):
         return synthesise(self.decode(bits))
+
+
+# ---------------------------------------------------------------- v1: tracked pitch, predicted shape
+def training_pairs(pitch="tracked"):
+    """DCT coefficient vectors of consecutive 20 ms frames (both non-silent) from the
+    training recordings, for fitting the shape predictor."""
+    raw = os.path.join(os.path.dirname(HERE), "codec", "codec2", "raw")
+    prev, cur = [], []
+    for f in ("hts1.raw", "kristoff.raw", "ve9qrp.raw"):
+        x = np.fromfile(os.path.join(raw, f), "<i2").astype(float) / 32768
+        segs = [x] if f != "ve9qrp.raw" else [x[:int(6.4 * FS)], x[int(21.4 * FS):]]
+        for s in segs:
+            rk = to_rate_k(analyse(s, pitch))[::2]
+            mean = rk.mean(1)
+            c = (rk - mean[:, None]) @ DCT.T
+            live = mean > np.percentile(mean, 20)
+            ok = live[1:] & live[:-1]
+            prev.append(c[:-1][ok])
+            cur.append(c[1:][ok])
+    return np.concatenate(prev), np.concatenate(cur)
+
+
+class SottoV1(SottoV0):
+    """v0 with the octave-corrected pitch track and a first-order predictor on the shape's
+    DCT coefficients (per-coefficient gains alpha_j, fitted on the training set and scaled
+    by `shrink` so channel errors die out quickly). The shape quantizer is trained on the
+    prediction residuals. Bit layout is unchanged from v0.
+
+    decode(bits, good) leaves the predictor state untouched on frames flagged bad, so a
+    concealed frame doesn't feed its residual in again."""
+
+    def __init__(self, shrink=0.8, pf=1.5, pitch="tracked", max_alpha=0.8):
+        p, c = training_pairs(pitch)
+        a = np.sum(p * c, 0) / np.maximum(np.sum(p * p, 0), 1e-9)
+        self.alpha = np.clip(a * shrink, 0, max_alpha)
+        self.alpha[0] = 0
+        res = (c - self.alpha * p) @ DCT
+        super().__init__(ShapeQ(res), pf=pf, pitch=pitch)
+
+    def _shape_idx_c(self, c):
+        return self._shape_idx(c @ DCT)
+
+    def encode(self, x):
+        m = analyse(x, self.pitch)
+        if len(m) % 2:
+            m = np.concatenate([m, m[-1:]])
+        rk = to_rate_k(m)
+        en = frame_energy_db(m)
+        prev = np.zeros(K)
+        frames = []
+        for i in range(0, len(m), 2):
+            v = [int(m[i]["voiced"] > 0), int(m[i + 1]["voiced"] > 0)]
+            wi, _ = q_wo(np.array([m[i]["Wo"]]))
+            ei, _ = q_uniform(np.array([en[i]]), self.E_LO, self.E_HI, 5)
+            c = (rk[i] - rk[i].mean()) @ DCT.T
+            pred = self.alpha * prev
+            si = self._shape_idx_c(c - pred)
+            prev = pred + self._shape_val(si) @ DCT.T
+            frames.append(self._pack([(v[0], 1), (v[1], 1), (wi[0], 7), (ei[0], 5)]
+                                     + list(zip(si, self.fields))))
+        return np.array(frames, np.int8)
+
+    def decode(self, bits, good=None):
+        bits = np.asarray(bits)
+        good = np.ones(len(bits), bool) if good is None else np.asarray(good, bool)
+        nshape = sum(self.fields)
+        prev = np.zeros(K)
+        out = bits.copy()
+        shapes = []
+        for f, b in enumerate(bits):
+            if good[f]:
+                p = 14
+                idx = []
+                for bb in self.fields:
+                    idx.append(int("".join(map(str, b[p:p + bb])), 2))
+                    p += bb
+                prev = self.alpha * prev + self._shape_val(idx) @ DCT.T
+            shapes.append(prev.copy())
+        # reuse v0's decoder with a memoryless shape quantizer that returns these shapes
+        m = SottoV0.decode(self, out)
+        rk = np.zeros((2 * len(bits), K))
+        rk[0::2] = np.array(shapes) @ DCT
+        if self.pf:
+            rk[0::2] = postfilter_rk(rk[0::2], self.pf)
+        rk = decimate_interp(rk)
+        en = frame_energy_db(m)
+        return set_energy(from_rate_k(m, rk), en)

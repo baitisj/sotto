@@ -182,7 +182,9 @@ void phase_synth_zero_order(
   for (m = 1; m <= model->L; m++) {
     /* generate excitation */
 
-    if (model->voiced) {
+    /* sotto: voiced >= 2 is a band-voicing cutoff, harmonics m < voiced are
+       voiced and the rest random (voiced == 1 keeps every harmonic voiced) */
+    if (model->voiced && (model->voiced == 1 || m < model->voiced)) {
       Ex[m].real = cosf(ex_phase[0] * m);
       Ex[m].imag = sinf(ex_phase[0] * m);
     } else {
