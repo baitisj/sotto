@@ -305,6 +305,25 @@ The encoder race (3 voices; v3.4 → v3.5 PESQ) shows v3.5 ahead of v3.4 in ever
 
 Against v3, the version on the public listening page, the VHF fading scores are up by 0.13 to 0.29.
 
+## Longer interleaving: two YSF frames (200 ms)
+
+On 2 m at 30 to 60 km/h, about 40% of lost frames came in runs of exactly five: one whole YSF frame (100 ms) wiped out by a fade. `modem/interleave.py` spreads each 100 ms codeword over two consecutive YSF frames. Even payload positions of YSF frame k carry codeword k, and odd positions carry codeword k−1. A fade over one YSF frame now costs two codewords half their bits each, and the convolutional code (rate 0.39) can often rebuild both. The cost is 100 ms more delay, plus one extra voice frame at the end of each transmission.
+
+`tools/interleave_race.py`: 146 MHz, 5 voices × 3 fading seeds, decoded with v3.5. The same channel realisation is used for both depths. Results are in `docs/results/interleave_2m.json`.
+
+| speed | C/N0 (dB-Hz) | PESQ, depth 1 | PESQ, depth 2 | change | frames lost, depth 1 | frames lost, depth 2 |
+|---|---|---|---|---|---|---|
+| 5 km/h | 52 | 1.72 | 1.66 | −0.06 | 19.2% | 19.5% |
+| 5 km/h | 56 | 2.21 | 2.13 | −0.08 | 8.9% | 9.5% |
+| 30 km/h | 52 | 2.02 | 2.19 | +0.16 | 13.5% | 11.3% |
+| 30 km/h | 56 | 2.69 | 2.83 | +0.13 | 3.7% | 2.5% |
+| 60 km/h | 52 | 2.29 | 2.52 | +0.23 | 9.2% | 6.8% |
+| 60 km/h | 56 | 2.91 | 2.94 | +0.04 | 1.7% | 1.0% |
+| 100 km/h | 52 | 2.49 | 2.79 | +0.30 | 6.2% | 3.9% |
+| 100 km/h | 56 | 3.01 | 3.03 | +0.02 | 1.0% | 0.3% |
+
+Depth 2 cuts lost frames by a quarter to two thirds from 30 km/h up, and gains up to 0.30 PESQ where the channel is weak. At walking pace a 2 m fade lasts longer than 200 ms, so spreading doesn't help. Losses then hit two codewords at once, which costs 0.06 to 0.08. Over all eight conditions the mean goes from 2.42 to 2.51. **Depth 2 is the better default for mobile use.** Longer depths would add another 100 ms each for the walking case, which is the case they can't fix.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC. (Partly solved later with Speech Commands, see above.)
