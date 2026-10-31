@@ -23,7 +23,7 @@ PESQ for these conditions (mean of 3 fading seeds; the files are from the first 
 
 ## Encoder against encoder (`encoder/`)
 
-`encoder/<voice>__<condition>__codec2_2400.flac` and `...__sotto_v1.flac` are the same voice sent through the identical chain (sotto VW payload, C4FM softmodem, same channel and fading seed, same receiver). Only the encoder and decoder differ. The conditions are no radio channel; 446 MHz, 60 km/h, 52 dB-Hz; and 146 MHz, 30 km/h, 56 dB-Hz. Scores are in `docs/encoder-v1.md`.
+`encoder/<voice>__<condition>__codec2_2400.flac` and `...__sotto_v2.flac` are the same voice sent through the identical chain (sotto VW payload, C4FM softmodem, same channel and fading seed, same receiver). Only the encoder and decoder differ. The conditions are no radio channel; 446 MHz, 60 km/h, 52 dB-Hz; and 146 MHz, 30 km/h, 56 dB-Hz. Scores are in `docs/encoder-v1.md`.
 
 ## Sources
 

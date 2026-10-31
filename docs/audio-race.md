@@ -79,3 +79,5 @@ All 7 conditions, with per-clip values, are in `docs/results/audio_race_15s.json
 
 - **The channel ranking is the same for both voices.** sotto VW is best everywhere, and it reaches no-channel quality at 48 dB-Hz without fading and at 56 dB-Hz at UHF.
 - **The female voice loses about 0.7 PESQ in Codec 2 itself, before any channel.** Her ESTOI (intelligibility) is as good as the male voices', so this is a quality gap, not an intelligibility gap. It matches Codec 2's known weakness on higher-pitched voices, where few harmonics carry the spectral envelope. It is a target for the improved vocoder (better spectral envelope at high pitch, MBE-style band voicing). This rests on one female clip from a lossy source, so it needs more female voices to confirm.
+
+*Correction (2026-10-31): ESTOI here was computed with a per-clip waveform alignment that misjudged the codec delay, so it is understated, and PESQ is off by up to ±0.1. Rankings hold. Corrected numbers are in [encoder-v1.md](encoder-v1.md).*

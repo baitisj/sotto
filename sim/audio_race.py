@@ -58,11 +58,27 @@ def c2dec(bits):
         return np.fromfile(f"{d}/out.raw", "<i2").astype(float) / 32768
 
 
-def best_lag(r, x, max_lag=400):
+CODEC_DELAY = 160     # samples; Codec 2 and every sotto encoder here (ESTOI peaks at 150-170)
+
+
+def best_lag(r, x):
+    """Delay to undo before scoring. Fixed: the codecs compared here all share Codec 2's
+    framing, and per-clip searches were unreliable. Waveform correlation fails on synthetic
+    phase, and even envelope matching wanders by +-20 samples. That moved PESQ by up to 0.1
+    and ESTOI by much more (fixed 2026-10-31)."""
+    return CODEC_DELAY
+
+
+def search_lag(r, x, max_lag=400):
+    """Delay search for a codec with unknown delay: matches the short-time energy envelopes
+    (5 ms smoothing), not the waveforms, which synthetic-phase vocoders barely follow."""
+    def env(s):
+        return np.log(np.convolve(s ** 2, np.ones(40) / 40, "same") + 1e-7)
     n = min(len(r), len(x))
+    er, ex = env(r[:n]), env(x[:n])
     best = (-2, 0)
     for lag in range(max_lag):
-        a, b = r[:n - lag], x[lag:n]
+        a, b = er[:n - lag] - er[:n - lag].mean(), ex[lag:n] - ex[lag:n].mean()
         c = np.dot(a, b) / np.sqrt(np.dot(a, a) * np.dot(b, b) + 1e-9)
         best = max(best, (c, lag))
     return best[1]

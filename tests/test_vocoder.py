@@ -83,3 +83,21 @@ def test_codec_frames_decode(pitch):
     lag = ar.best_lag(x, y)
     pesq, _ = ar.score(x, y, lag)
     assert pesq > 2.2
+
+
+def test_joint_tracker_follows_pitch_above_400_hz():
+    x = _vowel(440, formants=(800, 1500, 2800))
+    Sw = sn.spectra(np.round(x * 32767))
+    wo_c2 = np.full(len(Sw), sn.WO_MAX)              # Codec 2 clamps at 400 Hz
+    wo, v = sn.track_pitch_voicing(Sw, wo_c2, np.ones(len(Sw), int))
+    mid = slice(5, -5)
+    assert np.all(v[mid] == 1)
+    assert np.all(np.abs(np.log(wo[mid] / (2 * np.pi * 440 / FS))) < 0.05)
+
+
+def test_joint_tracker_unvoices_noise():
+    x = 0.1 * np.random.default_rng(3).standard_normal(FS)
+    m = vl.analyse(x)                                 # Codec 2 calls some of it voiced
+    Sw = sn.spectra(np.round(x * 32767))
+    _, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"])
+    assert v.mean() <= m["voiced"].mean() and v.mean() < 0.05

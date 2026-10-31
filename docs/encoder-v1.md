@@ -1,4 +1,4 @@
-# sotto encoder v1: pitch, voicing and quantizer experiments
+# sotto encoder v1 and v2: pitch, voicing and quantizer experiments
 
 *Written 2026-10-31. Follows [encoder-v0.md](encoder-v0.md). Code: `sim/sinusoid.py`, `sim/vocoder_lab.py` (`analyse(x, "tracked")`, `SottoV1`), `sim/encoder_race.py --codecs`. Results: `docs/results/encoder_race.json`. Tests: `tests/test_vocoder.py`.*
 
@@ -55,6 +55,8 @@ Things tried here that didn't earn their bits:
 
 ## Encoder against encoder
 
+*These numbers used the old per-clip alignment; corrected numbers, with v2, are in the v2 section below.*
+
 Everything goes through the same chain as before: sotto VW payload, C4FM softmodem, the same fading seeds, and the same receiver with CRC concealment. Mean of 3 seeds:
 
 | Condition | Codec | Female | Male (LibriSpeech) | Male (ve9qrp) |
@@ -80,6 +82,54 @@ Compared with v0:
 
 The listening page now pairs Codec 2 with v1.
 
+## v2: pitch and voicing tracked together (2026-10-31)
+
+The first club listening test (two listeners) found no preference for band voicing. It did find a "springs / glorp" sound in v1 on the female voice at 6 to 7 s. Two causes:
+- She goes above 420 Hz there, past Codec 2's 400 Hz pitch ceiling.
+- Frames in a quiet transition were called voiced with a pitch wandering between 50 and 300 Hz.
+
+v2 (`SottoV2`, `sinusoid.track_pitch_voicing`) runs one Viterbi search over the whole utterance. Each frame can be unvoiced, or voiced at one of these candidate pitches: Codec 2's estimate for this frame or its neighbours, times 1, 2 or ½, each refined. The costs are:
+- the MBE fit error, as in v1;
+- a penalty for disagreeing with Codec 2's voicing decision;
+- a penalty for switching between voiced and unvoiced;
+- a penalty for a pitch jump, steeper above a third of an octave.
+
+The 7-bit pitch field now spans 50 to 500 Hz. Re-checking Codec 2's voicing test at the corrected pitch, without the joint search, unvoiced too much (female 2.68 to 2.55) and was dropped. Normalising the fit error by its value on white noise, instead of the fixed bias toward higher pitch, scored the same and is left as an option (`norm="noise"`).
+
+### Scoring fix
+
+The scripts used to find each clip's delay by waveform correlation. Codecs with synthetic phase barely follow the input waveform, so that search picked lags from 50 to 180 samples. That pulled ESTOI down by up to 0.1 and moved PESQ by up to ±0.1. ESTOI peaks at a 150 to 170 sample delay for Codec 2 and every sotto encoder, so scoring now uses a fixed 160 (`audio_race.CODEC_DELAY`). ESTOI figures in earlier write-ups (audio-race.md, encoder-v0.md) are understated. Their rankings hold.
+
+### Encoder against encoder, corrected alignment
+
+The chain is the same as above. Each cell is the mean of 3 seeds, shown as PESQ (ESTOI):
+
+| Condition | Codec | Female | Male (LibriSpeech) | Male (ve9qrp) |
+|---|---|---:|---:|---:|
+| No radio channel | Codec 2 2400 | 2.21 (0.74) | 2.94 (0.75) | 2.78 (0.74) |
+| | sotto v0 | 2.51 (0.72) | 3.13 (0.84) | 2.92 (0.75) |
+| | sotto v1 | 2.65 (0.77) | 3.20 (0.85) | 2.87 (0.76) |
+| | **sotto v2** | **2.91 (0.79)** | **3.21 (0.85)** | **3.00 (0.76)** |
+| 446 MHz 60 km/h, 52 dB-Hz | Codec 2 2400 | 1.69 (0.67) | 2.30 (0.70) | 2.48 (0.71) |
+| | sotto v0 | 2.11 (0.70) | 2.67 (0.82) | 2.76 (0.74) |
+| | sotto v1 | 2.27 (0.75) | 2.78 (0.83) | 2.61 (0.75) |
+| | **sotto v2** | **2.44 (0.77)** | **2.91 (0.84)** | **2.78 (0.75)** |
+| 446 MHz 60 km/h, 56 dB-Hz | Codec 2 2400 | 2.21 (0.74) | 2.73 (0.74) | 2.75 (0.74) |
+| | sotto v0 | 2.45 (0.72) | 3.07 (0.84) | 2.89 (0.75) |
+| | sotto v1 | 2.63 (0.77) | 3.11 (0.84) | 2.83 (0.76) |
+| | **sotto v2** | **2.86 (0.79)** | **3.12 (0.85)** | **2.98 (0.76)** |
+| 146 MHz 30 km/h, 56 dB-Hz | Codec 2 2400 | 1.82 (0.67) | 2.06 (0.67) | 1.98 (0.67) |
+| | sotto v0 | 2.19 (0.70) | 2.65 (0.82) | 2.30 (0.73) |
+| | sotto v1 | 2.26 (0.75) | 2.65 (0.82) | 2.20 (0.74) |
+| | **sotto v2** | **2.51 (0.77)** | 2.61 (0.82) | **2.30 (0.74)** |
+
+- **v2 is best or tied in every condition except one.** At VHF, LibriSpeech male scores 2.61 against 2.65, which is within noise.
+- **Against Codec 2, the female voice gains +0.6 to +0.75 PESQ** and all three voices gain in ESTOI. The male LibriSpeech ESTOI gain is large: 0.75 to 0.85 with no channel.
+- **The female voice is now within 0.1 to 0.3 of the men** (it was 0.7 behind with Codec 2), so most of her gap was pitch and voicing errors.
+- The predictive variant from above was not rescored.
+
+A second blind listening test (v1 against v2, and Codec 2 against v2) is with the club. The listening page now pairs Codec 2 with v2.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC, only GitHub.
@@ -87,6 +137,6 @@ The shape quantizer is trained on about 2 minutes of speech, nearly all from one
 ## Next
 
 1. More training and test speech, ideally 30+ minutes from at least 10 speakers, half of them female. With that: a trained (split or multistage) VQ for the shape, and re-tuning the tracker on a held-out set.
-2. A bounded-lookahead version of the tracker, so it can run in real time.
+2. A bounded-lookahead version of the v2 tracker (it now searches a whole utterance), so it can run in real time.
 3. Listening checks for band voicing and the postfilter, which PESQ can't judge.
 4. The C port of v1 (deferred).

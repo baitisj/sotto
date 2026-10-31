@@ -39,6 +39,7 @@ DCT[0] /= np.sqrt(2)                                     # orthonormal DCT-II
 
 # ---------------------------------------------------------------- c2sim I/O
 TRACK = {}
+TRACK2 = {}
 
 
 def analyse(x, pitch="c2"):
@@ -51,6 +52,14 @@ def analyse(x, pitch="c2"):
         Sw = sn.spectra(xi)
         wo = sn.track_pitch(Sw, m["Wo"], m["voiced"], **TRACK)
         return sn.analyse(xi, wo, voicing=m["voiced"], do_refine=False)[:len(m)]
+    if pitch == "tracked2":
+        # v2: pitch up to 500 Hz, and voicing re-checked at the corrected pitch
+        import sinusoid as sn
+        m = analyse(x)
+        xi = np.round(x * 32767)
+        Sw = sn.spectra(xi)
+        wo, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"], **TRACK2)
+        return sn.analyse(xi, wo, voicing=v, do_refine=False)[:len(m)]
     with tempfile.TemporaryDirectory() as d:
         np.round(x * 32767).astype("<i2").tofile(f"{d}/in.raw")
         subprocess.run([f"{ar.C2BIN}/c2sim", f"{d}/in.raw", "--modelout", f"{d}/m.bin"],
@@ -131,8 +140,8 @@ def q_uniform(x, lo, hi, bits):
     return idx, lo + idx * (hi - lo) / (n - 1)
 
 
-def q_wo(wo, bits=7):
-    idx, lw = q_uniform(np.log(wo), np.log(WO_MIN), np.log(WO_MAX), bits)
+def q_wo(wo, bits=7, hi=WO_MAX):
+    idx, lw = q_uniform(np.log(wo), np.log(WO_MIN), np.log(hi), bits)
     return idx, np.exp(lw)
 
 
@@ -291,6 +300,7 @@ class SottoV0:
     matches the input whatever the envelope smoothing does."""
 
     E_LO, E_HI = 10.0, 80.0
+    WO_HI = WO_MAX
 
     def __init__(self, shapeq=None, pf=1.5, pitch="c2"):
         self.pitch = pitch
@@ -333,7 +343,7 @@ class SottoV0:
         frames = []
         for i in range(0, len(m), 2):
             v = [int(m[i]["voiced"] > 0), int(m[i + 1]["voiced"] > 0)]
-            wi, _ = q_wo(np.array([m[i]["Wo"]]))
+            wi, _ = q_wo(np.array([m[i]["Wo"]]), hi=self.WO_HI)
             ei, _ = q_uniform(np.array([en[i]]), self.E_LO, self.E_HI, 5)
             si = self._shape_idx(rk[i] - rk[i].mean())
             frames.append(self._pack([(v[0], 1), (v[1], 1), (wi[0], 7), (ei[0], 5)]
@@ -355,7 +365,7 @@ class SottoV0:
                 p += k
                 return v
             voiced[2 * f], voiced[2 * f + 1] = take(1), take(1)
-            wo[2 * f] = np.exp(np.log(WO_MIN) + take(7) * (np.log(WO_MAX) - np.log(WO_MIN)) / 127)
+            wo[2 * f] = np.exp(np.log(WO_MIN) + take(7) * (np.log(self.WO_HI) - np.log(WO_MIN)) / 127)
             en[2 * f] = self.E_LO + take(5) * (self.E_HI - self.E_LO) / 31
             shape = self._shape_val([take(bb) for bb in self.fields])
             if self.pf:
@@ -459,3 +469,13 @@ class SottoV1(SottoV0):
         rk = decimate_interp(rk)
         en = frame_energy_db(m)
         return set_energy(from_rate_k(m, rk), en)
+
+
+class SottoV2(SottoV0):
+    """v1 plus pitch up to 500 Hz (the 7-bit Wo field now spans 50-500 Hz) and voicing
+    re-checked at the corrected pitch, with voiced runs under 30 ms dropped."""
+
+    WO_HI = 2 * np.pi / 16
+
+    def __init__(self, shapeq=None, pf=1.5):
+        super().__init__(shapeq, pf=pf, pitch="tracked2")

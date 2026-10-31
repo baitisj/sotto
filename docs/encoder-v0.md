@@ -65,3 +65,5 @@ Both codecs send 48 bits every 20 ms through the identical chain: sotto VW paylo
 1. Pitch tracking and voicing for higher voices: check Codec 2's estimator on the female clip, and try mixed or band voicing (MBE/MELP-style).
 2. Better shape quantization: trained VQ or predictive coding with error-resilient resets, which needs more training speech.
 3. Port v0 to C inside `codec/codec2/` as a new mode, so it runs in real time and on the DSP.
+
+*Correction (2026-10-31): ESTOI here was computed with a per-clip waveform alignment that misjudged the codec delay, so it is understated, and PESQ is off by up to ±0.1. Rankings hold. Corrected numbers are in [encoder-v1.md](encoder-v1.md).*

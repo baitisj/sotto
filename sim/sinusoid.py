@@ -13,6 +13,7 @@ import vocoder_lab as vl
 N, M_PITCH, NW, NFFT = 80, 320, 279, 512
 FS = vl.FS
 WO_MIN, WO_MAX = vl.WO_MIN, vl.WO_MAX
+WO_MAX_HI = 2 * np.pi / 16                       # 500 Hz, for voices above Codec 2's 400 Hz
 
 
 def _window():
@@ -45,7 +46,7 @@ def spectra(x):
     return out
 
 
-def refine(Sw, wo):
+def refine(Sw, wo, wo_max=WO_MAX):
     """Codec 2's two-stage harmonic-sum refinement around an initial Wo."""
     P = np.abs(Sw) ** 2
     for span, step in ((5, 1.0), (1, 0.25)):
@@ -59,7 +60,7 @@ def refine(Sw, wo):
             if e > best:
                 best, wbest = e, w
         wo = wbest
-    return float(np.clip(wo, WO_MIN, WO_MAX))
+    return float(np.clip(wo, WO_MIN, wo_max))
 
 
 def n_harm(wo):
@@ -155,7 +156,8 @@ def fit_error(Sw, wo, fmax=2500.0):
     return err / (np.sum(np.abs(Sw[1:hi]) ** 2) + 1e-9)
 
 
-def track_pitch(Sw, wo0, voiced, mults=(1.0, 2.0, 0.5), lam=3.0, bias=0.5, fmin=70.0):
+def track_pitch(Sw, wo0, voiced, mults=(1.0, 2.0, 0.5), lam=3.0, bias=0.5, fmin=70.0,
+                wo_max=WO_MAX):
     """Correct octave errors in an initial Wo track. For each voiced frame the candidates are
     wo0 * mults, each refined; a Viterbi search over each voiced run minimises
     log(fit error) - bias * log(Wo) (subharmonics fit about as well as the true pitch, so
@@ -171,7 +173,7 @@ def track_pitch(Sw, wo0, voiced, mults=(1.0, 2.0, 0.5), lam=3.0, bias=0.5, fmin=
         j = i
         while j < n and v[j]:
             j += 1
-        C = np.array([[refine(Sw[t], float(np.clip(wo0[t] * mu, WO_MIN, WO_MAX))) for mu in mults]
+        C = np.array([[refine(Sw[t], float(np.clip(wo0[t] * mu, WO_MIN, wo_max)), wo_max) for mu in mults]
                       for t in range(i, j)])
         # candidates other than the initial estimate must stay above fmin
         bad = (C * FS / (2 * np.pi) < fmin) & (np.arange(len(mults)) > 0)[None, :]
@@ -190,3 +192,90 @@ def track_pitch(Sw, wo0, voiced, mults=(1.0, 2.0, 0.5), lam=3.0, bias=0.5, fmin=
         wo[i:j] = C[np.arange(j - i), path[::-1]]
         i = j
     return wo
+
+
+def clean_voicing(Sw, m, voiced0, min_run=3):
+    """Voicing for a re-tracked model: a frame stays voiced only if Codec 2 called it voiced
+    and Codec 2's test also passes at the corrected pitch; voiced runs shorter than min_run
+    frames (30 ms) are dropped. Stops junk pitch in transitions being synthesised as buzz."""
+    v = np.array([int(voiced0[i] > 0 and codec2_voicing(Sw[i], m[i]["Wo"], m[i]["A"], m[i]["L"]))
+                  for i in range(len(m))])
+    i = 0
+    while i < len(v):
+        if v[i]:
+            j = i
+            while j < len(v) and v[j]:
+                j += 1
+            if j - i < min_run:
+                v[i:j] = 0
+            i = j
+        else:
+            i += 1
+    return v
+
+
+# Mean log fit_error() of white noise against f0 (Hz): a dense harmonic comb fits noise well,
+# so a low pitch must beat this baseline, not just fit well (measured on 4 s of noise).
+NOISE_F0 = np.array([50, 61, 75, 91, 111, 136, 166, 203, 248, 303, 370, 452, 500])
+NOISE_LOGERR = np.array([-1.84, -1.46, -1.21, -0.93, -0.72, -0.58, -0.46, -0.36, -0.31,
+                         -0.26, -0.25, -0.22, -0.21])
+
+
+def noise_logerr(w):
+    return np.interp(np.log(w * FS / (2 * np.pi)), np.log(NOISE_F0), NOISE_LOGERR)
+
+
+def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=WO_MAX_HI,
+                        uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias"):
+    """Joint pitch and voicing track over the whole utterance (Viterbi).
+
+    States per frame: unvoiced, or voiced at one of the candidates refine(wo0[t+d] * mu)
+    for d in -1..1 and mu in 1, 2, 1/2 (a neighbour's pitch lets the track bridge a frame
+    where Codec 2's estimate is junk). Costs:
+      voiced at w     log(fit error) - bias * log(w), plus `prior` if Codec 2 said unvoiced
+      unvoiced        uv_cost, plus `prior` if Codec 2 said voiced
+      voiced->voiced  lam * |log jump|, plus jump * excess over a third of an octave
+      voiced<->uv     switch
+    Returns (wo, voiced)."""
+    n = len(wo0)
+    v0 = np.asarray(voiced0) > 0
+    cands, costs = [], []
+    for t in range(n):
+        ws = []
+        for d in (0, -1, 1):
+            if 0 <= t + d < n:
+                for mu in (1.0, 2.0, 0.5):
+                    w = refine(Sw[t], float(np.clip(wo0[t + d] * mu, WO_MIN, wo_max)), wo_max)
+                    if w * FS / (2 * np.pi) >= fmin or (d == 0 and mu == 1.0):
+                        if all(abs(np.log(w / u)) > 0.01 for u in ws):
+                            ws.append(w)
+        ws = np.array(ws)
+        le = np.array([np.log(fit_error(Sw[t], w)) for w in ws])
+        le = le - noise_logerr(ws) if norm == "noise" else le - bias * np.log(ws)
+        c = le + prior * (not v0[t])
+        cands.append(ws)
+        costs.append(np.concatenate([[uv_cost + prior * v0[t]], c]))     # state 0 = unvoiced
+    D, back = costs[0].copy(), []
+    for t in range(1, n):
+        prev = np.concatenate([[0.0], cands[t - 1]])
+        cur = np.concatenate([[0.0], cands[t]])
+        tr = np.zeros((len(prev), len(cur)))
+        lj = np.abs(np.log(prev[1:, None] / cur[None, 1:]))
+        tr[1:, 1:] = lam * lj + jump * np.maximum(lj - np.log(2) / 3, 0)
+        tr[0, 1:] = switch
+        tr[1:, 0] = switch
+        tot = D[:, None] + tr
+        back.append(tot.argmin(0))
+        D = tot.min(0) + costs[t]
+    k = int(D.argmin())
+    path = [k]
+    for b in reversed(back):
+        k = int(b[k])
+        path.append(k)
+    path = path[::-1]
+    wo = np.asarray(wo0, float).copy()
+    voiced = np.zeros(n, int)
+    for t, k in enumerate(path):
+        if k:
+            wo[t], voiced[t] = cands[t][k - 1], 1
+    return wo, voiced
