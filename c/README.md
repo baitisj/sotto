@@ -12,9 +12,27 @@ built from `codec/codec2/` by `tools/build_codec2.sh`). The code in this directo
 ```sh
 tools/build_codec2.sh          # once: builds build/codec2/src/libcodec2.so
 make -C c                      # needs python3 + numpy to generate the codebook source
+make -C c check                # API test against libsotto.so
 c/sotto_enc in.raw out.bit     # 8 kHz, 16-bit mono raw in; 6 bytes per frame out
 c/sotto_dec out.bit dec.raw [good.u8]
+make -C c install PREFIX=/usr/local
 ```
+
+The build produces `libsotto.so` (soname `libsotto.so.0`, version 0.1.0), `libsotto.a`, the
+header `sotto.h` and a pkg-config file (`pkg-config --cflags --libs sotto`). The shared
+library exports only the `sotto_*` functions in `sotto.h`. It needs `libcodec2` at run time:
+the build-tree copy is found through an rpath, and an installed copy through the system's
+library path. `sotto_format()` names the bitstream the library speaks, for example
+`sotto v3.5, shape 12-11-11`. A library built with another codebook can't decode its frames.
+
+## Input level
+
+`sotto.h` documents the level scale and gives it as constants. Samples are 16-bit, and
+levels are dBFS of RMS, so a full-scale sine is −3 dBFS. The 5-bit energy field covers
+frames from −76 dBFS (quieter frames decode as silence) to −7.3 dBFS (louder frames
+saturate). Aim for an active speech level near −26 dBFS (`SOTTO_LEVEL_TARGET_DBFS`): the test
+voices sit at −22 to −27 dBFS, and their loudest 10 ms are 3 to 8 dB below saturation. The
+decoder reproduces the coded level. A pytest case checks the constants against the encoder.
 
 `good.u8` is optional: one byte per frame, 0 for a frame that failed its CRC. The decoder
 conceals those frames as v3.5 does (hold 40 ms, fade 6 dB per 20 ms, silent after 80 ms).

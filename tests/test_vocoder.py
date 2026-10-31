@@ -172,3 +172,19 @@ def test_c_port_matches_python():
     yc = cc.c_decode(bp, good)
     assert len(yc) == len(yp)
     assert cc.snr_db(yp, yc) > 60
+
+
+def test_header_level_constants_match_energy_field():
+    """c/sotto.h documents the energy field's scale; check it against the analysis."""
+    import re
+    h = open(os.path.join(ROOT, "c", "sotto.h")).read()
+    const = {k: float(v) for k, v in re.findall(r"#define (SOTTO_\w+_DB\w*) \(?(-?[\d.]+)\)?", h)}
+    a = 10 ** ((-23.0 + 3.0) / 20)                        # a sine at -23 dBFS RMS
+    x = a * np.sin(2 * np.pi * 440 * np.arange(FS) / FS) * 32767 / 32768
+    e = vl.frame_energy_db(vl.analyse(x))[20:-5].mean()
+    assert abs(e - (-23.0 + const["SOTTO_ENERGY_OFFSET_DB"])) < 0.3
+    lo, hi = vl.SottoV0.E_LO, vl.SottoV0.E_HI
+    assert (lo, hi) == (const["SOTTO_ENERGY_MIN_DB"], const["SOTTO_ENERGY_MAX_DB"])
+    step = (hi - lo) / 31
+    assert abs(const["SOTTO_LEVEL_SILENT_DBFS"] - (lo + step / 2 - const["SOTTO_ENERGY_OFFSET_DB"])) < 0.1
+    assert abs(const["SOTTO_LEVEL_MAX_DBFS"] - (hi - const["SOTTO_ENERGY_OFFSET_DB"])) < 0.1

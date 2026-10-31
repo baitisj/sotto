@@ -5,7 +5,9 @@
  *
  * SPDX-License-Identifier: MIT
  */
+#define SOTTO_BUILD
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -118,6 +120,16 @@ static double wo_hz(double wo) { return wo * FS / (2 * PI_D); }
 static int n_harm(float wo) {
   int L = (int)floorf((float)M_PI / wo);
   return (wo * (float)L >= (float)(0.95 * M_PI)) ? L - 1 : L;
+}
+
+const char *sotto_format(void) {
+  static char buf[64];
+  if (!buf[0]) {
+    int n = snprintf(buf, sizeof buf, "sotto v3.5, shape ");
+    for (int s = 0; s < sotto_cb_stages && n < (int)sizeof buf; s++)
+      n += snprintf(buf + n, sizeof buf - n, s ? "-%d" : "%d", sotto_cb_bits[s]);
+  }
+  return buf;
 }
 
 /* ------------------------------------------------------------------ encoder */
