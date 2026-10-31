@@ -47,7 +47,7 @@ Every **20 milliseconds** (one **frame**), sotto's encoder measures four things 
 
 | What | Question it answers | Bits |
 |---|---|---:|
-| Voicing | Is this a buzz (vowel) or a hiss ("s")? | 2 |
+| Voicing | Is this a buzz (vowel), a hiss ("s"), or both ("z")? | 2 |
 | Pitch | How high is the buzz? | 7 |
 | Energy | How loud is it? | 5 |
 | Envelope shape | What shape is the mouth making? | 34 |
@@ -62,7 +62,7 @@ The receiver's **decoder** takes those 48 bits and rebuilds 20 ms of sound with 
 
 The rebuilt voice is *not* the same as the original wiggle-for-wiggle. It only has to *sound* similar to a listener. Some things are thrown away on purpose (for example, the exact timing of each vocal-cord pulse), and some are lost to rounding. Much of this course is about which losses people notice and which they don't.
 
-You can hear sotto v1 right now on the [listening page](../index.html), or in chapter 5.
+You can hear sotto v3.5 right now on the [listening page](../index.html), or in chapter 5.
 
 ## Try it
 
@@ -72,8 +72,8 @@ You can hear sotto v1 right now on the [listening page](../index.html), or in ch
 
 ## Where this is in the code
 
-- `sim/vocoder_lab.py`: the `SottoV0` class, with `encode()` and `decode()`. sotto v1 is this same class with `pitch="tracked"`.
-- `docs/encoder-v0.md` and `docs/encoder-v1.md`: the design notes for v0 and v1.
+- `sim/vocoder_lab.py`: the `SottoV0` class, with `encode()` and `decode()`, and the later versions built on it, up to `SottoV35`.
+- `docs/encoder-v0.md` and `docs/encoder-v1.md`: the design notes (the second one covers v1 through v3.5).
 
 <details markdown="1"><summary>Answers</summary>
 

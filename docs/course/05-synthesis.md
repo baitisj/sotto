@@ -14,8 +14,8 @@ The decoder turns the 48 bits back into pitch, voicing, energy and envelope, and
 
 For each 10 ms piece of sound the decoder:
 
-1. **Unpacks the bits** into voicing, pitch (Wo), energy and the 16 shape numbers (chapter 4).
-2. **Rebuilds the envelope**: turns the shape numbers back into 20 points with the inverse DCT, and adds the level.
+1. **Unpacks the bits** into the voicing code, pitch (Wo), energy and the three codebook numbers (chapter 4).
+2. **Rebuilds the envelope**: adds up the three codebook entries to get the 20-point shape, and adds the level.
 3. **Sharpens the envelope** with a *formant postfilter* (see below).
 4. **Places the harmonics**: with pitch Wo, there are L = ⌊π ÷ Wo⌋ harmonics. Each one's loudness is read off the envelope at its frequency.
 5. **Sets the total loudness** to the sent energy.
@@ -36,13 +36,19 @@ There's a catch: sotto doesn't send phases. 41 phases would cost far more than 4
 
 For unvoiced frames, the phases are chosen **at random**. Sine waves with random phases add up to noise instead of a pulse. That's how the same machinery makes both buzz and hiss.
 
+For **mixed** frames (chapter 2), the decoder does both at once: harmonics below 1,000 Hz get made-up phases (buzz), and those above get random phases (hiss). Here's the same vowel played both ways:
+
+![The same vowel synthesized voiced and mixed](figures/mixed.svg)
+
+Below 1,000 Hz the two look the same: neat harmonic peaks. Above it, the voiced version still has a regular comb of harmonics, while the mixed one is smoother: noise shaped by the same envelope. That's what a "v" or "z" needs.
+
 Made-up phases are not free. In chapter 7 you'll see they cost about 0.3 to 0.7 PESQ points. They're one reason vocoded speech can sound a little "buzzy".
 
 ## Two different "postfilters"
 
 The word *postfilter* (a filter applied after decoding) means two different things in this project:
 
-- **sotto's formant postfilter.** Before placing the harmonics, sotto stretches the envelope's ups and downs by a factor of 1.5 (in decibels), and then puts the total loudness back. Peaks get sharper and valleys get deeper. Rounding in the quantizer tends to blur the envelope, and this undoes some of the blur. The idea comes from Codec 2's newamp1 experiments.
+- **sotto's formant postfilter.** Before placing the harmonics, sotto stretches the envelope's ups and downs by a factor of 1.35 (in decibels), and then puts the total loudness back. Peaks get sharper and valleys get deeper. Rounding in the quantizer tends to blur the envelope, and this undoes some of the blur. The idea comes from Codec 2's newamp1 experiments. The factor used to be 1.5, chosen for the old scalar quantizer. With the vector quantizer, a sweep found 1.35 scored best, and its shallower valleys also stopped the "v" in "five" from sounding nasal ("five-anuh").
 - **Codec 2's `--postfilter`.** This one doesn't touch the envelope. It keeps a running estimate of the background noise level. In voiced frames, any harmonic quieter than that noise gets a random phase, so background noise sounds like noise instead of a clicky buzz. It costs zero bits.
 
 sotto uses both.
@@ -58,23 +64,24 @@ The best way to understand each part is to switch it off and listen. Each of the
 | <audio controls preload="none" src="audio/whisper.flac"></audio><br>[whisper.flac](audio/whisper.flac) | Every frame forced to *unvoiced* | Voicing off: a whisper. Still understandable! |
 | <audio controls preload="none" src="audio/monotone.flac"></audio><br>[monotone.flac](audio/monotone.flac) | Pitch fixed at 110 Hz; envelope kept | Pitch off: a robot. The words survive, the melody doesn't |
 | <audio controls preload="none" src="audio/flat_envelope.flac"></audio><br>[flat_envelope.flac](audio/flat_envelope.flac) | All harmonics equally loud; pitch and voicing kept | Envelope off: a buzz with a tune, and the words get much harder to make out |
-| <audio controls preload="none" src="audio/sotto_v1.flac"></audio><br>[sotto_v1.flac](audio/sotto_v1.flac) | The real thing: sotto v1, 48 bits per 20 ms | Everything rounded to fit 2,400 bits per second |
+| <audio controls preload="none" src="audio/mixed.flac"></audio><br>[mixed.flac](audio/mixed.flac) | Every voiced frame made *mixed* | Hiss on top of every vowel: breathy, like a stage whisper |
+| <audio controls preload="none" src="audio/sotto_v35.flac"></audio><br>[sotto_v35.flac](audio/sotto_v35.flac) | The real thing: sotto v3.5, 48 bits per 20 ms | Everything rounded to fit 2,400 bits per second |
 
 What these show:
 
 - The **envelope** carries the words. Take it away and you can't understand anything.
 - The **pitch** carries the melody and much of who is speaking. Take it away and the words are still clear.
-- **Voicing** decides buzz or hiss. Take it away and you get a whisper.
+- **Voicing** decides buzz or hiss. Take it away and you get a whisper. Make everything mixed and the voice turns breathy, which is why mixed is only used where it's needed.
 
 ## Seeing the whole thing rebuilt
 
 Here are spectrograms of the woman's voice, before and after.
 
-![Spectrograms: original, Codec 2, sotto v1, and sotto v1 over a radio](figures/rebuild.svg)
+![Spectrograms: original, Codec 2, sotto v3.5, and sotto v3.5 over a radio](figures/rebuild.svg)
 
 - **Original**: sharp harmonic stripes and clear formant bands.
-- **Codec 2 2400** and **sotto v1**: both keep the stripes and the main bands, but finer detail is blurred. Where Codec 2's pitch tracker made octave errors, its stripes land in the wrong places; sotto v1's tracker avoids many of those (chapter 2). The difference is easier to hear than to see: PESQ scores this voice 2.16 for Codec 2 and 2.68 for sotto v1.
-- **sotto v1 over a weak, fading 446 MHz signal** from a moving car: close to the no-radio version, with short smudges where frames were lost and hidden (chapter 6).
+- **Codec 2 2400** and **sotto v3.5**: both keep the stripes and the main bands, but finer detail is blurred. Where Codec 2's pitch tracker made octave errors, its stripes land in the wrong places; sotto's tracker avoids many of those (chapter 2). The difference is easier to hear than to see: PESQ scores this voice 2.21 for Codec 2 and 2.90 for sotto v3.5.
+- **sotto v3.5 over a weak, fading 446 MHz signal** from a moving car: close to the no-radio version, with short smudges where frames were lost and hidden (chapter 6).
 
 You can hear all of these, for three voices, on the [listening page](../index.html).
 
@@ -86,11 +93,11 @@ You can hear all of these, for three voices, on the [listening page](../index.ht
 
 ## Where this is in the code
 
-- `sim/vocoder_lab.py`: `SottoV0.decode()` (steps 1–5), `postfilter_rk()` (the formant postfilter), `synthesise()` (runs `c2sim --modelin --phase0 --postfilter`).
-- `codec/codec2/src/phase.c`: `phase_synth_zero_order()`, the made-up phases.
+- `sim/vocoder_lab.py`: `SottoV0.decode()` (steps 1–5), `postfilter_rk()` (the formant postfilter), `mixed_cutoff()` (where mixed frames switch from buzz to hiss), `synthesise()` (runs `c2sim --modelin --phase0 --postfilter`).
+- `codec/codec2/src/phase.c`: `phase_synth_zero_order()`, the made-up phases. It also handles mixed frames: a `voiced` value of 2 or more says which harmonic the noise starts at.
 - `codec/codec2/src/postfilter.c`: Codec 2's background-noise postfilter.
 - `codec/codec2/src/sine.c`: `synthesise()`, adding the sine waves and blending frames.
-- `tools/course_figures.py`: `demos()` makes the six clips above.
+- `tools/course_figures.py`: `demos()` makes the seven clips above.
 
 <details markdown="1"><summary>Answers</summary>
 

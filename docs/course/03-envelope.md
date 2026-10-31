@@ -49,7 +49,7 @@ So sotto spends its points where your ears care most.
 
 ## Does it help? The numbers
 
-The sotto team measured voice quality with a score called PESQ (chapter 7 explains it; higher is better, 4.5 is perfect). Starting from the full set of harmonic amplitudes, they swapped in each kind of envelope:
+The sotto team measured voice quality with a score called PESQ (chapter 7 explains it; higher is better, 4.5 is perfect). Starting from the full set of harmonic amplitudes, they swapped in each kind of envelope (these early tests used Codec 2's pitch tracker):
 
 | Envelope | Woman | Man (LibriSpeech) | Man (VE9QRP) |
 |---|---:|---:|---:|
@@ -79,9 +79,9 @@ This way, saying the same vowel loudly or softly gives the same shape.
 
 This rewrite is called the **DCT** (discrete cosine transform). It's the same trick JPEG uses to shrink photos. Nothing is lost by the rewrite itself: 20 numbers in, 20 numbers out. But now most of the shape lives in the first few numbers.
 
-![Rebuilding the shape from cosine waves, and the bits sotto spends on each](figures/dct.svg)
+![Rebuilding the shape from cosine waves](figures/dct.svg)
 
-Left: with just 2 waves you get the overall tilt. With 5 you get the main formant humps. With all 20 you get the shape back exactly. Right: how many bits sotto spends on each wave, which is the subject of the next chapter.
+With just 2 waves you get the overall tilt. With 5 you get the main formant humps. With all 20 you get the shape back exactly. Early versions of sotto rounded each wave's size separately; since v3, sotto's vector quantizer looks at the whole shape at once (chapter 4). The code still works with the cosine-wave sizes inside, because it's a convenient way to drop the average.
 
 ## Try it
 

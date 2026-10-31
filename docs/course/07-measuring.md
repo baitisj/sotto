@@ -8,7 +8,7 @@ Previous: [Across the radio](06-radio.md) · [Course home](README.md) · Next: [
 
 ## Big idea
 
-"Does it sound better?" is a hard question to answer fairly. sotto's team uses computer scores that predict what listeners would say, and a kind of experiment called an **oracle** test, where part of the system is allowed to cheat. Stacking oracle tests one on top of another makes a **quantization ladder** that shows exactly where quality is lost.
+"Does it sound better?" is a hard question to answer fairly. sotto's team uses computer scores that predict what listeners would say, and a kind of experiment called an **oracle** test, where part of the system is allowed to cheat. Stacking oracle tests one on top of another makes a **quantization ladder** that shows exactly where quality is lost. And in the end, real people listen.
 
 ## Scoring speech with a computer
 
@@ -17,7 +17,7 @@ The best test is to play clips to many people and ask them to rate them. That's 
 - **PESQ** ("perceptual evaluation of speech quality") predicts how people would rate the *quality*, on a scale from about 1 (bad) to 4.5 (perfect). It's an international standard, built by fitting a model of human hearing to thousands of real listening tests. A clip compared with itself scores about 4.5; most low-bitrate vocoders land between 2.5 and 3.5.
 - **ESTOI** predicts *intelligibility*: what fraction of the words a listener would understand, from 0 to 1.
 
-These are predictions, not people. They can be fooled. For example, sotto's formant postfilter might flatter PESQ more than it helps real listeners. That's why the design notes list a listening panel as a next step.
+These are predictions, not people. They can be fooled: later in this chapter you'll see a case where PESQ preferred one design and listeners preferred the other. That's why sotto is also tested by ear.
 
 ## What's an oracle?
 
@@ -33,7 +33,7 @@ Now stack the oracles. Start at the top rung with everything perfect: the true h
 
 The team built this ladder for Codec 2 2400 (the code calls it the **oracle ladder**; "quantization ladder" means the same thing):
 
-![The quantization ladder for Codec 2, with sotto v1 at the end](figures/ladder.svg)
+![The quantization ladder for Codec 2, with sotto v3.5 at the end](figures/ladder.svg)
 
 Reading it from left to right:
 
@@ -47,16 +47,16 @@ Reading it from left to right:
 | + quantized pitch and energy, 20 ms | Pitch and energy rounded, every other frame sent | 0 to 0.2 |
 | Codec 2 2400 | The actual codec, start to finish | |
 
-The tallest step down for both men is the LPC-10 envelope. That is the single finding that shaped sotto v0: replace the envelope first (chapter 3). The diamonds at the right are sotto v1, the actual 48-bit codec today. It beats Codec 2 clearly for the woman and the LibriSpeech man, and is about level for VE9QRP.
+The tallest step down for both men is the LPC-10 envelope. That is the single finding that shaped sotto v0: replace the envelope first (chapter 3). The diamonds at the right are sotto v3.5, the actual 48-bit codec today. (They were scored later, with the corrected alignment described below, so compare them loosely.) It's well above Codec 2 for all three voices.
 
 Two other things jump out:
 
-- **The woman starts low.** Even at the top rung, with perfect harmonics, she scores only 3.08, against 3.8 to 4.0 for the men. Rounding can't be the reason, because nothing is rounded yet. The problem is earlier, in the *analysis*: pitch errors (chapter 2), or too few harmonics to read her envelope from (chapter 3). This finding led to sotto v1's pitch tracker, which raised her top-rung score from 2.77 to 3.10 (with made-up phases).
-- **Made-up phases are the second biggest loss.** That points at better voicing and phase models (like mixed voicing) as a future step.
+- **The woman starts low.** Even at the top rung, with perfect harmonics, she scores only 3.08, against 3.8 to 4.0 for the men. Rounding can't be the reason, because nothing is rounded yet. The problem is earlier, in the *analysis*: pitch errors (chapter 2), or too few harmonics to read her envelope from (chapter 3). This finding led to sotto's pitch tracker (v1, then v2), which closed most of her gap.
+- **Made-up phases are the second biggest loss.** That pointed at better voicing models, which led to mixed voicing in v3.2.
 
 ## A ladder for sotto v1
 
-The team built a second ladder for sotto v1 itself. It starts from the harmonic model with sotto's pitch tracker, and adds one step of the real codec at a time:
+Later the team built a ladder for sotto v1 itself. It starts from the harmonic model with sotto's pitch tracker, and adds one step of the real codec at a time:
 
 ![The quantization ladder for sotto v1](figures/ladder-v1.svg)
 
@@ -69,41 +69,73 @@ The team built a second ladder for sotto v1 itself. It starts from the harmonic 
 | + 7-bit pitch, 34-bit shape | Everything rounded to fit 48 bits (chapter 4) | **0.2 to 0.4** |
 | + formant postfilter (= v1) | The decoder sharpens the envelope (chapter 5) | a *gain* of 0.14 to 0.24 |
 
-Now the biggest single loss is the rounding step, the shape quantizer in particular. That tells the team where to work next: a smarter quantizer. But training one needs much more speech than they have (about 2 minutes, nearly all from one man).
+This time the biggest single loss was the rounding step, the shape quantizer in particular. That pointed to a smarter quantizer, but training one needed far more speech than the team had (about 2 minutes, nearly all from one man). Once they found freely usable speech collections, they trained the vector quantizer in v3 (chapter 4). That's how the ladders steer the work: measure where the loss is, fix that, measure again.
+
+## Sweeps: trying every setting
+
+Some choices are a single number, like the formant postfilter's strength or the pitch tracker's look-ahead. For those, the team runs a **sweep**: try a range of values on many voices and plot the score for each. Two examples from v3.5, each over 31 voices:
+
+| Postfilter strength | 1.0 | 1.2 | **1.35** | 1.5 | 1.7 | 2.0 |
+|---|---|---|---|---|---|---|
+| PESQ | 2.81 | 3.02 | **3.08** | 3.06 | 2.94 | 2.69 |
+
+| Tracker look-ahead | 10 ms | 20 ms | 40 ms | **80 ms** | whole recording |
+|---|---|---|---|---|---|
+| PESQ | 3.011 | 3.035 | 3.041 | **3.052** | 3.055 |
+
+The first shows a clear best value. The second shows that 80 ms of look-ahead is almost as good as seeing the whole recording, so real-time tracking costs almost nothing.
 
 ## Encoder against encoder
 
-A ladder tells you where to work. A **race** tells you whether the result is better. In the encoder race, Codec 2 2400, sotto v0 and sotto v1 each sent 48 bits every 20 ms through the identical radio chain, with the same simulated fading, and the scores were averaged over three different random fading patterns. The results are the table at the end of chapter 6. Over the radio channels, both sotto versions win every condition. Against Codec 2, v1 is about 0.5 to 0.6 better for the woman.
+A ladder tells you where to work. A **race** tells you whether the result is better. In the encoder race, every codec sends 48 bits every 20 ms through the identical radio chain, with the same simulated fading, and the scores are averaged over three different random fading patterns. The results are the table at the end of chapter 6.
+
+The team also scores codecs on more voices without the radio: 15 voices (the three clips plus 12 people counting from zero to nine), and 16 more studio and audiobook voices that were held out of training. On those 16, sotto beat Codec 2 on every one.
+
+## Listening tests
+
+Computer scores only predict what people hear, so sotto is now also tested by ear, by members of a radio club. Each test is a **blind A/B comparison**: the listener hears two versions of the same clip, labeled only A and B, and says which is better or that they're the same. Since round 5, the original recording plays next to every pair, so listeners judge "closer to the real voice", not just "nicer".
+
+Each round also includes a **null pair**: the same clip twice. A careful listener should call it a tie. If they pick a winner, their other answers are suspect too.
+
+Listening found things PESQ missed:
+
+- A "glorp" where the woman's voice went above 400 Hz, which led to raising the pitch limit to 500 Hz.
+- A faint "floor" of noise between words, which led to true silence for energy code 0.
+- "five-anuh" in the "v" of "five", which led to mixed voicing and a lighter postfilter.
+- Dropouts that sounded *worse* with a long fade, even though PESQ scored the long fade higher. That led to v3.5's short concealment (chapter 6).
+- A voice at 390 Hz recorded on a poor microphone, where listeners twice preferred Codec 2. That one is still open.
 
 ## Being honest about the results
 
-Good science says what it *didn't* test. The design notes list:
+Good science says what it *didn't* test, and fixes its own mistakes:
 
-- PESQ only, three clips, and no human listening panel yet.
-- One training speaker (VE9QRP) is also a test speaker, though a different part of the recording.
-- Only about 2 minutes of training speech, nearly all from one man. Small changes (like retraining the shape quantizer) move one voice's score by about ±0.1, so differences that small aren't meaningful.
-- The new pitch tracker looks ahead to the end of each voiced stretch, which a real-time radio can't do yet.
-- sotto is still a Python prototype using parts of Codec 2, not yet a fast C program on the radio's chip.
+- **A scoring bug.** PESQ and ESTOI compare the decoded clip with the original, so the two must be lined up in time. The scripts used to line them up by matching waveforms, but vocoders with made-up phases don't follow the original waveform, so the match picked delays anywhere from 50 to 180 samples when the right answer is about 160. That made scores wrong by up to ±0.1 (and ESTOI too low). Now every codec is scored with the same fixed delay of 160 samples. Old write-ups got their rankings right but some numbers wrong, and the course uses the corrected numbers.
+- **Few listeners.** Most listening rounds had one listener. That's enough to find problems, not to prove small differences.
+- **Training speech.** The codebook is trained on CC BY speech only, so it can be shipped. Another collection (EARS) is used only for testing because its license doesn't allow shipping.
+- **Not real time yet.** sotto is still a Python prototype using parts of Codec 2, not yet a fast C program on the radio's chip.
 
 ## What's next for sotto
 
 From `docs/encoder-v1.md`:
 
-1. Much more training and test speech (30 minutes or more, from at least 10 speakers, half of them women), then a smarter shape quantizer (a trained *vector quantizer*) and a re-tuned pitch tracker.
-2. A pitch tracker that only looks a short way ahead, so it can run in real time.
-3. Listening tests for band voicing and the postfilter, which PESQ can't judge.
-4. Rewriting sotto in C so it runs in real time on the radio's DSP chip (a TI C5517).
+1. Rewriting sotto v3.5 in C for the radio's DSP chip (a TI C5517), with the tracker's look-ahead fixed at 80 ms.
+2. Spreading each frame's bits across *two* radio frames (200 ms) to ride out longer fades at 30 to 60 km/h.
+3. Retraining the codebook on more speech when it's available.
+4. Working out, by ear, what listeners want for very high voices.
 
 ## Try it
 
 1. A ladder rung drops PESQ from 3.5 to 2.9. Another drops it from 2.9 to 2.8. If you had a month to improve the codec, which would you work on? Why?
 2. Design an oracle test to find out whether the 2 voicing bits are good enough. What would you replace, and what would you compare?
 3. Why do you think the team averaged the race over three different fading patterns instead of one?
+4. In a listening round, a listener says the null pair's B sounds clearly better. What should the team conclude?
 
 ## Where this is in the code
 
 - `sim/oracle_ladder.py`: builds the ladder. Results in `docs/results/oracle_ladder_15s.json`.
-- `sim/encoder_race.py`: the encoder race (`--codecs` picks which codecs race). Results in `docs/results/encoder_race.json`.
+- `sim/encoder_race.py`: the encoder race (`--codecs` picks which codecs race). Results in `docs/results/encoder_race.json`; more voices in `docs/results/clean_15voices.json` and `docs/results/codebook_eval.json`.
+- `sim/audio_race.py`: `CODEC_DELAY`, the fixed 160-sample alignment.
+- `tools/sc_counting_clips.py`: builds the counting clips from Speech Commands.
 - `sim/vocoder_lab.py`: the oracle lab (edit the model in Python, synthesize with `c2sim`).
 - `tools/score_samples.py` and `sim/audio_race.py`: PESQ and ESTOI scoring.
 
@@ -112,5 +144,6 @@ From `docs/encoder-v1.md`:
 1. The first one (a 0.6 drop). Fixing it could win back up to 0.6 points. The second could win back at most 0.1.
 2. Replace the 2 transmitted voicing bits with an oracle: careful voicing decisions for every 10 ms (for example, marked by hand or by a better detector), or even per-band voicing. Keep everything else the same and compare PESQ. If the score rises a lot, voicing is worth improving.
 3. Fading is random. One pattern might happen to put a deep fade on an important word for one codec and on a pause for the other. Averaging several patterns makes the comparison fairer.
+4. The two clips were identical, so the listener heard a difference that wasn't there. Their other answers in that round may be guesses too, and should count for less.
 
 </details>

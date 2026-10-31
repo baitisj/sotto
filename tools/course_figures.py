@@ -31,6 +31,8 @@ from modem.link import Transmitter
 SAMPLES = os.path.join(ROOT, "docs", "samples")
 FS = 8000
 MALE, FEMALE = "male_ve9qrp_15s", "female_libri198_14s"
+CODEC = vl.SottoV35            # the version the course describes
+PITCH = CODEC.PITCH
 
 # Reference palette (light mode), see the figures' README
 BG, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
@@ -194,7 +196,7 @@ def fig_harmonics(out, x, m, i):
 
 
 def fig_pitch(out, xm, mm, xf, mf, mf_c2):
-    """mm, mf: sotto v1 analysis (octave-corrected tracker); mf_c2: Codec 2's own track."""
+    """mm, mf: sotto's analysis (joint pitch and voicing tracker); mf_c2: Codec 2's own track."""
     t0, t1 = 0.0, 4.0
     fig, axs = plt.subplots(4, 1, figsize=(9, 9.4), sharex=True,
                             gridspec_kw=dict(height_ratios=[1.2, 1.2, 1, 1], hspace=0.36))
@@ -219,7 +221,7 @@ def fig_pitch(out, xm, mm, xf, mf, mf_c2):
     ax.set_title("The woman's pitch: sotto's tracker removes many of Codec 2's octave jumps")
     ax.set_xlabel("time (seconds)")
     for ax in axs[2:]:
-        ax.set_ylim(50, 400)
+        ax.set_ylim(50, 500)
         ax.set_ylabel("pitch (Hz)")
         ax.legend(loc="upper right", ncol=2, fontsize=9)
     save(fig, out, "pitch.svg")
@@ -253,37 +255,118 @@ def fig_envelope(out, x, m, i):
     save(fig, out, "envelope.svg")
 
 
-def fig_dct(out, m, i, sq):
+def fig_dct(out, m, i):
     rk = vl.to_rate_k(m)[i]
     shape = rk - rk.mean()
     c = vl.DCT @ shape
-    fig, axs = plt.subplots(1, 2, figsize=(9.5, 3.9), gridspec_kw=dict(width_ratios=[1.25, 1], wspace=0.28))
-    ax = axs[0]
+    fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(vl.KFREQ, shape, "s", ms=6, color=INK2, mec=BG, mew=1, label="the 20 points (average removed)", zorder=3)
     for n, col in ((2, YELLOW), (5, ORANGE), (20, AQUA)):
         cc = np.zeros(vl.K)
         cc[:n] = c[:n]
-        ax.plot(vl.KFREQ, vl.DCT.T @ cc, color=col, label=f"rebuilt from the first {n} wave{'s' if n > 1 else ''}"
+        ax.plot(vl.KFREQ, vl.DCT.T @ cc, color=col, label=f"rebuilt from the first {n} waves"
                 if n < 20 else "rebuilt from all 20 (exact)", lw=1.8)
     ax.set_xlabel("frequency (Hz)")
     ax.set_ylabel("dB above or below average")
     ax.set_title("Adding up cosine waves rebuilds the shape")
-    ax.legend(fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=2)
+    ax.legend(fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=2)
     ax.set_xlim(0, 4000)
-    ax = axs[1]
-    bits = np.concatenate([[0], sq.bits])
-    ax.bar(np.arange(vl.K), bits, color=AQUA, width=0.7)
-    ax.set_xlabel("which cosine wave (0 = average level)")
-    ax.set_ylabel("bits spent")
-    ax.set_title(f"sotto v1's {int(sq.bits.sum())} shape bits")
-    ax.set_xticks([0, 5, 10, 15, 19])
-    ax.grid(axis="x", visible=False)
-    for k, b in enumerate(bits):
-        if b:
-            ax.text(k, b + 0.1, str(b), ha="center", va="bottom", fontsize=8.5, color=INK2)
-    ax.text(0, 0.2, "sent as\nenergy", ha="center", va="bottom", fontsize=8, color=INK2)
-    ax.set_ylim(0, max(bits) + 1)
     save(fig, out, "dct.svg")
+
+
+def fig_vq(out, m, i, vq, sq):
+    """The 3-stage shape VQ on one frame, and its error against v0-v2's scalar quantizer."""
+    rk = vl.to_rate_k(m)
+    shape = rk[i] - rk[i].mean()
+    idx = vq.indices(shape)[0]
+    fig, axs = plt.subplots(1, 2, figsize=(9.5, 3.9), gridspec_kw=dict(width_ratios=[1.6, 1], wspace=0.3))
+    ax = axs[0]
+    ax.plot(vl.KFREQ, shape, "s", ms=6, color=INK2, mec=BG, mew=1, label="the shape to send", zorder=3)
+    c = np.zeros(vl.K)
+    for s_, (col, lab) in enumerate(((YELLOW, "stage 1 (12 bits)"), (ORANGE, "+ stage 2 (11 bits)"),
+                                     (AQUA, "+ stage 3 (11 bits)"))):
+        c[1:] += vq.cb[s_][idx[s_]]
+        ax.plot(vl.KFREQ, vl.DCT.T @ c, color=col, lw=1.8, label=lab)
+    ax.set_xlim(0, 4000)
+    ax.set_xlabel("frequency (Hz)")
+    ax.set_ylabel("dB above or below average")
+    ax.set_title("Three codebook entries, added up")
+    ax.legend(fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=2)
+    # mean squared error over the clip's speech frames
+    e = vl.frame_energy_db(m)
+    keep = e > np.percentile(e, 95) - 30
+    sh = rk[keep] - rk[keep].mean(1, keepdims=True)
+    err = []
+    for k in (1, 2, 3):
+        cs_ = np.zeros((len(sh), vl.K))
+        ii = vq.indices(sh)
+        for s_ in range(k):
+            cs_[:, 1:] += vq.cb[s_][ii[:, s_]]
+        err.append(np.mean((sh - cs_ @ vl.DCT) ** 2))
+    err_sq = np.mean((sh - sq.quantize(sh)) ** 2)
+    ax = axs[1]
+    labels = ["VQ\n1 stage\n12 bits", "VQ\n2 stages\n23 bits", "VQ\n3 stages\n34 bits", "scalar\n(v0–v2)\n34 bits"]
+    vals = err + [err_sq]
+    ax.bar(range(4), vals, color=[AQUA, AQUA, AQUA, INK2], width=0.65)
+    for k, v in enumerate(vals):
+        ax.text(k, v + 0.2, f"{v:.1f}", ha="center", va="bottom", fontsize=9, color=INK2)
+    ax.set_xticks(range(4))
+    ax.set_xticklabels(labels, fontsize=8)
+    ax.set_ylabel("average error (dB²)")
+    ax.set_title("Error on this clip")
+    ax.grid(axis="x", visible=False)
+    ax.set_ylim(0, max(vals) * 1.2)
+    save(fig, out, "vq.svg")
+    return err, err_sq
+
+
+def fig_mixed(out, m, i):
+    """Spectrum of the same vowel synthesised fully voiced and as mixed excitation."""
+    seg = m[i - 30:i + 30].copy()
+    vo, mx = seg.copy(), seg.copy()
+    vo["voiced"] = 1
+    mx["voiced"] = [vl.mixed_cutoff(w) for w in mx["Wo"]]
+    fig, axs = plt.subplots(1, 2, figsize=(9.5, 3.7), sharey=True, gridspec_kw=dict(wspace=0.08))
+    for ax, mm_, title, col in ((axs[0], vo, "Voiced: harmonics all the way up", BLUE),
+                                (axs[1], mx, "Mixed: harmonics below 1 kHz, noise above", VIOLET)):
+        y = vl.synthesise(mm_)[400:-400]
+        f, P = signal.welch(y, FS, nperseg=512)
+        ax.plot(f, 10 * np.log10(P + 1e-12), color=col, lw=1.2)
+        ax.axvline(1000, color=INK2, lw=0.8, ls=(0, (3, 3)))
+        ax.set_title(title, fontsize=11)
+        ax.set_xlim(0, 4000)
+        ax.set_xlabel("frequency (Hz)")
+    axs[0].set_ylabel("loudness (dB)")
+    lo = axs[0].get_ylim()
+    axs[0].set_ylim(max(lo[0], lo[1] - 80), lo[1])
+    save(fig, out, "mixed.svg")
+
+
+def fig_conceal(out):
+    """Output level during a run of lost frames, from the gain rule in SottoV34.decode()
+    (10 ms halves of 20 ms frames), and the older receiver rule (repeat 3 frames, then mute)."""
+    t = np.arange(0, 400, 10)                           # ms since the first lost frame
+
+    def level(hold, slope, max_lost):
+        j = t // 20 + 1                                 # which lost frame (1 = first)
+        half = (t % 20) // 10
+        g = -slope * np.maximum(0, j - hold + half / 2)
+        return np.where(j > max_lost, -80.0, g)
+    old = np.where(t // 20 + 1 > 3, -80.0, 0.0)
+    fig, ax = plt.subplots(figsize=(9, 3.8))
+    for y, col, lab in ((old, INK2, "receiver repeats 3 frames, then mutes (Codec 2; sotto to v3.3)"),
+                        (level(1, 2.0, 15), YELLOW, "v3.4: slow fade over 300 ms"),
+                        (level(2, 6.0, 4), BLUE, "v3.5: hold 40 ms, fade 6 dB per 20 ms, silent after 80 ms")):
+        ax.step(np.r_[-20, t], np.maximum(np.r_[0, y], -40), where="post", color=col, lw=2, label=lab)
+    ax.set_ylim(-42, 3)
+    ax.set_xlim(-20, 400)
+    ax.set_yticks([0, -10, -20, -30, -40])
+    ax.set_yticklabels(["0", "−10", "−20", "−30", "silent"])
+    ax.set_xlabel("time since the first lost frame (ms)")
+    ax.set_ylabel("output level (dB)")
+    ax.set_title("What the decoder plays while frames are lost")
+    ax.legend(loc="upper right", fontsize=9)
+    save(fig, out, "conceal.svg")
 
 
 def fig_quantize(out, m):
@@ -354,9 +437,9 @@ def fig_rebuild(out, voice):
     x = load(voice + "__original")
     files = [("Original speech", x),
              ("Codec 2 2400, no radio", load(f"{voice}__No_radio_channel__codec2_2400", "encoder")),
-             ("sotto v1, no radio", load(f"{voice}__No_radio_channel__sotto_v1", "encoder")),
-             ("sotto v1 over a weak 446 MHz mobile signal",
-              load(f"{voice}__446_MHz_60_kmh_52_dB-Hz__sotto_v1", "encoder"))]
+             ("sotto v3.5, no radio", load(f"{voice}__No_radio_channel__sotto_v35", "encoder")),
+             ("sotto v3.5 over a weak 446 MHz mobile signal",
+              load(f"{voice}__446_MHz_60_kmh_52_dB-Hz__sotto_v35", "encoder"))]
     t0, t1 = 1.0, 3.5
     fig, axs = plt.subplots(len(files), 1, figsize=(9, 9), sharex=True, gridspec_kw=dict(hspace=0.32))
     top = None
@@ -379,7 +462,8 @@ def best_lag(r, y, max_lag=400):
 
 def fig_ladder(out):
     """The quantization (oracle) ladder for Codec 2 from docs/results/oracle_ladder_15s.json,
-    with sotto v1 from docs/results/encoder_race.json as the last rung."""
+    with sotto v3.5 from docs/results/encoder_race.json as the last rung (scored with the later
+    fixed 160-sample alignment, so it is only roughly comparable)."""
     import json
     res = os.path.join(ROOT, "docs", "results")
     lad = json.load(open(os.path.join(res, "oracle_ladder_15s.json")))
@@ -395,11 +479,11 @@ def fig_ladder(out):
         y = [p for p, _ in lad[v].values()]
         ax.plot(x, y, "-o", color=col, ms=7, mec=BG, mew=1.5, label=lab)
         s0 = next(r["per_clip"][v]["pesq"] for r in race
-                  if r["codec"] == "sotto_v1" and r["cond"] == "No radio channel")
+                  if r["codec"] == "sotto_v35" and r["cond"] == "No radio channel")
         ax.plot(len(labels), s0, "D", ms=8, color=col, mec=BG, mew=1.5)
         ax.plot([len(labels) - 1, len(labels)], [y[-1], s0], color=col, lw=1.2, ls=(0, (3, 3)))
     ax.set_xticks(list(x) + [len(labels)])
-    ax.set_xticklabels(labels + ["sotto v1\n(48 bits)"], fontsize=8.5)
+    ax.set_xticklabels(labels + ["sotto v3.5\n(48 bits)"], fontsize=8.5)
     ax.axvspan(2.6, 3.4, color=VIOLET, alpha=0.1, lw=0)
     ax.text(3, 4.05, "biggest step\ndown for men", ha="center", va="top", fontsize=9, color=VIOLET)
     ax.set_ylabel("PESQ score (higher = better)")
@@ -532,17 +616,19 @@ def fig_spread(out):
 
 
 # ---------------------------------------------------------------- listening demos
-def demos(out, x, sq):
+def demos(out, x):
     """Short clips that each break one part of the model, so you can hear what it does."""
     x = x[:int(6 * FS)]
     d = os.path.join(out, "audio")
     os.makedirs(d, exist_ok=True)
-    m = vl.analyse(x, "tracked")
-    v1 = vl.SottoV0(sq, pitch="tracked")          # sotto v1: v0's layout with the octave-corrected tracker
+    m = vl.analyse(x, PITCH)
+    codec = CODEC()
     robot = vl.set_wo(m, np.full(len(m), 2 * np.pi * 110 / FS), m["voiced"])
     robot = vl.from_rate_k(robot, vl.to_rate_k(m))
     whisper = m.copy()
     whisper["voiced"] = 0
+    mixed = m.copy()
+    mixed["voiced"] = [vl.mixed_cutoff(w) if v else 0 for w, v in zip(m["Wo"], m["voiced"])]
     flat = m.copy()
     for r in flat:
         L = r["L"]
@@ -553,7 +639,8 @@ def demos(out, x, sq):
         "whisper": vl.synthesise(whisper),
         "monotone": vl.synthesise(robot),
         "flat_envelope": vl.synthesise(flat, postfilter=False),
-        "sotto_v1": v1.decode_audio(v1.encode(x)),
+        "mixed": vl.synthesise(mixed),
+        "sotto_v35": codec.decode_audio(codec.encode(x)),
     }
     for name, y in clips.items():
         y = np.asarray(y)[:len(x)]
@@ -565,23 +652,25 @@ def demos(out, x, sq):
 def main(out):
     os.makedirs(os.path.join(out, "figures"), exist_ok=True)
     xm, xf = load(MALE + "__original"), load(FEMALE + "__original")
-    mm, mf = vl.analyse(xm, "tracked"), vl.analyse(xf, "tracked")      # sotto v1's analysis
+    mm, mf = vl.analyse(xm, PITCH), vl.analyse(xf, PITCH)      # sotto's analysis
     iv, _ = fig_waveform(out, xm, mm)
     fig_harmonics(out, xm, mm, iv)
     fig_pitch(out, xm, mm, xf, mf, vl.analyse(xf))
     fig_envelope(out, xm, mm, iv)
+    fig_dct(out, mm, iv)
     sq = vl.ShapeQ(vl.training_set("tracked"))
-    print("shape bits:", sq.bits.tolist())
-    fig_dct(out, mm, iv, sq)
+    print("VQ error by stage, scalar error:", *fig_vq(out, mm, iv, vl.ShapeMSVQ.load(), sq))
     fig_quantize(out, mm)
     fig_synthesis(out, xm, mm, iv)
+    fig_mixed(out, mm, iv)
     fig_rebuild(out, FEMALE)
     fig_ladder(out)
     fig_ladder_v1(out)
     fig_c4fm(out)
     fig_fading(out)
+    fig_conceal(out)
     print("spread demo (plain, spread):", *fig_spread(out))
-    demos(out, xm, sq)
+    demos(out, xm)
 
 
 if __name__ == "__main__":
