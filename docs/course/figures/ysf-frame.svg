@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 290" width="900" height="290" font-family="DejaVu Sans, system-ui, sans-serif">
+  <style>
+    .t { font-size: 13px; font-weight: bold; fill: #0b0b0b; text-anchor: middle; }
+    .s { font-size: 11.5px; fill: #52514e; text-anchor: middle; }
+    .a { stroke: #52514e; stroke-width: 1.6; fill: none; marker-end: url(#ar); }
+  </style>
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker></defs>
+  <rect width="900" height="290" fill="#fcfcfb"/>
+  <text x="20" y="26" style="font-size:14px;font-weight:bold;fill:#0b0b0b">One 100 ms radio frame (System Fusion layout) carrying five sotto frames</text>
+  <!-- 960 bits over 840 px: 0.875 px/bit -->
+  <rect x="30" y="44" width="35" height="44" fill="#e2dfd7" stroke="#fcfcfb" stroke-width="2"/>
+  <rect x="65" y="44" width="175" height="44" fill="#fbe7b8" stroke="#fcfcfb" stroke-width="2"/>
+  <rect x="240" y="44" width="630" height="44" fill="#fdd9c7" stroke="#fcfcfb" stroke-width="2"/>
+  <text x="47.5" y="71" class="t" style="font-size:11px">sync</text>
+  <text x="152" y="71" class="t">FICH</text>
+  <text x="555" y="71" class="t">payload: 720 bits</text>
+  <text x="47.5" y="104" class="s">40</text><text x="152" y="104" class="s">200 bits: what kind of frame</text><text x="555" y="104" class="s">the voice, heavily protected</text>
+  <!-- payload build -->
+  <g transform="translate(0,130)">
+    <text x="30" y="14" style="font-size:12px;font-weight:bold;fill:#52514e">How the payload is built</text>
+    <rect x="30" y="26" width="150" height="56" rx="8" fill="#e8f1fb" stroke="#2a78d6" stroke-width="1.5"/>
+    <text x="105" y="50" class="t">5 × 48 bits</text><text x="105" y="68" class="s">voice frames</text>
+    <rect x="215" y="26" width="150" height="56" rx="8" fill="#fff" stroke="#c9c7c0" stroke-width="1.5"/>
+    <text x="290" y="50" class="t">+ CRC-8 each</text><text x="290" y="68" class="s">5 × 56 = 280 bits</text>
+    <rect x="400" y="26" width="160" height="56" rx="8" fill="#fff" stroke="#c9c7c0" stroke-width="1.5"/>
+    <text x="480" y="50" class="t">Convolutional code</text><text x="480" y="68" class="s">280 → 720 bits</text>
+    <rect x="595" y="26" width="120" height="56" rx="8" fill="#fff" stroke="#c9c7c0" stroke-width="1.5"/>
+    <text x="655" y="50" class="t">Spread</text><text x="655" y="68" class="s">shuffle positions</text>
+    <rect x="750" y="26" width="120" height="56" rx="8" fill="#fff" stroke="#c9c7c0" stroke-width="1.5"/>
+    <text x="810" y="50" class="t">Scramble</text><text x="810" y="68" class="s">XOR with PN9</text>
+    <path d="M180,54 H211" class="a"/><path d="M365,54 H396" class="a"/><path d="M560,54 H591" class="a"/><path d="M715,54 H746" class="a"/>
+    <text x="30" y="112" style="font-size:11.5px;fill:#52514e">CRC: lets the receiver tell a broken frame from a good one. Code: adds 440 bits of clever redundancy to fix errors.</text>
+    <text x="30" y="130" style="font-size:11.5px;fill:#52514e">Spread: one fade can't wipe out one whole frame. Scramble: avoids long runs of the same symbol.</text>
+  </g>
+</svg>
