@@ -350,7 +350,11 @@ That makes 3 wins for depth 2, 2 for depth 1 and 1 tie. Ears and PESQ disagree o
 
 ESTOI improves on 14 of 19 voices, most on the EARS studio voices. PESQ drops on one voice (EARS p047, 2.90 to 2.77).
 
-**`SottoV36`** = v3.5 + the 9 + 9 + 8 + 8 codebook in 8-bit values (round 9: 5 ties of 5) + envelope-band energy. The C port builds it with `make -C c VARIANT=v3.6`, and the check against Python is bit-exact on 2 voices apart from one tracker near-tie frame. Listening round 10 puts v3.5 against v3.6 on 10 voices, including p020 and p047.
+**`SottoV36`** = v3.5 + the 9 + 9 + 8 + 8 codebook in 8-bit values (round 9: 5 ties of 5) + envelope-band energy. The C port builds it (now by default; `make -C c VARIANT=v3.5` for the old one). Listening round 10 put v3.5 against v3.6 on 10 voices, including p020 and p047. Jeff picked v3.6 twice: LibriSpeech 652, and p020, where v3.6 "has much better sound as the speaker inhales" and the opening buzz is gone. The other 8 were ties, including p047, and the null pair was answered correctly. **v3.6 is now the C port's default.**
+
+Still open from round 10:
+- Faint high-frequency "squeaks" in p020's first second in both versions.
+- A rough rendering of background noise in LibriSpeech 3081, in both versions.
 
 ## What limits the next step: speech data
 
@@ -361,6 +365,6 @@ The shape quantizer is trained on about 2 minutes of speech, nearly all from one
 1. Done: the public listening page uses v3.5 (rounds 7 and 8).
 2. Done: float C port of v3.5 in `c/`, bit-exact with Python on 99.97% of frames (`docs/c-port.md`). Next is fixed point for the C5517, starting with Codec 2's analysis and synthesis.
 3. Done: depth-2 interleaving (200 ms): +0.02 to +0.30 PESQ from 30 km/h up (most on weak signals), −0.07 at walking pace. Round 9 by ear: depth 2 won 3, lost 2, tied 1. Test more fast-mobile pairs before making it the default.
-4. v3.6: the 9 + 9 + 8 + 8 codebook (29 KB as 8-bit values, a quarter of the search) scores the same as the shipped one by PESQ, and round 9 heard no difference (5 ties out of 5). Switch to it so the PC tools and the DSP share it.
+4. Done: v3.6 (29 KB codebook + envelope-band energy) won round 10 (2 wins, 8 ties) and is the C default. Next: the public page, and background noise (LibriSpeech 3081 in round 10).
 5. Retrain the codebook on VCTK or more LibriSpeech (train-clean-100) when someone can upload it.
 6. Still open by ear: the 390 Hz voice (Codec 2 preferred twice, though v3 is closer to that band-limited original).

@@ -159,7 +159,7 @@ def test_c_port_matches_python():
     x16 = x16[:len(x16) // 160 * 160]
     vl.TRACK2["lag"] = 8
     try:
-        v = vl.SottoV35()
+        v = vl.SottoV36()                                 # the C build's default variant
         bp = v.encode(x16 / 32767.0)
     finally:
         vl.TRACK2.pop("lag")

@@ -1,6 +1,7 @@
 # sotto in C
 
-A C port of the sotto v3.5 codec (`sim/vocoder_lab.py`, class `SottoV35`), floating point.
+A C port of the sotto codec (`sim/vocoder_lab.py`), floating point. It builds v3.6 (`SottoV36`, the
+29 KB codebook for the radio's DSP) by default, and v3.5 (`SottoV35`) with `make VARIANT=v3.5`.
 It encodes 8 kHz speech into 48-bit frames every 20 ms (2400 bit/s) and decodes them back,
 with the same bits as the Python model.
 
@@ -23,7 +24,7 @@ header `sotto.h` and a pkg-config file (`pkg-config --cflags --libs sotto`). The
 library exports only the `sotto_*` functions in `sotto.h`. It needs `libcodec2` at run time:
 the build-tree copy is found through an rpath, and an installed copy through the system's
 library path. `sotto_format()` names the bitstream the library speaks, for example
-`sotto v3.5, shape 12-11-11`. A library built with another codebook can't decode its frames.
+`sotto v3.6, shape 9-9-8-8`. A library built with another codebook can't decode its frames.
 
 ## Input level
 
@@ -35,7 +36,7 @@ voices sit at −22 to −27 dBFS, and their loudest 10 ms are 3 to 8 dB below s
 decoder reproduces the coded level. A pytest case checks the constants against the encoder.
 
 `good.u8` is optional: one byte per frame, 0 for a frame that failed its CRC. The decoder
-conceals those frames as v3.5 does (hold 40 ms, fade 6 dB per 20 ms, silent after 80 ms).
+conceals those frames as v3.5 and v3.6 do (hold 40 ms, fade 6 dB per 20 ms, silent after 80 ms).
 
 ## API
 
@@ -47,7 +48,7 @@ late, because each odd 10 ms half is interpolated with the next frame.
 ## Checked against Python
 
 `tools/check_c_port.py` encodes clips with both, and decodes the same bits with both (with a
-random 10% frame loss). On 19 voices (`docs/results/c_port_check.json`):
+random 10% frame loss). On 19 voices with v3.5 (`docs/results/c_port_check.json`):
 
 - encoder: 11,170 of 11,173 frames (99.97%) bit-exact. The 3 others are near-ties where the
   pitch tracker can go either way between two octaves: the C side computes spectra with
@@ -55,6 +56,8 @@ random 10% frame loss). On 19 voices (`docs/results/c_port_check.json`):
   encoder against 2.475 for Python (with the 10% loss).
 - decoder: given the same bits, the C output matches the Python output to about 100 dB SNR,
   concealment included.
+- v3.6 (`docs/results/c_port_check_v36.json`): the same 11,170 of 11,173 frames bit-exact,
+  decoders within 96 dB.
 
 ## Speed
 

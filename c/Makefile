@@ -3,13 +3,13 @@
 #   make check           API test against the shared library
 #   make install PREFIX=/usr/local   library, header and pkg-config file
 #   make CODEC2_SRC=... CODEC2_LIB=...   to use another Codec 2 tree
-#   make clean all VARIANT=v3.6   for v3.6 (the C5517 codebook)
+#   make clean all VARIANT=v3.5   for v3.5 (the 152 KB 12+11+11 codebook)
 #   make clean all CODEBOOK=sim/data/shape_msvq_9988.npz   for another codebook
 CODEC2_SRC ?= ../codec/codec2/src
 CODEC2_LIB ?= ../build/codec2/src
 PYTHON ?= python3
 # VARIANT=v3.6: 9+9+8+8 codebook in 8-bit values, energy from the rate-K envelope
-VARIANT ?= v3.5
+VARIANT ?= v3.6
 ifeq ($(VARIANT),v3.6)
 CODEBOOK ?= sim/data/shape_msvq_9988.npz
 CBROUND = --round 8
