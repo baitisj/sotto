@@ -145,7 +145,7 @@ struct sotto_enc {
   /* even half of the frame being built */
   float wo_e;
   double en_e;
-  int idx_e[3], cls_e;
+  int idx_e[SOTTO_CB_MAX_STAGES], cls_e;
   unsigned char q[8][SOTTO_BYTES_PER_FRAME];
   int q_head, q_n, flushed;
 };
@@ -336,11 +336,11 @@ static int get_bits(const unsigned char *in, int *pos, int nb) {
 }
 
 /* ShapeMSVQ._search: M-best multistage search over DCT coefficients 1..K-1 */
-static void msvq_search(const double *c, int idx[3]) {
-  int np = 1, path[MBEST][3];
+static void msvq_search(const double *c, int *idx) {
+  int np = 1, path[MBEST][SOTTO_CB_MAX_STAGES];
   double recon[MBEST][NC];
   memset(recon, 0, sizeof recon);
-  for (int s = 0; s < SOTTO_CB_STAGES; s++) {
+  for (int s = 0; s < sotto_cb_stages; s++) {
     int n = 1 << sotto_cb_bits[s], nk = 0;
     const float *cb = sotto_cb[s];
     double kd[MBEST];
@@ -359,7 +359,7 @@ static void msvq_search(const double *c, int idx[3]) {
         }
       }
     }
-    int npath[MBEST][3];
+    int npath[MBEST][SOTTO_CB_MAX_STAGES];
     double nrec[MBEST][NC];
     for (int i = 0; i < nk; i++) {
       memcpy(npath[i], path[kp[i]], sizeof path[0]);
@@ -377,7 +377,7 @@ static void msvq_search(const double *c, int idx[3]) {
     for (int k = 0; k < NC; k++) d += (c[k] - recon[p][k]) * (c[k] - recon[p][k]);
     if (p == 0 || d < bd) bd = d, best = p;
   }
-  memcpy(idx, path[best], 3 * sizeof(int));
+  memcpy(idx, path[best], sotto_cb_stages * sizeof(int));
 }
 
 /* vocoder_lab.to_rate_k for one frame */
@@ -455,7 +455,7 @@ static void emit(struct sotto_enc *e, int cls) {
     put_bits(out, &pos, code, 2);
     put_bits(out, &pos, q_index(logf(e->wo_e), log(WO_MIN), log(WO_HI), 7), 7);
     put_bits(out, &pos, q_index(e->en_e, E_LO, E_HI, 5), 5);
-    for (int s2 = 0; s2 < SOTTO_CB_STAGES; s2++) put_bits(out, &pos, e->idx_e[s2], sotto_cb_bits[s2]);
+    for (int s2 = 0; s2 < sotto_cb_stages; s2++) put_bits(out, &pos, e->idx_e[s2], sotto_cb_bits[s2]);
   }
 }
 
@@ -591,7 +591,7 @@ static void unpack(struct sotto_dec *d, const unsigned char *b, dframe_t *f) {
   f->wo = exp(log(WO_MIN) + wi * (log(WO_HI) - log(WO_MIN)) / 127);
   f->en = ei == 0 ? -60.0 : E_LO + ei * (E_HI - E_LO) / 31;
   double c[K] = {0};
-  for (int s = 0; s < SOTTO_CB_STAGES; s++) {
+  for (int s = 0; s < sotto_cb_stages; s++) {
     const float *y = sotto_cb[s] + get_bits(b, &pos, sotto_cb_bits[s]) * NC;
     for (int k = 0; k < NC; k++) c[k + 1] += y[k];
   }

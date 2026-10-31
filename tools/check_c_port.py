@@ -1,13 +1,13 @@
 """Check the C port (c/) against the Python model (sim/vocoder_lab.py SottoV35 with the
 fixed-lag tracker, TRACK2["lag"] = 8).
 
-Usage: python tools/check_c_port.py CLIP.flac [...] [--loss 0.1] [--json OUT.json]
+Usage: python tools/check_c_port.py CLIP.flac [...] [--loss 0.1] [--json OUT.json] [--codebook CB.npz]
 
 Encoder: the fraction of 20 ms frames whose 48 bits match exactly, and which fields differ.
 Decoder: both decoders get the same (Python) bits, with a random frame-loss pattern when
 --loss is set; reports the sample SNR of the C output against the Python output, plus
 PESQ of each against the original so a mismatch can be judged by its effect.
-Build c/ first (make -C c).
+Build c/ first (make -C c), with CODEBOOK=CB.npz when checking another codebook.
 """
 import argparse, json, os, subprocess, sys, tempfile
 import numpy as np, soundfile as sf
@@ -45,9 +45,9 @@ def snr_db(ref, y):
     return 10 * np.log10(np.sum(ref[:n] ** 2) / (np.sum((ref[:n] - y[:n]) ** 2) + 1e-20))
 
 
-def main(clips, loss, out):
+def main(clips, loss, out, codebook=None):
     vl.TRACK2["lag"] = 8
-    v = vl.SottoV35()
+    v = vl.SottoV35(vq=vl.ShapeMSVQ.load(codebook) if codebook else None)
     import audio_race as ar
 
     def pesq(x, y):
@@ -88,5 +88,6 @@ if __name__ == "__main__":
     a.add_argument("clips", nargs="+")
     a.add_argument("--loss", type=float, default=0.0)
     a.add_argument("--json")
+    a.add_argument("--codebook")
     a = a.parse_args()
-    main(a.clips, a.loss, a.json)
+    main(a.clips, a.loss, a.json, a.codebook)
