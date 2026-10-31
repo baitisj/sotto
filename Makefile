@@ -1,6 +1,6 @@
 # sotto top-level build. Builds our Codec 2 fork, then libsotto and its tools in c/.
 #   make                          Codec 2 (build/codec2) + libsotto.so, libsotto.a, c/sotto_enc, c/sotto_dec
-#   make fixed                    the fixed-point (integer-only) build in c/fixed/ (decoder so far)
+#   make fixed                    the fixed-point (integer-only) encoder and decoder in c/fixed/
 #   make check                    C API test, then the Python tests (pytest)
 #   make install PREFIX=/usr/local   libsotto + header + pkg-config, and libcodec2 from our fork
 #   make clean                    remove the C build;  make distclean also removes build/codec2

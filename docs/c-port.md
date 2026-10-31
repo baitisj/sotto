@@ -115,11 +115,73 @@ top of `c/fixed/fx.h`.
   | 10% frame loss | 2.481 | 2.492 |
 
 - Size on x86: 5 KB of code, 34 KB of tables (29 KB of them the codebook), and 0.8 KB of
-  state. Work per 10 ms is about 40,000 multiply-adds at most (the synthesis sums are
-  25,600 of them at the lowest pitch). That is a few MHz on the C5517, to be measured with
-  TI's compiler.
+  state.
 
-**Encoder: next.** After that come the encoder memory change and cycle counts.
+**Encoder: done** (`c/fixed/sotto_fx_enc.c`, the same `sotto_enc_*` API).
+
+- It follows the float encoder step by step: Codec 2's nlp pitch estimator in block floating
+  point, the harmonic-sum refinement and MBE voicing fit, sotto's tracker with its costs in
+  natural-log units (Q16), the rate-K envelope, and the M-best codebook search.
+- The spectra come from a 512-point integer FFT. Instead of the float encoder's 16 stored
+  spectra (70 KB), it keeps the last 1,520 input samples and redoes the FFT for the frame
+  the tracker is deciding, 80 ms later.
+- The codebook search, the largest cost, is written as one 16 × 16-bit multiply-add per
+  value: |r − y|² = |r|² − 2 r·y + |y|², with |y|² from a table. That gives exactly the same
+  distances as the direct form.
+- Over 19 voices, 11,173 frames (`tools/check_fx.py --enc`, `docs/results/fx_enc_check.json`):
+
+  | | Result |
+  |---|---:|
+  | Frames whose 48 bits match the float encoder | 97.8% |
+  | Frames differing in voicing / pitch / energy / shape | 35 / 103 / 30 / 202 |
+  | PESQ, float encoder + float decoder | 2.924 |
+  | PESQ, fixed encoder + fixed decoder | 2.928 |
+  | PESQ, fixed encoder + float decoder | 2.926 |
+
+  The frames that differ are near-ties: a pitch or band edge exactly on a grid point, or two
+  codebook paths at almost the same distance, where float rounding decides. Integer code
+  can't copy float rounding, and these choices are equally good.
+- All stress signals (silence, full-scale noise and square waves, clicks, a chirp, speech,
+  and random bits with losses for the decoder) run clean under AddressSanitizer,
+  UndefinedBehaviorSanitizer and `FX_CHECK`.
+- Size on x86: 13 KB of code and 15.7 KB of state (3 KB of input history, two 2 KB spectra,
+  4 KB of FFT scratch). The tables are shared with the decoder, 43 KB in all with the 6 KB
+  of codebook lengths.
+
+**Cycle estimate (not measured).** TI's C55x compiler can't be downloaded from the
+environment this was built in, so these numbers come from counting how often each inner
+loop runs on x86 (`sh tools/fx_profile.sh`, gcov on 10 s of ve9qrp) and assuming a cost per
+iteration on the C55x. The low end assumes hand-tuned loops (the dual multiply-accumulate
+for the codebook search); the high end assumes plain compiled C.
+
+| Block | Inner iterations per second | C55x cycles each | MHz |
+|---|---:|---:|---:|
+| Codebook search | 8.3 M multiply-adds, 0.44 M vectors | 0.5–1.5, plus 4–10 per vector | 6–17 |
+| Harmonic sums (pitch refinement, tracker) | 0.92 M | 5–10 | 5–9 |
+| 512-point FFT, 32-bit data | 0.46 M butterflies | 10–16 | 5–7 |
+| nlp DFT (64 points × 115 bins) | 0.74 M | 2–4 | 1.5–3 |
+| nlp 48-tap filter | 0.39 M | 1–2 | 0.4–0.8 |
+| Everything else | about 15 M x86 instructions | about 0.5–1 per instruction | 8–15 |
+| **Encoder** | | | **25–50** |
+| Decoder synthesis sums | 0.67 M (2 multiply-adds each) | 3–5 | 2–3.5 |
+| Decoder minimum phase (cepstrum) | 0.82 M | 1.5–3 | 1.2–2.5 |
+| Decoder, everything else | | | 1–2 |
+| **Decoder** | | | **4–8** |
+
+The radio is half duplex, so only one of the two runs at a time. 25 to 50 MHz is an eighth
+to a quarter of the C5517's 200 MHz, which leaves room for the modem and FEC. The real
+number needs TI's compiler and a C55x board, for example the C5517 EVM.
+
+**Before a C55x build.**
+
+- The TI compiler's `long long` is 40 bits. The sums of products already fit (that is what
+  `FX_CHECK` checks), and most of the scalar steps that use 64-bit types here fit too, but
+  a few do not: the 2^48 reciprocal in the pitch refinement and the 32 × 32-bit band powers
+  in the encoder's decide step. Those need a two-word helper.
+- `char` is 16 bits, so the int8 codebook takes 58 KB unless it is packed two values to a
+  word.
+- The FFT could move to the C5517's hardware FFT accelerator, which works on 16-bit data.
+  That would change the low bits of the spectra, so it needs its own check against float.
 
 ## Fixed point: the plan
 

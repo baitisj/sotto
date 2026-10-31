@@ -217,7 +217,7 @@ static int nlp_bin(struct sotto_enc *e) {
   int16_t x16[64];
   for (int i = 0; i < 64; i++) x16[i] = (int16_t)(s ? fx_rshr(xd[i], s) : xd[i]);
   /* DFT magnitudes at bins 15..129 of 512 */
-  static fx_acc P[130];
+  fx_acc P[130];                                          /* entries 15..129 used */
   for (int k = 15; k < 130; k++) {
     fx_acc r = 0, q = 0;
     for (int n = 0; n < 64; n++) {
@@ -468,18 +468,26 @@ static void msvq_search(const int32_t *c, int16_t *idx) {
   for (int s = 0; s < fx_cb_stages; s++) {
     int n = 1 << fx_cb_bits[s], nk = 0;
     const int8_t *cb = fx_cb[s];
+    const int32_t *e2 = fx_cb_e2[s];
     fx_acc kd[MBEST];
     int kp[MBEST], kc[MBEST];
     for (int p = 0; p < np; p++) {
-      int32_t r[NC];                                         /* residual in codebook steps, Q6 */
-      for (int k = 0; k < NC; k++) r[k] = (int32_t)(((fx_acc)(c[k] - recon[p][k]) * fx_cb_istep[s]) >> 24);
+      int16_t r[NC];                                         /* residual in codebook steps, Q6 */
+      fx_acc rr = 0;
+      for (int k = 0; k < NC; k++) {
+        fx_acc t = ((fx_acc)(c[k] - recon[p][k]) * fx_cb_istep[s]) >> 24;
+        r[k] = (int16_t)(t > 32767 ? 32767 : t < -32767 ? -32767 : t);
+        rr += (fx_acc)r[k] * r[k];
+      }
+      FX_ACC_CHECK(rr);
+      /* d = sum (r - 64 y)^2 = rr - 128 r.y + 4096 |y|^2, exactly, so the inner loop is one
+         16 x 16 multiply-accumulate per value */
       for (int v = 0; v < n; v++) {
         const int8_t *y = cb + v * NC;
-        fx_acc d = 0;
-        for (int k = 0; k < NC; k++) {
-          int32_t q = r[k] - (int32_t)y[k] * 64;
-          d += (fx_acc)q * q;
-        }
+        fx_acc ry = 0;
+        for (int k = 0; k < NC; k++) ry += (fx_acc)r[k] * y[k];
+        FX_ACC_CHECK(ry);
+        fx_acc d = rr - 128 * ry + 4096 * (fx_acc)e2[v];   /* < 2^36 */
         FX_ACC_CHECK(d);
         if (nk < MBEST || d < kd[nk - 1]) {
           int i = nk < MBEST ? nk++ : MBEST - 1;

@@ -210,3 +210,22 @@ def test_fixed_point_decoder_matches_float():
            if np.sum(yf[i:i + 80] ** 2) > 1e-6]
     assert np.median(seg) > 40
     assert abs(10 * np.log10(np.sum(yx ** 2) / np.sum(yf ** 2))) < 0.5
+
+
+def test_fixed_point_encoder_matches_float():
+    """c/fixed/sotto_enc_fx against the float encoder: almost every frame gives the same 48
+    bits (the rest are near-ties at float rounding boundaries), and the fixed decoder gets
+    the same PESQ from them."""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import check_c_port as cc
+    import check_fx
+    x = _ve9qrp(4.0)
+    x16 = np.round(x * 32767).astype(np.int16)[:len(x) // 160 * 160]
+    bf = cc.c_encode(x16)
+    bx = check_fx.run_enc(os.path.join(ROOT, "c", "fixed", "sotto_enc_fx"), x16)
+    assert bx.shape == bf.shape
+    assert np.mean(np.all(bf == bx, 1)) > 0.9
+    y = check_fx.run_dec(os.path.join(ROOT, "c", "fixed", "sotto_dec_fx"), bx)
+    pf = ar.score(x[:len(x16)], cc.c_decode(bf), ar.CODEC_DELAY)[0]
+    px = ar.score(x[:len(x16)], y, ar.CODEC_DELAY)[0]
+    assert px > pf - 0.1

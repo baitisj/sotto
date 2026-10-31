@@ -21,6 +21,7 @@ extern const uint32_t fx_exp2_tab[257];   /* the last entry, 2^31, needs 32 unsi
 extern const int16_t fx_cb_stages;
 extern const int16_t fx_cb_bits[];
 extern const int8_t *const fx_cb[];
+extern const int32_t *const fx_cb_e2[];  /* sum of squares of each vector, for the search */
 extern const int32_t fx_cb_step[];
 extern const int32_t fx_cb_istep[];
 /* encoder */
