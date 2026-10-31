@@ -759,6 +759,48 @@ class SottoV33(SottoV32):
     PITCH = "tracked3"
 
 
+class SottoV34(SottoV33):
+    """v3.3 with concealment in the decoder. A lost frame (CRC failure) replays the last
+    good frame's parameters, not its bits' audio: the level falls `slope` dB per 20 ms
+    after the first lost frame, voiced frames turn mixed from the `mix_after`-th lost frame
+    (a held buzz is what makes "springs"), and after `max_lost` frames the output is
+    silent until a good frame arrives. Needs the receiver's good flags."""
+
+    def __init__(self, vq=None, pf=1.5, quiet=None, slope=2.0, mix_after=2, max_lost=15):
+        super().__init__(vq=vq, pf=pf, quiet=quiet)
+        self.slope, self.mix_after, self.max_lost = slope, mix_after, max_lost
+
+    def decode(self, bits, good=None):
+        bits = np.asarray(bits)
+        if good is None or np.all(good):
+            return super().decode(bits)
+        bits = bits.copy()
+        run = np.zeros(len(bits), int)
+        last, r = None, 0
+        for f in range(len(bits)):
+            if good[f]:
+                last, r = bits[f].copy(), 0
+            else:
+                r += 1
+                run[f] = r
+                if last is not None:
+                    bits[f] = last
+        m = super().decode(bits)
+        for f in np.where(run > 0)[0]:
+            for k in (2 * f, 2 * f + 1):
+                if k >= len(m):
+                    continue
+                j = run[f]
+                if j > self.max_lost:
+                    g = 1e-4
+                else:
+                    g = 10 ** (-self.slope * max(0, j - 1 + (k - 2 * f) / 2) / 20)
+                    if j >= self.mix_after and m[k]["voiced"] == 1:
+                        m[k]["voiced"] = mixed_cutoff(m[k]["Wo"])
+                m[k]["A"] *= g
+        return m
+
+
 class _VQAdapter:
     """Lets SottoV0's packing code treat the VQ stages as its 'fields'."""
 

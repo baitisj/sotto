@@ -135,3 +135,16 @@ def test_odd_even_flags_half_pitch():
     w = 2 * np.pi * 250 / 8000
     assert sn.odd_even_db(Sw[20], w / 2) < -15
     assert sn.odd_even_db(Sw[20], w) > -6
+
+
+def test_v34_conceals_lost_frames():
+    x = _ve9qrp(2.0)
+    v = vl.SottoV34(slope=3.0, max_lost=5)
+    bits = v.encode(x)
+    good = np.ones(len(bits), bool)
+    good[30:40] = False
+    m0, m = v.decode(bits), v.decode(bits, good)
+    e = vl.frame_energy_db(m)
+    assert np.allclose(m["A"][:59], m0["A"][:59])         # frames before the gap untouched
+    assert e[2 * 31] > e[2 * 34] + 5                      # level falls through the gap
+    assert e[2 * 36] < e[58] - 60                         # silent after max_lost frames

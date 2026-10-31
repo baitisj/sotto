@@ -46,6 +46,9 @@ def make_codecs(names):
             v = {"sotto_v3": vl.SottoV3, "sotto_v31": vl.SottoV31, "sotto_v32": vl.SottoV32,
                  "sotto_v33": vl.SottoV33}[name]()
             out[name] = dict(enc=v.encode, dec=lambda b, g, v=v: v.decode_audio(b), mute=mute)
+        elif name == "sotto_v34":
+            v = vl.SottoV34()
+            out[name] = dict(enc=v.encode, dec=lambda b, g, v=v: vl.synthesise(v.decode(b, g)), mute=mute)
         elif name.startswith("sotto_v2p"):            # sotto_v2p<N>, N = forced reset period (0 = none)
             v = vl.SottoV2P(every=int(name[9:] or 0) or None)
             out[name] = dict(enc=v.encode, dec=lambda b, g, v=v: vl.synthesise(v.decode(b, g)), mute=mute)

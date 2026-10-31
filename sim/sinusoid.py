@@ -242,7 +242,7 @@ def odd_even_db(S, w, fmax=1500.0, first=3):
 
 def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=WO_MAX_HI,
                         uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias", tilt=0.0,
-                        sub=0.0, sub_db=10.0):
+                        sub=0.0, sub_db=10.0, lag=None):
     """Joint pitch and voicing track over the whole utterance (Viterbi).
 
     States per frame: unvoiced, or voiced at one of the candidates refine(wo0[t+d] * mu)
@@ -253,6 +253,8 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
       voiced->voiced  lam * |log jump|, plus jump * excess over a third of an octave
       voiced<->uv     switch
       sub-octave      sub per 10 dB that odd_even_db(w) falls below -sub_db
+    With `lag` set, frame t is decided from the best path at frame t + lag (fixed-lag
+    Viterbi, as a real-time encoder would run) instead of from the whole utterance.
     Returns (wo, voiced)."""
     n = len(wo0)
     v0 = np.asarray(voiced0) > 0
@@ -281,6 +283,7 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
         cands.append(ws)
         costs.append(np.concatenate([[uv_cost + prior * v0[t]], c]))     # state 0 = unvoiced
     D, back = costs[0].copy(), []
+    Ds = [D]
     for t in range(1, n):
         prev = np.concatenate([[0.0], cands[t - 1]])
         cur = np.concatenate([[0.0], cands[t]])
@@ -292,12 +295,22 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
         tot = D[:, None] + tr
         back.append(tot.argmin(0))
         D = tot.min(0) + costs[t]
-    k = int(D.argmin())
-    path = [k]
-    for b in reversed(back):
-        k = int(b[k])
-        path.append(k)
-    path = path[::-1]
+        Ds.append(D)
+    if lag is None:
+        k = int(D.argmin())
+        path = [k]
+        for b in reversed(back):
+            k = int(b[k])
+            path.append(k)
+        path = path[::-1]
+    else:
+        path = []
+        for t in range(n):
+            e = min(n - 1, t + lag)
+            k = int(Ds[e].argmin())
+            for u in range(e, t, -1):
+                k = int(back[u - 1][k])
+            path.append(k)
     wo = np.asarray(wo0, float).copy()
     voiced = np.zeros(n, int)
     for t, k in enumerate(path):

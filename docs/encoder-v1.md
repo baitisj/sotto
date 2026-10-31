@@ -224,6 +224,42 @@ PESQ, no channel. Full results are in `docs/results/codebook_eval.json`.
 
 The shipped codebook (`sim/data/shape_msvq_34.npz`) is now the Speech Commands + LibriSpeech one. Its training data is CC BY only, so EARS is used only for testing.
 
+## Lost frames on 2 m: decoder concealment (v3.4)
+
+Until now the receiver handled a lost frame (CRC failure) by repeating the last good frame's bits up to three times (60 ms) and then sending a mute frame. Replaying a voiced frame holds a steady buzz, which is the "springs" that listeners report on fading digital voice. The mute then cuts to silence.
+
+**v3.4** (`SottoV34`) moves concealment into the decoder, which receives the CRC flags. A lost frame reuses the last good frame's parameters. The level falls `slope` dB per 20 ms after the first lost frame. Voiced frames turn mixed (harmonics below 1 kHz, noise above) from the second lost frame on. After `max_lost` frames the output is silent until a good frame arrives.
+
+The sweep in `tools/conceal_sweep.py` covers 146 MHz at 5, 30 and 60 km/h and 52 and 56 dB-Hz, with 7 voices and 3 fading seeds. Mean frame loss is 8.5%; the worst case, 5 km/h at 52 dB-Hz, loses 16%. Mean PESQ:
+
+| decoder | PESQ |
+|---|---|
+| Codec 2 2400 (receiver repeat, then mute) | 1.70 |
+| v3.3 (receiver repeat, then mute) | 2.24 |
+| v3.4, 3 dB/frame, mixed from frame 2, silent after 8 | 2.34 |
+| v3.4, 6 dB/frame | 2.30 |
+| v3.4, 3 dB/frame, stays voiced | 2.34 |
+| v3.4, 3 dB/frame, silent after 4 | 2.31 |
+| **v3.4, 2 dB/frame, mixed from frame 2, silent after 15 (default)** | **2.36** |
+
+What the sweep shows:
+
+- **Concealment gains 0.10 to 0.17 at 52 dB-Hz** and 0.05 to 0.10 at 56 dB-Hz.
+- **A slow fade beats a quick mute.** The default fades by 28 dB over 300 ms.
+- **Mixing has no measurable PESQ effect** (+0.01). It's kept because the held buzz is what listeners complain about.
+
+Listening round 7 (fading 2 m pairs against Codec 2 and v3.3) is with the club.
+
+## Real-time pitch tracking
+
+The joint pitch and voicing tracker searched each whole utterance (Viterbi with full traceback). A real-time encoder can only look a fixed number of frames ahead, so the tracker now has a `lag` option: frame t is decided from the best path at frame t + lag. Mean PESQ over 31 voices (the earlier 15 and the 16 held-out):
+
+| look-ahead | whole utterance | 10 ms | 20 ms | 40 ms | 80 ms |
+|---|---|---|---|---|---|
+| PESQ | 3.055 | 3.011 | 3.035 | 3.041 | 3.052 |
+
+An 80 ms look-ahead gives up only 0.003, so real-time tracking costs nothing that matters. That adds 80 ms of delay; push-to-talk radio tolerates it. The C port should use lag = 8.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC. (Partly solved later with Speech Commands, see above.)
