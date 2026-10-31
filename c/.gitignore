@@ -1,0 +1,5 @@
+sotto_codebook.c
+*.o
+libsotto.a
+sotto_enc
+sotto_dec
