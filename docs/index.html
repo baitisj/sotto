@@ -48,7 +48,8 @@
   <h1>sotto</h1>
   <p class="lede">Open 2400 bit/s digital voice for FM radios: a vocoder, error correction and a C4FM modem path, built for small fixed-point DSPs.</p>
 
-  <p>Every clip below went through the same chain: Codec 2 at 2400 bit/s, then System Fusion (C4FM) frames, then a simulated mobile radio channel with fading and noise, then our software receiver. The only thing that changes between rows is how the voice bits are protected and where they sit in the frame.</p>
+  <h2 style="margin-top:24px">Part 1: same encoder, different channel protection</h2>
+  <p>sotto's own encoder isn't built yet, so every clip here uses the stock Codec 2 2400 encoder. Each went through System Fusion (C4FM) frames, a simulated mobile radio channel with fading and noise, and our software receiver. The rows differ only in how the voice bits are protected and where they sit in the frame. Encoder-against-encoder comparisons (sotto's encoder next to Codec 2's, through the same channel and receiver) come next.</p>
   <p>
     <span class="cond">UHF 446 MHz, 60 km/h, 52 dB-Hz (a weak mobile signal)</span>
     <span class="cond">same transmit power for every row</span>
