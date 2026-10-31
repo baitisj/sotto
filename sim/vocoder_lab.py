@@ -477,5 +477,31 @@ class SottoV2(SottoV0):
 
     WO_HI = 2 * np.pi / 16
 
-    def __init__(self, shapeq=None, pf=1.5):
+    def __init__(self, shapeq=None, pf=1.5, quiet=None):
         super().__init__(shapeq, pf=pf, pitch="tracked2")
+        self.quiet = quiet          # dict(margin, tilt, atten): see soften_pauses
+
+    def decode(self, bits):
+        m = super().decode(bits)
+        return soften_pauses(m, **self.quiet) if self.quiet else m
+
+
+def soften_pauses(m, margin=25.0, tilt=6.0, atten=0.0, release=0.995):
+    """Decoder-only treatment of background between words: unvoiced frames more than
+    `margin` dB below the recent speech peak get a high-frequency roll-off of `tilt` dB per
+    octave above 1 kHz and `atten` dB less level. Codec 2's softer, darker pauses were
+    preferred by a listener over v2's flat hiss."""
+    m = m.copy()
+    en = frame_energy_db(m)
+    peak = -1e9
+    for i in range(len(m)):
+        peak = max(en[i], peak * release + (1 - release) * en[i] if peak > -1e8 else en[i])
+        if m[i]["voiced"] or en[i] > peak - margin:
+            continue
+        L = m[i]["L"]
+        f = np.arange(1, L + 1) * m[i]["Wo"] * FS / (2 * np.pi)
+        g = -tilt * np.log2(np.maximum(f, 1000) / 1000)
+        a = m[i]["A"][1:L + 1] * 10 ** (g / 20)
+        a *= np.sqrt(np.sum(m[i]["A"][1:L + 1] ** 2) / (np.sum(a ** 2) + 1e-12)) * 10 ** (-atten / 20)
+        m[i]["A"][1:L + 1] = a
+    return m

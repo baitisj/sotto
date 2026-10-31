@@ -130,6 +130,12 @@ The chain is the same as above. Each cell is the mean of 3 seeds, shown as PESQ 
 
 A second blind listening test (v1 against v2, and Codec 2 against v2) is with the club. The listening page now pairs Codec 2 with v2.
 
+### Listening round 2 (first answers)
+
+Jeff's answers: v2 beat v1 in 3 of the 4 pairs, with the fourth a tie, and won the pair on the old "glorp" passage. Against Codec 2, v2 won on the female and the LibriSpeech male. On ve9qrp it lost a close call: v2 "had better bottom end", but Codec 2 "had a little bit more pleasant silence". Measured in that clip's pauses, v2's background is as loud as the original but brighter, 5 to 6 dB above Codec 2 at 3 to 4 kHz.
+
+`soften_pauses` (a `SottoV2(quiet=...)` option, off by default) is a decoder-only fix. It gives unvoiced frames well below the recent speech peak a high-frequency roll-off. At a 20 dB margin and 6 dB/octave above 1 kHz it is PESQ-neutral. It goes into the next listening round before becoming the default.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC, only GitHub.
