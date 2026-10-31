@@ -56,7 +56,7 @@
     <span class="cond">UHF 446 MHz, 60 km/h, 52 dB-Hz (a weak mobile signal)</span>
     <span class="cond">VHF 146 MHz, 30 km/h, 56 dB-Hz (slow fading)</span>
   </p>
-  <p class="note">The score is PESQ, an automatic speech-quality estimate from 1 (bad) to 4.5 (excellent), averaged over three fading runs. sotto v3 is an early prototype: a mel-spaced spectral envelope in place of Codec 2's 10th-order LPC, quantized with a codebook trained on 600 speakers, and a tracker that decides pitch and voicing together, with Codec 2's synthesis.</p>
+  <p class="note">The score is PESQ, an automatic speech-quality estimate from 1 (bad) to 4.5 (excellent), averaged over three fading runs. sotto v3.5 is an early prototype: a mel-spaced spectral envelope in place of Codec 2's 10th-order LPC, quantized with a codebook trained on 632 speakers, a tracker that decides pitch and voicing together, and its own handling of lost frames, with Codec 2's synthesis.</p>
 
   <div id="encoders"></div>
 
@@ -71,10 +71,10 @@
 
 
   <h2>What you're hearing</h2>
-  <p><b>sotto v3</b> (Part 1) describes the spectrum with 20 mel-spaced amplitudes, quantized with 34 bits by a three-stage codebook trained on 600 volunteer speakers from Google's Speech Commands recordings, plus a formant postfilter and a frame-energy field, where Codec 2 uses a 10th-order LPC filter. Its tracker starts from Codec 2's pitch estimate and fixes octave errors (pitch reported at double or half its true value), which Codec 2 makes most often on higher voices. The same tracker decides which frames are voiced, follows pitch up to 500 Hz, and avoids the warbling that wandering pitch causes in quiet transitions. Pauses decode as true silence. It keeps Codec 2's synthesis. It needs no memory between frames, so a lost frame doesn't damage the next one.</p>
+  <p><b>sotto v3.5</b> (Part 1) describes the spectrum with 20 mel-spaced amplitudes, quantized with 34 bits by a three-stage codebook trained on 632 speakers (Google's Speech Commands volunteers and LibriSpeech readers), plus a formant postfilter and a frame-energy field, where Codec 2 uses a 10th-order LPC filter. Its tracker starts from Codec 2's pitch estimate and fixes octave errors (pitch reported at double or half its true value), which Codec 2 makes most often on higher voices. The same tracker decides which frames are voiced, follows pitch up to 500 Hz, and avoids the warbling that wandering pitch causes in quiet transitions. Breathy sounds like the "v" in "five" get harmonics only below 1 kHz with noise above, at no extra bits. Pauses decode as true silence. When a frame is lost, it holds the last sound for 40 ms and fades it out within 80 ms, which a listener preferred to repeating and cutting. It keeps Codec 2's synthesis. It needs no memory between frames, so a lost frame doesn't damage the next one.</p>
   <p><b>VW slot</b> (used for everything in Part 1) puts the voice in the full-rate part of the Fusion frame, adds a CRC to each 20 ms frame and protects everything with a strong tail-biting convolutional code. <b>DN slot + our code</b> uses the half-rate slot Fusion radios use for DN mode, with a weaker version of the same code. <b>Fusion-style protection</b> mimics how DN protects its voice bits (the first 27 bits sent three times, the rest unprotected), applied to Codec 2. That's a statement about Codec 2 with that protection, not about AMBE+2, whose decoder is built around it.</p>
-  <p>At 146 MHz and 30 km/h, fades outlast the 100 ms interleaver, so whole frames are lost; longer interleaving and better concealment are on the list.</p>
-  <p class="note">Simulation only, not yet on the air. Sources: the ve9qrp recording from the Codec 2 project, and LibriSpeech readers (CC BY 4.0; see <a href="samples/README.md">samples/README.md</a>). Details: <a href="https://github.com/baitisj/sotto/blob/main/docs/encoder-v1.md">encoder-v1.md</a> (v1, v2 and v3), <a href="https://github.com/baitisj/sotto/blob/main/docs/audio-race.md">audio-race.md</a>. Code: <a href="https://github.com/baitisj/sotto">github.com/baitisj/sotto</a> (MIT; the Codec 2 fork is LGPL-2.1).</p>
+  <p>At 146 MHz and 30 km/h, fades outlast the 100 ms interleaver, so whole frames are lost. sotto v3.5 fades lost frames out quickly; longer interleaving is on the list.</p>
+  <p class="note">Simulation only, not yet on the air. Sources: the ve9qrp recording from the Codec 2 project, and LibriSpeech readers (CC BY 4.0; see <a href="samples/README.md">samples/README.md</a>). Details: <a href="https://github.com/baitisj/sotto/blob/main/docs/encoder-v1.md">encoder-v1.md</a> (v1 to v3.5), <a href="https://github.com/baitisj/sotto/blob/main/docs/audio-race.md">audio-race.md</a>. Code: <a href="https://github.com/baitisj/sotto">github.com/baitisj/sotto</a> (MIT; the Codec 2 fork is LGPL-2.1).</p>
 </main>
 <script>
   const voices = [
@@ -110,9 +110,9 @@
   }
   // Part 1: encoder against encoder (files in samples/encoder/)
   const enc = {
-    female_libri198_14s: { none: [2.21, 2.93], uhf52: [1.69, 2.29], vhf56: [1.82, 2.45] },
-    male_libri3436_15s:  { none: [2.94, 3.33], uhf52: [2.30, 3.02], vhf56: [2.06, 2.63] },
-    male_ve9qrp_15s:     { none: [2.78, 2.99], uhf52: [2.48, 2.69], vhf56: [1.98, 2.42] },
+    female_libri198_14s: { none: [2.21, 2.90], uhf52: [1.69, 2.46], vhf56: [1.82, 2.53] },
+    male_libri3436_15s:  { none: [2.94, 3.36], uhf52: [2.30, 2.94], vhf56: [2.06, 2.90] },
+    male_ve9qrp_15s:     { none: [2.78, 3.09], uhf52: [2.48, 2.97], vhf56: [1.98, 2.58] },
   };
   const conds = [
     { key: "none", file: "No_radio_channel", title: "No radio channel" },
@@ -134,7 +134,7 @@
     for (const c of conds) {
       const [c2, so] = enc[v.id][c.key];
       card.append(clip("Codec 2 encoder", c.title, c2, `samples/encoder/${v.id}__${c.file}__codec2_2400.flac`));
-      card.append(clip("sotto v3 encoder", c.title, so, `samples/encoder/${v.id}__${c.file}__sotto_v3.flac`, so >= c2));
+      card.append(clip("sotto v3.5 encoder", c.title, so, `samples/encoder/${v.id}__${c.file}__sotto_v35.flac`, so >= c2));
     }
     ehost.append(card);
   }

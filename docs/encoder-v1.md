@@ -257,6 +257,20 @@ Listening round 7 (one listener, fading 2 m, original in every pair):
 
 `SottoV34` now takes `hold`, the number of lost frames kept at full level. Round 8 compares v3.3 with two short-fade versions: "mid" (hold 3, then 6 dB per frame, silent after 5) and "quick" (hold 2, 6 dB per frame, silent after 4).
 
+Round 8 (one listener, weak-signal 2 m, original in every pair):
+
+- **quick:** won 2, tied 3, lost none against v3.3.
+- **mid:** won 2, lost 1, tied 2.
+- **Null pair:** called a tie, which is correct.
+
+v3.5's concealment is therefore "quick": it holds a lost frame for 40 ms, fades 6 dB per 20 ms, and is silent after 80 ms. With that, v3.5 scores (female / LibriSpeech male / ve9qrp):
+
+- no channel: 2.90 / 3.36 / 3.09
+- UHF 60 km/h, 52 dB-Hz: 2.46 / 2.94 / 2.97
+- VHF 30 km/h, 56 dB-Hz: 2.53 / 2.90 / 2.58
+
+Codec 2 scores 2.21 / 2.94 / 2.78, 1.69 / 2.30 / 2.48 and 1.82 / 2.06 / 1.98 in the same conditions. The public listening page now uses v3.5.
+
 **Would unequal protection save part of a lost frame?** A second CRC on the most important bits (voicing, pitch, energy and the first VQ stage) would let the decoder use those bits when the rest of the frame fails. On 2 m fading, the frames that fail CRC almost always fail completely: the median failed frame has 12 to 21 wrong bits out of 48. Only 10 to 20% of failed frames had their first 26 bits intact, and 16 to 34% had their first 14 (voicing, pitch and energy). The losses are deep fades, not scattered bit errors, so a split CRC would recover little. It isn't worth the extra CRC bits.
 
 ## Real-time pitch tracking
@@ -297,7 +311,7 @@ The shape quantizer is trained on about 2 minutes of speech, nearly all from one
 
 ## Next
 
-1. Listening round 7: fading 2 m pairs, v3.4 against Codec 2 and against v3.3. If the concealment holds up by ear, move the public listening page to v3.5 (renders are ready).
+1. Done: the public listening page uses v3.5 (rounds 7 and 8).
 2. The C port of v3.5 for the C5517 (deferred at Jeff's request). Use a fixed tracker look-ahead of 8 frames (80 ms).
 3. Longer interleaving across two YSF frames (200 ms) for 30 to 60 km/h. At walking pace, fades outlast any usable interleaver, so concealment carries that case.
 4. Retrain the codebook on VCTK or more LibriSpeech (train-clean-100) when someone can upload it.

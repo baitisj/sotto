@@ -803,12 +803,16 @@ class SottoV34(SottoV33):
 
 
 class SottoV35(SottoV34):
-    """v3.4 with a lighter formant postfilter (gain 1.35 instead of 1.5). Re-tuned for the
-    trained codebook: +0.02 PESQ and +0.01 ESTOI over 31 voices, and the shallower valleys
-    keep more of the 1-2 kHz frication in sounds like the "v" of "five"."""
+    """v3.4 with a lighter formant postfilter (gain 1.35 instead of 1.5) and short
+    concealment. The postfilter was re-tuned for the trained codebook: +0.02 PESQ and +0.01
+    ESTOI over 31 voices, and the shallower valleys keep more of the 1-2 kHz frication in
+    sounds like the "v" of "five". Concealment holds a lost frame for 40 ms, fades 6 dB per
+    20 ms, and is silent after 80 ms: listening round 8 preferred it to v3.3's
+    repeat-then-mute or tied, and round 7 found v3.4's 300 ms tail made drops obvious."""
 
-    def __init__(self, vq=None, pf=1.35, quiet=None, **conceal):
-        super().__init__(vq=vq, pf=pf, quiet=quiet, **conceal)
+    def __init__(self, vq=None, pf=1.35, quiet=None, hold=2, slope=6.0, mix_after=99, max_lost=4):
+        super().__init__(vq=vq, pf=pf, quiet=quiet, hold=hold, slope=slope,
+                         mix_after=mix_after, max_lost=max_lost)
 
 
 class _VQAdapter:

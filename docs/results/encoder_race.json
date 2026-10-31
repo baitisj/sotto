@@ -862,5 +862,81 @@
     "estoi": 0.7631445448064155
    }
   }
+ },
+ {
+  "cond": "No radio channel",
+  "codec": "sotto_v35_final",
+  "per_clip": {
+   "female_libri198_14s": {
+    "pesq": 2.8969953060150146,
+    "estoi": 0.8121337801557468
+   },
+   "male_libri3436_15s": {
+    "pesq": 3.363718032836914,
+    "estoi": 0.8776601006077149
+   },
+   "male_ve9qrp_15s": {
+    "pesq": 3.0884366035461426,
+    "estoi": 0.785973470770047
+   }
+  },
+  "note": "v3.5 with round-8 concealment (hold 2, 6 dB/frame, silent after 4)"
+ },
+ {
+  "cond": "446 MHz 60 km/h 52 dB-Hz",
+  "codec": "sotto_v35_final",
+  "per_clip": {
+   "female_libri198_14s": {
+    "pesq": 2.4586464564005532,
+    "estoi": 0.7869051713269215
+   },
+   "male_libri3436_15s": {
+    "pesq": 2.9352713425954184,
+    "estoi": 0.8604770419210982
+   },
+   "male_ve9qrp_15s": {
+    "pesq": 2.966646114985148,
+    "estoi": 0.7736187242454186
+   }
+  },
+  "note": "v3.5 with round-8 concealment (hold 2, 6 dB/frame, silent after 4)"
+ },
+ {
+  "cond": "446 MHz 60 km/h 56 dB-Hz",
+  "codec": "sotto_v35_final",
+  "per_clip": {
+   "female_libri198_14s": {
+    "pesq": 2.905641794204712,
+    "estoi": 0.8113166740659444
+   },
+   "male_libri3436_15s": {
+    "pesq": 3.2199238936106362,
+    "estoi": 0.8740679814640328
+   },
+   "male_ve9qrp_15s": {
+    "pesq": 3.0874544779459634,
+    "estoi": 0.782207898484179
+   }
+  },
+  "note": "v3.5 with round-8 concealment (hold 2, 6 dB/frame, silent after 4)"
+ },
+ {
+  "cond": "146 MHz 30 km/h 56 dB-Hz",
+  "codec": "sotto_v35_final",
+  "per_clip": {
+   "female_libri198_14s": {
+    "pesq": 2.531564235687256,
+    "estoi": 0.7904843776261222
+   },
+   "male_libri3436_15s": {
+    "pesq": 2.9004087448120117,
+    "estoi": 0.8553115805402273
+   },
+   "male_ve9qrp_15s": {
+    "pesq": 2.5784785747528076,
+    "estoi": 0.7637779981455769
+   }
+  },
+  "note": "v3.5 with round-8 concealment (hold 2, 6 dB/frame, silent after 4)"
  }
 ]
