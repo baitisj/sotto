@@ -42,7 +42,7 @@ ESTOI follows the same order. All values are in the JSON.
 
 ## Listening samples
 
-They are in the project folder, `vocoder/softmodem/samples/` (FLAC). The clip is ve9qrp, 10 s, run through each scheme at 446 MHz / 60 km/h, 52 dB-Hz and at 146 MHz / 30 km/h, 56 dB-Hz. The folder also has the original and Codec 2 with no channel. Audio files are not committed to the repo.
+They are in the project folder, `vocoder/softmodem/samples/` (FLAC). The clip is ve9qrp, 10 s, run through each scheme at 446 MHz / 60 km/h, 52 dB-Hz and at 146 MHz / 30 km/h, 56 dB-Hz. The folder also has the original and Codec 2 with no channel. A representative set (all three 15 s voices) is committed in `docs/samples/`.
 
 ## Caveats
 
