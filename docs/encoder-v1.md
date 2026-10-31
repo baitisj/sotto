@@ -348,7 +348,7 @@ That makes 3 wins for depth 2, 2 for depth 1 and 1 tie. Ears and PESQ disagree o
 | All harmonics (v3.5) | 2.917 | 0.800 |
 | Envelope band only | 2.939 | 0.818 |
 
-ESTOI improves on 15 of 19 voices, most on the EARS studio voices. PESQ drops on one voice (EARS p047, 2.90 to 2.77).
+ESTOI improves on 14 of 19 voices, most on the EARS studio voices. PESQ drops on one voice (EARS p047, 2.90 to 2.77).
 
 **`SottoV36`** = v3.5 + the 9 + 9 + 8 + 8 codebook in 8-bit values (round 9: 5 ties of 5) + envelope-band energy. The C port builds it with `make -C c VARIANT=v3.6`, and the check against Python is bit-exact on 2 voices apart from one tracker near-tie frame. Listening round 10 puts v3.5 against v3.6 on 10 voices, including p020 and p047.
 
