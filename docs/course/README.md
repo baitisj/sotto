@@ -22,17 +22,17 @@ Every picture in the course is drawn from real recordings and from the real sott
 1. [Sound, numbers and the 2,400-bit budget](01-sound-and-bits.md): what a vocoder is and why we need one.
 2. [Pitch and voicing](02-pitch-and-voicing.md): the buzz of your vocal cords, and the hiss of an "s".
 3. [The spectral envelope](03-envelope.md): the shape of your mouth, and sotto's 20-point mel envelope.
-4. [Quantization: fitting it into 48 bits](04-quantization.md): rounding, steps, bit budgets and the shape quantizer.
-5. [Synthesis: rebuilding the voice](05-synthesis.md): adding up sine waves, and the six listening demos.
-6. [Across the radio](06-radio.md): C4FM, error-correcting codes, fading and spreading.
-7. [How we measure "better"](07-measuring.md): PESQ, oracles and the quantization ladder.
+4. [Quantization: fitting it into 48 bits](04-quantization.md): rounding, steps, and the vector quantizer for the shape.
+5. [Synthesis: rebuilding the voice](05-synthesis.md): adding up sine waves, mixed voicing, and seven listening demos.
+6. [Across the radio](06-radio.md): C4FM, error-correcting codes, fading, spreading and hiding lost frames.
+7. [How we measure "better"](07-measuring.md): PESQ, oracles, the quantization ladder and listening tests.
 8. [Glossary](glossary.md): every term used in the code and the design notes, in plain words.
 
 Each chapter ends with **Try it** questions. Answers to the number questions are at the bottom of each chapter.
 
 ## A note on what's real
 
-sotto is a research project and it is changing quickly. This course describes **sotto v1** (October 2026), as described in [`docs/encoder-v0.md`](../encoder-v0.md) and [`docs/encoder-v1.md`](../encoder-v1.md). v1 is a Python prototype built on [Codec 2](https://github.com/drowe67/codec2), an older open-source vocoder: it borrows Codec 2's voicing detector and synthesizer. Its new parts are a pitch tracker that catches octave errors (chapter 2, new in v1), and the way it describes and packs the shape of the voice (chapters 3 and 4, from v0). The 48-bit frame is the same in v0 and v1. Everything has been tested in simulation, not yet on the air.
+sotto is a research project and it is changing quickly. This course describes **sotto v3.5** (October 2026), as described in [`docs/encoder-v0.md`](../encoder-v0.md) and [`docs/encoder-v1.md`](../encoder-v1.md) (which covers v1 through v3.5). sotto is a Python prototype built on [Codec 2](https://github.com/drowe67/codec2), an older open-source vocoder, and borrows its analysis and synthesizer. sotto's own parts are a pitch and voicing tracker (chapter 2), mixed voicing (chapters 2 and 5), the 20-point envelope and its trained vector quantizer (chapters 3 and 4), and concealment of lost frames (chapter 6). It has been tested in simulation and by ear in a radio club's listening rounds, not yet on the air.
 
 ## Rebuilding the figures
 

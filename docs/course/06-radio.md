@@ -77,7 +77,21 @@ The receiver runs the steps backwards:
 2. **Measure each hop** and turn it into soft bits.
 3. **Unscramble, unspread, and run the Viterbi decoder.**
 4. **Check each frame's CRC.**
-5. **Hide the damage.** A frame that fails its CRC is replaced by the last good frame (up to 3 times in a row), then by silence. This is called **concealment**. A repeated 20 ms frame is much less annoying than a burst of garbage noise.
+5. **Pass the frames to the vocoder's decoder, with a flag on each one that failed its CRC.**
+
+## Hiding lost frames
+
+When a frame fails its CRC, the decoder has to play *something* for those 20 ms. Hiding the damage is called **concealment**. Playing garbage bits would be a loud burst of noise, so instead the decoder reuses the last good frame's pitch, voicing and envelope. The question is what to do if the loss goes on.
+
+![Output level during a run of lost frames, for three concealment rules](figures/conceal.svg)
+
+- **Codec 2 (and sotto up to v3.3)**: repeat the last good frame up to 3 times (60 ms) at full level, then go silent. Holding a buzzy vowel steady sounds like "springs", a sound listeners complain about on fading digital voice.
+- **sotto v3.4** faded slowly over 300 ms. The computer scores liked it, because it fills the gap. But a listener found it made dropouts *more* obvious: it sounded like the last sound dragging on.
+- **sotto v3.5** holds for 40 ms, fades 6 dB every 20 ms, and goes silent after 80 ms. In listening tests it beat or tied the old rule every time. People prefer a short, quiet gap to a long, smeared one.
+
+Why 80 ms? At 30 to 60 km/h, 40% of lost frames come in runs of exactly five: a whole 100 ms radio frame, since the code spreads each radio frame's bits across all five vocoder frames. When a fade is deep enough to beat the code, the whole radio frame goes.
+
+Could a second CRC on just the most important bits (voicing, pitch and energy) save part of a lost frame? The team checked: a failed frame typically has 12 to 21 wrong bits out of 48, and only 16 to 34% of failed frames had their first 14 bits intact. Losses come from deep fades, not scattered errors, so the extra CRC wouldn't be worth its bits.
 
 Because sotto is memoryless (chapter 4), a lost frame doesn't damage the frames after it.
 
@@ -87,21 +101,23 @@ sotto includes a **softmodem**: a program that does all of this in software. It 
 
 ## How well does it work?
 
-From `docs/encoder-v0.md` and `docs/encoder-v1.md`, all three codecs sent through the identical radio chain (scores are PESQ, chapter 7; higher is better):
+From `docs/encoder-v1.md` and `docs/results/encoder_race.json`, with every codec sent through the identical radio chain (scores are PESQ, chapter 7; higher is better; averaged over 3 fading patterns):
 
 | Condition | Codec | Woman | Man (LibriSpeech) | Man (VE9QRP) |
 |---|---|---:|---:|---:|
-| No radio | Codec 2 2400 | 2.16 | 2.91 | 2.85 |
-| | sotto v0 | 2.50 | 3.14 | 2.88 |
-| | **sotto v1** | **2.68** | **3.28** | 2.83 |
-| 446 MHz, 60 km/h, weak signal | Codec 2 2400 | 1.69 | 2.29 | 2.49 |
-| | sotto v0 | 2.11 | 2.68 | 2.69 |
-| | **sotto v1** | **2.27** | **2.77** | 2.62 |
-| 146 MHz, 30 km/h | Codec 2 2400 | 1.82 | 2.06 | 1.91 |
-| | sotto v0 | 2.19 | 2.61 | 2.31 |
-| | **sotto v1** | **2.28** | **2.66** | 2.25 |
+| No radio | Codec 2 2400 | 2.21 | 2.94 | 2.78 |
+| | sotto v1 | 2.65 | 3.20 | 2.87 |
+| | **sotto v3.5** | **2.90** | **3.36** | **3.09** |
+| 446 MHz, 60 km/h, weak signal | Codec 2 2400 | 1.69 | 2.30 | 2.48 |
+| | sotto v1 | 2.27 | 2.78 | 2.61 |
+| | **sotto v3.5** | **2.47** | **2.97** | **2.94** |
+| 146 MHz, 30 km/h | Codec 2 2400 | 1.82 | 2.06 | 1.98 |
+| | sotto v1 | 2.26 | 2.65 | 2.20 |
+| | **sotto v3.5** | **2.58** | **2.92** | **2.60** |
 
-Both sotto versions beat Codec 2 over the radio in every case. v1's better pitch tracking helps the woman most (+0.1 to +0.2 over v0). The VE9QRP voice scores slightly lower in v1, by an amount the team considers within the noise of these tests, and is level with Codec 2 with no radio. The slow VHF fades are the hardest, as the fading picture suggests.
+sotto v3.5 beats Codec 2 for every voice in every condition, by 0.3 to 0.9. The slow VHF fades are the hardest, as the fading picture suggests, and that's where v3.5's better concealment and quantizer help most: 0.27 to 0.4 better than v1.
+
+You can hear sotto v3.5 against Codec 2 over these channels on the [listening page](../index.html).
 
 ## Try it
 
@@ -115,7 +131,9 @@ Both sotto versions beat Codec 2 over the radio in every case. v1's better pitch
 - `modem/ysf.py`: the frame layout, FICH, Golay code and CRC-16.
 - `modem/payload.py`: `SottoVW`, which adds the CRC-8, runs the code, spreads and scrambles.
 - `modem/fec.py`: the convolutional code, puncturing and Viterbi decoder.
-- `modem/link.py`: `Transmitter` and `Receiver`, including concealment.
+- `modem/link.py`: `Transmitter` and `Receiver` (which flags failed frames).
+- `sim/vocoder_lab.py`: `SottoV34.decode()`, the decoder's concealment (`hold`, `slope`, `max_lost`); `SottoV35` sets the values above.
+- `tools/conceal_sweep.py`: the concealment experiments.
 - `sim/c4fm_sim.py` and `sim/waveforms.py`: the simulated radio channel with noise and fading.
 - `docs/softmodem.md`, `docs/waveform-race.md`: details and design choices.
 
