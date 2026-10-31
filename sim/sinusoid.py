@@ -284,3 +284,22 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
         if k:
             wo[t], voiced[t] = cands[t][k - 1], 1
     return wo, voiced
+
+
+def unvoice_tails(Sw, m, lo_snr=6.0, drop=20.0, hold=30):
+    """Voicing clean-up for the fading ends of voiced fricatives (the "v" in "five"): voiced
+    frames whose harmonic fit below 1 kHz is weak (mean per-harmonic SNR < lo_snr dB) and
+    which sit more than `drop` dB below the loudest frame of the last `hold` frames are
+    played as noise. Fully voiced, they buzz on as a low "uh" or a reverb-like tail.
+    Returns the new voicing flags."""
+    v = m["voiced"].copy()
+    e = np.array([10 * np.log10(np.sum(r["A"][1:r["L"] + 1] ** 2) + 1e-9) for r in m])
+    for k in np.where(v > 0)[0]:
+        if e[k] >= e[max(0, k - hold):k + 1].max() - drop:
+            continue
+        wo = m["Wo"][k]
+        L = n_harm(wo)
+        f = np.arange(L + 1) * wo * FS / (2 * np.pi)
+        if harmonic_snr(Sw[k], wo, L)[(f > 0) & (f < 1000)].mean() < lo_snr:
+            v[k] = 0
+    return v

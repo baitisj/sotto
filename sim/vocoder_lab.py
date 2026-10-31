@@ -52,14 +52,18 @@ def analyse(x, pitch="c2"):
         Sw = sn.spectra(xi)
         wo = sn.track_pitch(Sw, m["Wo"], m["voiced"], **TRACK)
         return sn.analyse(xi, wo, voicing=m["voiced"], do_refine=False)[:len(m)]
-    if pitch == "tracked2":
+    if pitch in ("tracked2", "tracked2t"):
         # v2: pitch up to 500 Hz, and voicing re-checked at the corrected pitch
         import sinusoid as sn
         m = analyse(x)
         xi = np.round(x * 32767)
         Sw = sn.spectra(xi)
         wo, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"], **TRACK2)
-        return sn.analyse(xi, wo, voicing=v, do_refine=False)[:len(m)]
+        m2 = sn.analyse(xi, wo, voicing=v, do_refine=False)[:len(m)]
+        if pitch == "tracked2t":
+            # v3.1: fading voiced-fricative tails played as noise
+            m2["voiced"] = sn.unvoice_tails(Sw, m2)
+        return m2
     with tempfile.TemporaryDirectory() as d:
         np.round(x * 32767).astype("<i2").tofile(f"{d}/in.raw")
         subprocess.run([f"{ar.C2BIN}/c2sim", f"{d}/in.raw", "--modelout", f"{d}/m.bin"],
@@ -365,7 +369,7 @@ class SottoV0:
                 v = int("".join(map(str, b[p:p + k])), 2)
                 p += k
                 return v
-            voiced[2 * f], voiced[2 * f + 1] = take(1), take(1)
+            voiced[2 * f], voiced[2 * f + 1] = self._read_voicing(take(2), voiced[2 * f - 1] if f else 0)
             wo[2 * f] = np.exp(np.log(WO_MIN) + take(7) * (np.log(self.WO_HI) - np.log(WO_MIN)) / 127)
             ei = take(5)
             en[2 * f] = -60.0 if ei == 0 and self.SILENT0 else self.E_LO + ei * (self.E_HI - self.E_LO) / 31
@@ -379,8 +383,16 @@ class SottoV0:
         wo = interp_wo(wo, voiced)
         wo = np.where(voiced > 0, wo, np.maximum(wo, WO_MIN))
         m = np.zeros(2 * n, MODEL)
-        m = set_wo(m, wo, voiced)
-        return set_energy(from_rate_k(m, rk), en)
+        m = set_wo(m, wo, np.minimum(voiced, 1))
+        m = set_energy(from_rate_k(m, rk), en)
+        for k in np.where(voiced == MIXED)[0]:
+            m[k]["voiced"] = mixed_cutoff(m[k]["Wo"])
+        return m
+
+    @staticmethod
+    def _read_voicing(code, prev):
+        """2-bit voicing field -> flags for the two 10 ms halves (v0-v3.1: one bit each)."""
+        return (code >> 1) & 1, code & 1
 
     def decode_audio(self, bits):
         return synthesise(self.decode(bits))
@@ -478,9 +490,10 @@ class SottoV2(SottoV0):
     re-checked at the corrected pitch, with voiced runs under 30 ms dropped."""
 
     WO_HI = 2 * np.pi / 16
+    PITCH = "tracked2"
 
     def __init__(self, shapeq=None, pf=1.5, quiet=None):
-        super().__init__(shapeq, pf=pf, pitch="tracked2")
+        super().__init__(shapeq, pf=pf, pitch=self.PITCH)
         self.quiet = quiet          # dict(margin, tilt, atten): see soften_pauses
 
     def decode(self, bits):
@@ -665,6 +678,75 @@ class SottoV3(SottoV2):
         vq = vq or ShapeMSVQ.load()
         self.vq = vq
         super().__init__(shapeq=_VQAdapter(vq), pf=pf, quiet=quiet)
+
+
+class SottoV31(SottoV3):
+    """v3 with sinusoid.unvoice_tails in the encoder: the fading ends of voiced fricatives
+    are sent as unvoiced. Same frame and decoder as v3. Listening round 5: preferred on the
+    "five" of one voice, no difference on four others, never worse."""
+
+    PITCH = "tracked2t"
+
+
+MIXED = 2                       # decoder-internal voicing state: harmonics below MIX_HZ only
+MIX_HZ = 1000.0
+
+
+def mixed_cutoff(wo):
+    """MODEL 'voiced' value for mixed excitation: phase.c treats voiced >= 2 as the first
+    harmonic index synthesised as noise."""
+    return max(2, int(MIX_HZ / (wo * FS / (2 * np.pi))) + 1)
+
+
+def voicing_classes(x, m):
+    """Per 10 ms frame: 0 unvoiced, 1 voiced, MIXED where the frame is voiced but the
+    harmonic fit below 1 kHz is weak (mean per-harmonic SNR < 8 dB): voiced fricatives,
+    breathy and fading vowels."""
+    import sinusoid as sn
+    Sw = sn.spectra(np.round(x * 32767))
+    c = (m["voiced"] > 0).astype(int)
+    for k in np.where(c)[0]:
+        wo = m["Wo"][k]
+        L = sn.n_harm(wo)
+        f = np.arange(L + 1) * wo * FS / (2 * np.pi)
+        if sn.harmonic_snr(Sw[k], wo, L)[(f > 0) & (f < 1000)].mean() < 8.0:
+            c[k] = MIXED
+    return c
+
+
+class SottoV32(SottoV31):
+    """v3.1 with mixed excitation and no extra bits. The 2-bit voicing field becomes one
+    code per 20 ms frame instead of one bit per 10 ms half:
+        0 = U U    1 = V V    2 = M M    3 = an edge: one half unvoiced, the other mixed,
+    where M means harmonics below 1 kHz and noise above. The order of an edge follows the
+    previous frame: after an unvoiced half it is an onset (U M), otherwise an offset (M U).
+    Fully voiced/unvoiced edges (U V, V U) are only ~1% of frames; they become U M / M U.
+    V M and M V (~9%) are sent as V V."""
+
+    def encode(self, x):
+        bits = super().encode(x)
+        m = analyse(x, self.PITCH)
+        c = voicing_classes(x, m)
+        if len(c) % 2:
+            c = np.concatenate([c, c[-1:]])
+        prev = 0
+        for f in range(len(bits)):
+            a, b = c[2 * f], c[2 * f + 1]
+            if a == b:
+                code = a
+            elif 0 in (a, b):
+                code = 3
+            else:
+                code = 1
+            bits[f, 0], bits[f, 1] = code >> 1, code & 1
+            prev = self._read_voicing(code, prev)[1]
+        return bits
+
+    @staticmethod
+    def _read_voicing(code, prev):
+        if code < 3:
+            return code, code
+        return (0, MIXED) if prev == 0 else (MIXED, 0)
 
 
 class _VQAdapter:

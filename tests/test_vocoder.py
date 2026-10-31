@@ -112,3 +112,16 @@ def test_v3_frames_decode():
     assert pesq > 2.5
     idx = v.vq.indices(np.zeros((1, vl.K)))
     assert idx.shape == (1, 3)
+
+
+def test_v31_only_unvoices_quiet_tails():
+    x = _ve9qrp(4.0)
+    m3 = vl.analyse(x, "tracked2")
+    m31 = vl.analyse(x, "tracked2t")
+    gone = (m3["voiced"] > 0) & (m31["voiced"] == 0)
+    assert not ((m31["voiced"] > 0) & (m3["voiced"] == 0)).any()
+    e = vl.frame_energy_db(m3)
+    for k in np.where(gone)[0]:
+        assert e[k] < e[max(0, k - 30):k + 1].max() - 20
+    bits = vl.SottoV31().encode(x)
+    assert bits.shape == (len(x) // 160, 48)

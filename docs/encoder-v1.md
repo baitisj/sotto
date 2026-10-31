@@ -181,6 +181,21 @@ Round 4 (one listener so far). v3 beat Codec 2 on 3 of 4 counting voices, includ
 
 Both v2 and v3 have a fault on "five" ("five-anuh", or a reverb tail). The final /v/ is a voiced fricative: the low harmonics are clean, but above 1 kHz the harmonic fit SNR is only 2 to 4 dB. Binary voicing renders it as a fully voiced vowel. On one voice the tracker also follows it down to about 100 Hz and keeps it voiced for 200 ms as it fades to -80 dB. Mixed (band) voicing on fricative tails, or ending the voiced run once the high-band fit collapses, is the next thing to try.
 
+### Voiced fricatives: v3.1 and v3.2
+
+Listeners heard "five-anuh" and a reverb-like tail on "five" in both v2 and v3. Round 5 tested two fixes against v3, with the original playing next to every pair (one listener; null pair called correctly):
+
+- **tail**: voiced frames whose harmonic fit below 1 kHz is weak (mean per-harmonic SNR under 6 dB) and that sit more than 20 dB below the loudest frame of the last 300 ms are sent as unvoiced. It needs no new bits. Preferred on one "five", tied on four other pairs.
+- **mix**: voiced frames with a weak low-band fit (under 8 dB) are synthesised with harmonics only below 1 kHz and noise above. Preferred on two pairs, including the other "five", tied on two.
+
+Neither lost a pair. PESQ calls both even with v3 (3.26 against 3.27 over 15 voices).
+
+**v3.1** (`SottoV31`) puts the tail rule in the encoder (`sinusoid.unvoice_tails`). It uses the same frame and decoder as v3. PESQ over 15 voices is 3.27 (v3: 3.27). Over the channels it is level on average: female UHF 52 dB-Hz is 2.53 against 2.29, LibriSpeech male 2.85 against 3.02. Those are within the run-to-run spread of the fading channel.
+
+**v3.2** (`SottoV32`) sends mixed excitation without new bits. The two voicing bits become one code per 20 ms frame: U U, V V, M M, or an edge (one half unvoiced, the other mixed). An edge's order follows the previous frame: after an unvoiced half it is an onset. Plain U V and V U edges are only about 1% of frames and become U M and M U. V M and M V (about 9%) are sent as V V. PESQ over 15 voices is 3.25, against 3.27 for v3.1. Round 6 compares the two by ear.
+
+The remaining "anuh" on one voice is partly the formant postfilter. In the "v" of "five" it cuts 1 to 2 kHz by 6 to 10 dB, which makes the frication sound nasal. Unquantized synthesis keeps that band. Weakening the postfilter on quiet or mixed frames restores the band but costs 0.06 to 0.1 PESQ everywhere, so it is parked.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC. (Partly solved later with Speech Commands, see above.)
