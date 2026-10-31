@@ -32,6 +32,19 @@ C2LIBS = -L$(CODEC2_LIB) -Wl,-rpath,$(abspath $(CODEC2_LIB)) -lcodec2 -lm
 
 all: libsotto.so libsotto.a sotto_enc sotto_dec
 
+# fixed-point build (fixed/), integer only, v3.6 codebook; FX_CHECK aborts if a sum would
+# overflow the C55x's 40-bit accumulator
+FX_CODEBOOK = sim/data/shape_msvq_9988.npz
+FXFLAGS ?= -DFX_CHECK
+FX_OBJS = fixed/fx_math.o fixed/fx_tables.o
+fixed: fixed/sotto_dec_fx
+fixed/fx_tables.c: ../$(FX_CODEBOOK) ../tools/gen_fx_tables.py
+	cd .. && $(PYTHON) tools/gen_fx_tables.py --codebook $(FX_CODEBOOK) c/fixed/fx_tables.c
+fixed/%.o: fixed/%.c fixed/fx.h fixed/fx_tables.h sotto.h
+	$(CC) $(CFLAGS) $(FXFLAGS) -c -o $@ $<
+fixed/sotto_dec_fx: sotto_dec.o fixed/sotto_fx_dec.o $(FX_OBJS)
+	$(CC) -o $@ $^
+
 sotto_codebook.c: ../$(CODEBOOK) ../tools/export_codebook_c.py
 	cd .. && $(PYTHON) tools/export_codebook_c.py $(CBROUND) $(CODEBOOK) c/sotto_codebook.c
 
@@ -76,5 +89,6 @@ install: libsotto.so libsotto.a sotto.pc
 
 clean:
 	rm -f *.o libsotto.a libsotto.so* sotto_enc sotto_dec test_api sotto_codebook.c sotto.pc
+	rm -f fixed/*.o fixed/fx_tables.c fixed/sotto_dec_fx
 
-.PHONY: all check install clean
+.PHONY: all fixed check install clean

@@ -188,3 +188,25 @@ def test_header_level_constants_match_energy_field():
     step = (hi - lo) / 31
     assert abs(const["SOTTO_LEVEL_SILENT_DBFS"] - (lo + step / 2 - const["SOTTO_ENERGY_OFFSET_DB"])) < 0.1
     assert abs(const["SOTTO_LEVEL_MAX_DBFS"] - (hi - const["SOTTO_ENERGY_OFFSET_DB"])) < 0.1
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "c", "fixed", "sotto_dec_fx")),
+                    reason="fixed-point decoder not built (make -C c fixed)")
+def test_fixed_point_decoder_matches_float():
+    """c/fixed/sotto_dec_fx (integer only) against the float decoder, same bits. The two
+    drift apart only where a harmonic sits on the postfilter's noise threshold and the
+    random-phase sequences fall out of step, so most 10 ms segments match closely."""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import check_c_port as cc
+    import check_fx
+    x16 = np.round(_ve9qrp(4.0) * 32767).astype(np.int16)
+    bits = cc.c_encode(x16[:len(x16) // 160 * 160])
+    good = np.ones(len(bits), bool)
+    good[60:64] = False
+    yf = cc.c_decode(bits, good)
+    yx = check_fx.run_dec(os.path.join(ROOT, "c", "fixed", "sotto_dec_fx"), bits, good)
+    assert len(yx) == len(yf)
+    seg = [cc.snr_db(yf[i:i + 80], yx[i:i + 80]) for i in range(0, len(yf) - 80, 80)
+           if np.sum(yf[i:i + 80] ** 2) > 1e-6]
+    assert np.median(seg) > 40
+    assert abs(10 * np.log10(np.sum(yx ** 2) / np.sum(yf ** 2))) < 0.5
