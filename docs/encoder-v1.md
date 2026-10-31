@@ -200,6 +200,30 @@ Round 6 (one listener, original in every pair): v3.2 was preferred on 2 of 10 pa
 
 The remaining "anuh" on one voice is partly the formant postfilter. In the "v" of "five" it cuts 1 to 2 kHz by 6 to 10 dB, which makes the frication sound nasal. Unquantized synthesis keeps that band. Weakening the postfilter on quiet or mixed frames restores the band but costs 0.06 to 0.1 PESQ everywhere, so it is parked.
 
+## Cleaner speech: LibriSpeech and EARS (v3.3 codebook)
+
+The listener pointed out that the Speech Commands clips are phone-microphone recordings of single words. Two cleaner corpora were added:
+
+- **LibriSpeech dev-clean** (CC BY 4.0, 40 speakers).
+- **EARS** (Meta, 2024; 107 speakers, anechoic studio, read and conversational speech). Its CC BY-NC 4.0 licence rules it out for anything shipped in this repository.
+
+`tools/clean_corpus.py` holds out 8 speakers from each corpus, half female and half male. It writes one untrimmed 12 s clip per held-out speaker, and builds training shapes from the other speakers: up to 240 s each for 32 LibriSpeech speakers and 120 s each for 99 EARS speakers. Three codebooks were trained with `tools/train_shape_vq.py` and scored with v3.3 on the 16 new voices and on the earlier 15:
+
+| codebook | training frames | LibriSpeech 8 | EARS 8 | earlier 15 |
+|---|---|---|---|---|
+| Codec 2 2400 (reference) | | 2.43 | 2.25 | 2.84 |
+| Speech Commands (v3) | 0.19 M | 2.88 | 2.80 | 3.26 |
+| + LibriSpeech | 0.48 M | 2.88 | 2.84 | 3.27 |
+| + LibriSpeech + EARS | 0.93 M | 2.89 | 2.81 | 3.27 |
+
+PESQ, no channel. Full results are in `docs/results/codebook_eval.json`.
+
+- **sotto against Codec 2 on unseen voices:** v3.3 beats Codec 2 on all 16 new voices, by 0.45 PESQ on LibriSpeech and 0.56 to 0.59 on EARS.
+- **More data helps a little:** adding LibriSpeech cuts the shape error on the new voices by 7 to 8% (2.23 to 2.06 dB² on LibriSpeech, 2.17 to 2.02 on EARS). PESQ moves up by up to 0.035.
+- **EARS adds nothing useful:** it lowers the in-domain shape error further but doesn't improve PESQ.
+
+The shipped codebook (`sim/data/shape_msvq_34.npz`) is now the Speech Commands + LibriSpeech one. Its training data is CC BY only, so EARS is used only for testing.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC. (Partly solved later with Speech Commands, see above.)
