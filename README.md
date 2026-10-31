@@ -19,6 +19,7 @@ Compare sotto with Fusion-style protection over a simulated weak mobile signal, 
 - `tools/score_samples.py`: PESQ (narrowband) and ESTOI scoring of coded clips
   against the originals.
 - `codec/codec2/`: our working fork of Codec 2 (LGPL-2.1), where the oracle experiments and the 2400 bps improvements happen.
+- `docs/course/`: **How sotto works**, an illustrated beginner course (about 10th-grade level) with a glossary. Figures and demos are rebuilt by `tools/course_figures.py`. Online at https://baitisj.github.io/sotto/course/.
 - `docs/`: design memos (TWELP survey, Codec 2 improvement plan, FEC race, waveform race,
   softmodem, audio results).
 
