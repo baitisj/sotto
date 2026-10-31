@@ -8,13 +8,47 @@ target: the TI C5517 in the Yaesu FTM-300D).
 
 Compare sotto with Fusion-style protection over a simulated weak mobile signal, for male and female voices: **https://baitisj.github.io/sotto/** (the page is `docs/index.html`; the FLAC files are in `docs/samples/`).
 
+## Build libsotto
+
+You need a C compiler, `make`, `cmake`, and Python 3 with numpy (the build generates the
+codebook source from `sim/data/`). From the top of the repository:
+
+```sh
+make                      # Codec 2 fork into build/codec2, then libsotto and the tools in c/
+make check                # C API test, then the Python tests (needs the Python dependencies below)
+sudo make install         # PREFIX=/usr/local by default; then run sudo ldconfig on Linux
+```
+
+`make` produces `c/libsotto.so` (soname `libsotto.so.0`), `c/libsotto.a`, and two command-line
+tools that read and write raw files:
+
+```sh
+sox talk.wav -r 8000 -c 1 -b 16 -e signed -t raw talk.raw   # 8 kHz, 16-bit mono
+c/sotto_enc talk.raw talk.bit                     # 6 bytes per 20 ms frame (2400 bit/s)
+c/sotto_dec talk.bit out.raw
+```
+
+After `make install`, build a program against it with
+`cc app.c $(pkg-config --cflags --libs sotto)` and `#include <sotto.h>`. The header documents
+the API and the input level the codec expects (speech near −26 dBFS).
+
+- `make install` also installs `libcodec2` and its headers from our fork (`codec/codec2/`,
+  LGPL-2.1), because libsotto calls Codec 2's analysis and synthesis. To keep it apart from a
+  Codec 2 already on your system, install to its own prefix, for example
+  `make install PREFIX=/opt/sotto`, and set `PKG_CONFIG_PATH=/opt/sotto/lib/pkgconfig` and
+  `LD_LIBRARY_PATH=/opt/sotto/lib`.
+- If `python3` has no numpy, point the build at a Python that does: `make PYTHON=.venv/bin/python`.
+- The library speaks one bitstream, v3.6 by default (`sotto_format()` says which).
+  `make clean all VARIANT=v3.5` builds the older one.
+- `make distclean` also removes the Codec 2 build. More detail is in `c/README.md`.
+
 ## Contents
 
 - `modem/`: the **softmodem**. It sends and receives YSF frames carrying sotto voice through a radio's 9600 data port and a sound card, or through an SDR (IQ). `python -m modem tx voice.bit tx.flac`, then `python -m modem rx rx.flac voice.bit`. See `docs/softmodem.md`.
 - `tests/`: `python -m pytest tests`.
-- `c/`: the **C port** of the sotto v3.5 encoder and decoder (float, links Codec 2). `make -C c`, then `c/sotto_enc in.raw out.bit` and `c/sotto_dec out.bit out.raw`. See `c/README.md` and `docs/c-port.md` for the plan to run it on the radio's DSP.
+- `c/`: the **C port** of the sotto v3.6 encoder and decoder (float, links Codec 2), built as `libsotto` by `make` (see Build libsotto above). See `c/README.md` and `docs/c-port.md` for the plan to run it on the radio's DSP.
 - `tools/listening/` and `docs/listening-tests.md`: the blind A/B listening-test pages used to check each codec change by ear.
-- `tools/build_codec2.sh`: builds c2enc, c2dec and c2sim into `build/codec2/src`.
+- `tools/build_codec2.sh`: builds libcodec2, c2enc, c2dec and c2sim into `build/codec2/src` (the top-level `make` runs it).
 - `sim/`: a C4FM (4-level FSK over FM) link simulator with Rayleigh and two-path
   fading; an FEC race (`fec_race.py`); a waveform race (`waveform_race.py`, `vw_race.py`); and an
   end-to-end speech test through the softmodem (`audio_race.py`, needs the Codec 2 build).
