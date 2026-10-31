@@ -153,9 +153,35 @@ PESQ, female / male LibriSpeech / ve9qrp, mean of 3 seeds:
 - **Prediction itself gains nothing yet.** Even with no channel, the predicted variants are within ±0.08 of v2. With this 34-bit scalar DCT quantizer, coding a residual is no cheaper than coding the frame. Resets are on 12 to 48% of frames (more for ve9qrp, which pauses more).
 - **Next:** revisit with a trained vector quantizer, where prediction does pay off in AMBE. The resets and the CRC hold make it safe to try.
 
+## More voices, and v3 (trained vector quantizer)
+
+### Speech Commands voices
+
+LibriVox, Wikimedia, OpenSLR and Hugging Face are blocked from the sandbox. Google's Speech Commands v0.02 (Warden 2018, CC BY 4.0) is reachable: one-second words from about 2,600 volunteers. Test clips: speakers who said all ten digits were joined into "zero ... nine" clips of 8 to 12 s, and 12 clean ones were kept, 6 lower voices and 6 higher. Two of the higher voices are around 380 to 390 Hz. These 12 speakers are excluded from all training. The clips and their scores are in the project folder, and `tools/sc_counting_clips.py` builds them.
+
+### Club listening rounds 3 and 4
+
+Round 3 (Jeff and Andrew) put v2 against Codec 2 on 8 of the new voices. v2 won 9 of the 16 answers, Codec 2 won 7. Both listeners picked Codec 2 for the very high voice (390 Hz) and a very low one (80 Hz), and both picked v2 on three mid-range voices. PESQ favoured v2 on every pair, so the pitch-range edges are where ears and PESQ disagree. The pause softening drew "no difference" or a preference for plain v2, so it's dropped. Jeff also heard v2 put a faint floor in the gaps between words. v2's lowest energy code plays about −80 dBFS of noise, while Codec 2 goes to −95. A crackle after "th" came from fricative frames called voiced at a junk low pitch. Normalising the pitch fit by its value on noise fixes "three" but not "six", so that is still open.
+
+### v3
+
+`SottoV3` keeps v2's frame layout. Two changes:
+- **The 34 shape bits are a 3-stage vector quantizer (12 + 11 + 11 bits) with M-best search (M = 8).** It is trained on 184,000 frames from 600 Speech Commands speakers (300 above and 300 below 165 Hz median pitch) plus Codec 2's recordings. `tools/sc_corpus.py` and `tools/train_shape_vq.py` build it, and it is stored in `sim/data/shape_msvq_34.npz` (0.6 MB). On held-out frames it has 45% less envelope error than the scalar quantizer retrained on the same data (2.54 against 4.66 dB²).
+- **Energy code 0 decodes as true silence.**
+
+No radio channel, 15 voices (`docs/results/clean_15voices.json`), mean PESQ (ESTOI):
+
+| Codec 2 | v2 | v2, scalar retrained on the new data | **v3** |
+|---:|---:|---:|---:|
+| 2.84 (0.73) | 3.19 (0.77) | 3.20 (0.78) | **3.27 (0.79)** |
+
+v3 beats v2 on 12 of the 15 voices. Over the radio channels it ties v2 on average (PESQ 2.72 for both over 9 condition × voice cells). It is up to +0.12 on the men and down 0.15 on the female at UHF 52 dB-Hz. ESTOI is equal or better in every cell. The female loss may come from the mute after three lost frames, which is now true silence rather than faint noise.
+
+Round 4 (v3 against Codec 2 on the pitch-edge voices, v3 against v2 with and without the channel) is with the club.
+
 ## What limits the next step: speech data
 
-The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC, only GitHub.
+The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC. (Partly solved later with Speech Commands, see above.)
 
 ## Next
 

@@ -226,7 +226,7 @@ def noise_logerr(w):
 
 
 def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=WO_MAX_HI,
-                        uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias"):
+                        uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias", tilt=0.0):
     """Joint pitch and voicing track over the whole utterance (Viterbi).
 
     States per frame: unvoiced, or voiced at one of the candidates refine(wo0[t+d] * mu)
@@ -253,6 +253,11 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
         le = np.array([np.log(fit_error(Sw[t], w)) for w in ws])
         le = le - noise_logerr(ws) if norm == "noise" else le - bias * np.log(ws)
         c = le + prior * (not v0[t])
+        if tilt:
+            # fricatives (s, sh, th) put most energy above 2 kHz; penalise voicing there
+            P = np.abs(Sw[t]) ** 2
+            lo, hi = P[1:NFFT * 2000 // FS].sum(), P[NFFT * 2000 // FS:NFFT // 2].sum()
+            c = c + tilt * max(0.0, -10 * np.log10((lo + 1e-9) / (hi + 1e-9))) / 10
         cands.append(ws)
         costs.append(np.concatenate([[uv_cost + prior * v0[t]], c]))     # state 0 = unvoiced
     D, back = costs[0].copy(), []

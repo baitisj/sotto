@@ -301,6 +301,7 @@ class SottoV0:
 
     E_LO, E_HI = 10.0, 80.0
     WO_HI = WO_MAX
+    SILENT0 = False             # energy code 0 decodes as silence (v3 on)
 
     def __init__(self, shapeq=None, pf=1.5, pitch="c2"):
         self.pitch = pitch
@@ -366,7 +367,8 @@ class SottoV0:
                 return v
             voiced[2 * f], voiced[2 * f + 1] = take(1), take(1)
             wo[2 * f] = np.exp(np.log(WO_MIN) + take(7) * (np.log(self.WO_HI) - np.log(WO_MIN)) / 127)
-            en[2 * f] = self.E_LO + take(5) * (self.E_HI - self.E_LO) / 31
+            ei = take(5)
+            en[2 * f] = -60.0 if ei == 0 and self.SILENT0 else self.E_LO + ei * (self.E_HI - self.E_LO) / 31
             shape = self._shape_val([take(bb) for bb in self.fields])
             if self.pf:
                 shape = postfilter_rk(shape[None], self.pf)[0]
@@ -578,3 +580,112 @@ class SottoV2P(SottoV2):
             rk[0::2] = postfilter_rk(rk[0::2], self.pf)
         m = set_energy(from_rate_k(m, decimate_interp(rk)), frame_energy_db(m))
         return soften_pauses(m, **self.quiet) if self.quiet else m
+
+
+# ---------------------------------------------------------------- multistage VQ for the shape
+class ShapeMSVQ:
+    """Multistage vector quantizer for the mean-removed rate-K shape (K = 20, DC removed, so
+    it works on DCT coefficients 1..K-1). Stage s has 2**bits[s] codewords; each stage codes
+    the residual of the ones before. Training is k-means per stage, then a few passes of
+    joint re-estimation. The search keeps the M best paths through the stages (M-best), as
+    in MELPe's LSF quantizer. Distortion is squared error in dB, so every rate-K point
+    weighs the same."""
+
+    def __init__(self, train, bits=(12, 11, 11), m_best=8, iters=25, joint=3, seed=0):
+        from sklearn.cluster import KMeans
+        self.bits, self.m = tuple(bits), m_best
+        c = (train @ DCT.T)[:, 1:]
+        r = c.copy()
+        self.cb = []
+        for b in bits:
+            km = KMeans(2 ** b, n_init=1, max_iter=iters, random_state=seed).fit(r)
+            self.cb.append(km.cluster_centers_)
+            r = r - self.cb[-1][km.labels_]
+        for _ in range(joint):                   # re-estimate each stage given the others
+            idx = self._search(c)
+            for s in range(len(bits)):
+                others = c - sum(self.cb[t][idx[:, t]] for t in range(len(bits)) if t != s)
+                for k in range(2 ** bits[s]):
+                    sel = idx[:, s] == k
+                    if sel.any():
+                        self.cb[s][k] = others[sel].mean(0)
+
+    def _search(self, c, chunk=2000):
+        c = np.atleast_2d(c)
+        if len(c) > chunk:
+            return np.concatenate([self._search(c[i:i + chunk]) for i in range(0, len(c), chunk)])
+        n = len(c)
+        paths = np.zeros((n, 1, 0), int)
+        recon = np.zeros((n, 1, c.shape[1]))
+        for cb in self.cb:
+            res = c[:, None, :] - recon                               # n, P, D
+            d = (res ** 2).sum(-1)[..., None] - 2 * res @ cb.T + (cb ** 2).sum(1)  # n, P, C
+            C = d.shape[2]
+            keep = np.argpartition(d.reshape(n, -1), min(self.m, d[0].size) - 1, 1)[:, :self.m]
+            pi, ci = keep // C, keep % C
+            paths = np.concatenate([np.take_along_axis(paths, pi[..., None], 1), ci[..., None]], 2)
+            recon = np.take_along_axis(recon, pi[..., None], 1) + cb[ci]
+        best = ((c[:, None, :] - recon) ** 2).sum(-1).argmin(1)
+        return paths[np.arange(n), best]
+
+    @classmethod
+    def load(cls, path=os.path.join(HERE, "data", "shape_msvq_34.npz")):
+        d = np.load(path)
+        q = cls.__new__(cls)
+        q.bits, q.m = tuple(int(b) for b in d["bits"]), int(d["m_best"])
+        q.cb = [d[f"stage{i}"].astype(float) for i in range(len(q.bits))]
+        return q
+
+    def save(self, path):
+        np.savez_compressed(path, bits=np.array(self.bits), m_best=self.m,
+                            **{f"stage{i}": cb.astype(np.float32) for i, cb in enumerate(self.cb)})
+
+    def indices(self, shape):
+        return self._search((np.atleast_2d(shape) @ DCT.T)[:, 1:])
+
+    def value(self, idx):
+        idx = np.atleast_2d(idx)
+        c = np.zeros((len(idx), K))
+        c[:, 1:] = sum(self.cb[s][idx[:, s]] for s in range(len(self.cb)))
+        return c @ DCT
+
+    def quantize(self, shape):
+        return self.value(self.indices(shape))
+
+
+class SottoV3(SottoV2):
+    """v2 with the 34 shape bits sent as multistage VQ indices instead of scalar DCT
+    coefficients, and energy code 0 decoding as silence. Same 48-bit frame: voicing 2,
+    pitch 7, energy 5, shape 12 + 11 + 11. The default codebook (sim/data/shape_msvq_34.npz)
+    is trained by tools/train_shape_vq.py on 600 Speech Commands speakers."""
+
+    SILENT0 = True
+
+    def __init__(self, vq=None, pf=1.5, quiet=None):
+        vq = vq or ShapeMSVQ.load()
+        self.vq = vq
+        super().__init__(shapeq=_VQAdapter(vq), pf=pf, quiet=quiet)
+
+
+class _VQAdapter:
+    """Lets SottoV0's packing code treat the VQ stages as its 'fields'."""
+
+    def __init__(self, vq):
+        self.vq = vq
+        self.bits = np.array(vq.bits)
+
+
+def _v3_shape_idx(self, shape):
+    if isinstance(self.sq, _VQAdapter):
+        return [int(i) for i in self.sq.vq.indices(shape)[0]]
+    return SottoV0._shape_idx_scalar(self, shape)
+
+
+def _v3_shape_val(self, idx):
+    if isinstance(self.sq, _VQAdapter):
+        return self.sq.vq.value(np.array(idx))[0]
+    return SottoV0._shape_val_scalar(self, idx)
+
+
+SottoV0._shape_idx_scalar, SottoV0._shape_val_scalar = SottoV0._shape_idx, SottoV0._shape_val
+SottoV0._shape_idx, SottoV0._shape_val = _v3_shape_idx, _v3_shape_val

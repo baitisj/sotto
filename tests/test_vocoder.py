@@ -101,3 +101,14 @@ def test_joint_tracker_unvoices_noise():
     Sw = sn.spectra(np.round(x * 32767))
     _, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"])
     assert v.mean() <= m["voiced"].mean() and v.mean() < 0.05
+
+
+def test_v3_frames_decode():
+    x = _ve9qrp(2.0)
+    v = vl.SottoV3()
+    bits = v.encode(x)
+    assert bits.shape == (len(x) // 160, 48)
+    pesq, _ = ar.score(x, v.decode_audio(bits), ar.best_lag(x, None))
+    assert pesq > 2.5
+    idx = v.vq.indices(np.zeros((1, vl.K)))
+    assert idx.shape == (1, 3)
