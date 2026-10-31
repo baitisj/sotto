@@ -248,7 +248,14 @@ What the sweep shows:
 - **A slow fade beats a quick mute.** The default fades by 28 dB over 300 ms.
 - **Mixing has no measurable PESQ effect** (+0.01). It's kept because the held buzz is what listeners complain about.
 
-Listening round 7 (fading 2 m pairs against Codec 2 and v3.3) is with the club.
+Listening round 7 (one listener, fading 2 m, original in every pair):
+
+- **Against Codec 2:** v3.4 won all 6 pairs.
+- **Against v3.3:** v3.3 won 2 (two men at 30 km/h, weak signal, 13 to 17% of frames lost) and 2 were ties.
+- **Why:** the listener described v3.3 as "quietly drops", and v3.4 as continuing the last sound, which makes drops more obvious.
+- **Takeaway:** PESQ rewards filling a gap; the ear prefers a short, quiet one. At 30 to 60 km/h, 40% of lost frames come in runs of exactly 5, a whole 100 ms YSF frame, because the code spans all five frames.
+
+`SottoV34` now takes `hold`, the number of lost frames kept at full level. Round 8 compares v3.3 with two short-fade versions: "mid" (hold 3, then 6 dB per frame, silent after 5) and "quick" (hold 2, 6 dB per frame, silent after 4).
 
 **Would unequal protection save part of a lost frame?** A second CRC on the most important bits (voicing, pitch, energy and the first VQ stage) would let the decoder use those bits when the rest of the frame fails. On 2 m fading, the frames that fail CRC almost always fail completely: the median failed frame has 12 to 21 wrong bits out of 48. Only 10 to 20% of failed frames had their first 26 bits intact, and 16 to 34% had their first 14 (voicing, pitch and energy). The losses are deep fades, not scattered bit errors, so a split CRC would recover little. It isn't worth the extra CRC bits.
 
