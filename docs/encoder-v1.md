@@ -250,6 +250,8 @@ What the sweep shows:
 
 Listening round 7 (fading 2 m pairs against Codec 2 and v3.3) is with the club.
 
+**Would unequal protection save part of a lost frame?** A second CRC on the most important bits (voicing, pitch, energy and the first VQ stage) would let the decoder use those bits when the rest of the frame fails. On 2 m fading, the frames that fail CRC almost always fail completely: the median failed frame has 12 to 21 wrong bits out of 48. Only 10 to 20% of failed frames had their first 26 bits intact, and 16 to 34% had their first 14 (voicing, pitch and energy). The losses are deep fades, not scattered bit errors, so a split CRC would recover little. It isn't worth the extra CRC bits.
+
 ## Real-time pitch tracking
 
 The joint pitch and voicing tracker searched each whole utterance (Viterbi with full traceback). A real-time encoder can only look a fixed number of frames ahead, so the tracker now has a `lag` option: frame t is decided from the best path at frame t + lag. Mean PESQ over 31 voices (the earlier 15 and the 16 held-out):
@@ -259,6 +261,28 @@ The joint pitch and voicing tracker searched each whole utterance (Viterbi with 
 | PESQ | 3.055 | 3.011 | 3.035 | 3.041 | 3.052 |
 
 An 80 ms look-ahead gives up only 0.003, so real-time tracking costs nothing that matters. That adds 80 ms of delay; push-to-talk radio tolerates it. The C port should use lag = 8.
+
+## Postfilter re-tuned (v3.5)
+
+The formant postfilter gain (1.5) was chosen for the scalar quantizer in v0. With the trained codebook, a sweep over 31 voices (no channel):
+
+| gain | 1.0 | 1.2 | 1.35 | 1.5 | 1.7 | 2.0 |
+|---|---|---|---|---|---|---|
+| PESQ | 2.81 | 3.02 | **3.08** | 3.06 | 2.94 | 2.69 |
+| ESTOI | 0.802 | 0.803 | 0.796 | 0.785 | 0.767 | 0.737 |
+
+**v3.5** (`SottoV35`) is v3.4 with gain 1.35. Its shallower valleys also cut less of the 1 to 2 kHz frication that made "five" sound like "five-anuh". Round 7 was rendered before this change, with gain 1.5.
+
+The encoder race (3 voices; v3.4 → v3.5 PESQ) shows v3.5 ahead of v3.4 in every cell:
+
+| condition | female | LibriSpeech male | ve9qrp |
+|---|---|---|---|
+| no channel | 2.89 → 2.90 | 3.31 → 3.36 | 3.03 → 3.09 |
+| UHF 60 km/h 52 dB-Hz | 2.47 → 2.47 | 2.91 → 2.97 | 2.88 → 2.94 |
+| UHF 60 km/h 56 dB-Hz | 2.89 → 2.91 | 3.16 → 3.22 | 3.04 → 3.08 |
+| VHF 30 km/h 56 dB-Hz | 2.55 → 2.58 | 2.88 → 2.92 | 2.53 → 2.60 |
+
+Against v3, the version on the public listening page, the VHF fading scores are up by 0.13 to 0.29.
 
 ## What limits the next step: speech data
 

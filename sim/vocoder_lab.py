@@ -801,6 +801,15 @@ class SottoV34(SottoV33):
         return m
 
 
+class SottoV35(SottoV34):
+    """v3.4 with a lighter formant postfilter (gain 1.35 instead of 1.5). Re-tuned for the
+    trained codebook: +0.02 PESQ and +0.01 ESTOI over 31 voices, and the shallower valleys
+    keep more of the 1-2 kHz frication in sounds like the "v" of "five"."""
+
+    def __init__(self, vq=None, pf=1.35, quiet=None, **conceal):
+        super().__init__(vq=vq, pf=pf, quiet=quiet, **conceal)
+
+
 class _VQAdapter:
     """Lets SottoV0's packing code treat the VQ stages as its 'fields'."""
 
