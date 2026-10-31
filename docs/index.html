@@ -48,24 +48,32 @@
   <h1>sotto</h1>
   <p class="lede">Open 2400 bit/s digital voice for FM radios: a vocoder, error correction and a C4FM modem path, built for small fixed-point DSPs.</p>
 
-  <h2 style="margin-top:24px">Part 1: same encoder, different channel protection</h2>
-  <p>sotto's own encoder isn't built yet, so every clip here uses the stock Codec 2 2400 encoder. Each went through System Fusion (C4FM) frames, a simulated mobile radio channel with fading and noise, and our software receiver. The rows differ only in how the voice bits are protected and where they sit in the frame. Encoder-against-encoder comparisons (sotto's encoder next to Codec 2's, through the same channel and receiver) come next.</p>
+  <h2 style="margin-top:24px">Part 1: sotto's encoder against Codec 2's</h2>
+  <p>Both encoders run at 2400 bit/s (48 bits every 20 ms). Each pair went through exactly the same chain: the same System Fusion (C4FM) frames and error protection, the same simulated radio channel with the same fading, and the same software receiver. The only difference is the encoder and decoder.</p>
   <p>
+    <span class="cond">no radio channel</span>
     <span class="cond">UHF 446 MHz, 60 km/h, 52 dB-Hz (a weak mobile signal)</span>
+    <span class="cond">VHF 146 MHz, 30 km/h, 56 dB-Hz (slow fading)</span>
+  </p>
+  <p class="note">The score is PESQ, an automatic speech-quality estimate from 1 (bad) to 4.5 (excellent), averaged over three fading runs. sotto v0 is an early prototype: a mel-spaced spectral envelope in place of Codec 2's 10th-order LPC, with Codec 2's pitch tracker and synthesis.</p>
+
+  <div id="encoders"></div>
+
+  <h2>Part 2: same encoder (Codec 2), different channel protection</h2>
+  <p>These clips all use the stock Codec 2 2400 encoder. The rows differ only in how the voice bits are protected and where they sit in the Fusion frame.</p>
+  <p>
+    <span class="cond">UHF 446 MHz, 60 km/h, 52 dB-Hz</span>
     <span class="cond">same transmit power for every row</span>
   </p>
-  <p class="note">The score is PESQ, an automatic speech-quality estimate from 1 (bad) to 4.5 (excellent), averaged over three fading runs. "No radio channel" is the best any row can reach with today's codec.</p>
 
   <div id="voices"></div>
 
-  <h2>Slow VHF fading: the hard case</h2>
-  <p>At 146 MHz and town-driving speed (30 km/h), fades last longer than the 100 ms interleaver, so whole frames are lost. This is sotto at 56 dB-Hz. Longer interleaving and better concealment are on the list.</p>
-  <div id="vhf"></div>
 
   <h2>What you're hearing</h2>
-  <p><b>sotto (VW slot)</b> puts the voice in the full-rate part of the Fusion frame, adds a CRC to each 20 ms frame and protects everything with a strong tail-biting convolutional code. <b>DN slot + our code</b> uses the half-rate slot Fusion radios use for DN mode, with a weaker version of the same code. <b>Fusion-style protection</b> mimics how DN protects its voice bits (the first 27 bits sent three times, the rest unprotected), applied to Codec 2. That's a statement about Codec 2 with that protection, not about AMBE+2, whose decoder is built around it.</p>
-  <p>Today's vocoder is stock Codec 2 2400. The next step for the project is a better open vocoder at the same rate, which should lift every row. The female voice especially: Codec 2 itself costs her about 0.7 PESQ before any radio channel.</p>
-  <p class="note">Simulation only, not yet on the air. Sources: the ve9qrp recording from the Codec 2 project, and LibriSpeech readers (CC BY 4.0; see <a href="samples/README.md">samples/README.md</a>). Details: <a href="https://github.com/baitisj/sotto/blob/main/docs/audio-race.md">audio-race.md</a>. Code: <a href="https://github.com/baitisj/sotto">github.com/baitisj/sotto</a> (MIT; the Codec 2 fork is LGPL-2.1).</p>
+  <p><b>sotto v0</b> (Part 1) keeps Codec 2's pitch tracker, voicing decision and synthesis, but describes the spectrum with 20 mel-spaced amplitudes, quantized as a DCT with 34 bits, plus a formant postfilter and a frame-energy field. It needs no memory between frames, so a lost frame doesn't damage the next one. The pitch tracker and voicing come next, especially for the female voice.</p>
+  <p><b>VW slot</b> (used for everything in Part 1) puts the voice in the full-rate part of the Fusion frame, adds a CRC to each 20 ms frame and protects everything with a strong tail-biting convolutional code. <b>DN slot + our code</b> uses the half-rate slot Fusion radios use for DN mode, with a weaker version of the same code. <b>Fusion-style protection</b> mimics how DN protects its voice bits (the first 27 bits sent three times, the rest unprotected), applied to Codec 2. That's a statement about Codec 2 with that protection, not about AMBE+2, whose decoder is built around it.</p>
+  <p>At 146 MHz and 30 km/h, fades outlast the 100 ms interleaver, so whole frames are lost; longer interleaving and better concealment are on the list.</p>
+  <p class="note">Simulation only, not yet on the air. Sources: the ve9qrp recording from the Codec 2 project, and LibriSpeech readers (CC BY 4.0; see <a href="samples/README.md">samples/README.md</a>). Details: <a href="https://github.com/baitisj/sotto/blob/main/docs/encoder-v0.md">encoder-v0.md</a>, <a href="https://github.com/baitisj/sotto/blob/main/docs/audio-race.md">audio-race.md</a>. Code: <a href="https://github.com/baitisj/sotto">github.com/baitisj/sotto</a> (MIT; the Codec 2 fork is LGPL-2.1).</p>
 </main>
 <script>
   const voices = [
@@ -80,7 +88,7 @@
   const rows = [
     { key: null, file: "original", title: "Original", sub: "the input speech" },
     { key: "clean", file: "codec2_2400_no_channel", title: "Codec 2 2400, no radio channel", sub: "the ceiling for every row below" },
-    { key: "sotto", file: `${uhf}__sotto_vw`, title: "sotto (VW slot)", sub: "CRC + rate 7/18 tail-biting code", best: true },
+    { key: "sotto", file: `${uhf}__sotto_vw`, title: "VW slot (sotto's protection)", sub: "CRC + rate 7/18 tail-biting code", best: true },
     { key: "dnconv", file: `${uhf}__dn_conv`, title: "DN slot + our code", sub: "CRC + rate 7/13 code" },
     { key: "dnrep", file: `${uhf}__dn_rep`, title: "Fusion-style protection", sub: "27 bits sent three times, the rest bare" },
   ];
@@ -99,11 +107,36 @@
     for (const r of rows) card.append(row(v, r));
     host.append(card);
   }
-  const vhf = document.getElementById("vhf");
-  const card = el("section", "voice");
-  for (const v of voices)
-    card.append(row(v, { key: "vhf", file: "146_MHz_30_kmh_56_dB-Hz__sotto_vw", title: v.name.split(" (")[0], sub: "sotto, 146 MHz, 30 km/h, 56 dB-Hz" }));
-  vhf.append(card);
+  // Part 1: encoder against encoder (files in samples/encoder/)
+  const enc = {
+    female_libri198_14s: { none: [2.16, 2.50], uhf52: [1.69, 2.11], vhf56: [1.82, 2.19] },
+    male_libri3436_15s:  { none: [2.91, 3.14], uhf52: [2.29, 2.68], vhf56: [2.06, 2.61] },
+    male_ve9qrp_15s:     { none: [2.85, 2.88], uhf52: [2.49, 2.69], vhf56: [1.91, 2.31] },
+  };
+  const conds = [
+    { key: "none", file: "No_radio_channel", title: "No radio channel" },
+    { key: "uhf52", file: "446_MHz_60_kmh_52_dB-Hz", title: "UHF 446 MHz, 60 km/h, 52 dB-Hz" },
+    { key: "vhf56", file: "146_MHz_30_kmh_56_dB-Hz", title: "VHF 146 MHz, 30 km/h, 56 dB-Hz" },
+  ];
+  function clip(label, sub, score, src, best) {
+    const d = el("div", "row" + (best ? " best" : ""));
+    d.append(el("div", "label", `<b>${label}</b><span>${sub}</span>`));
+    d.append(el("div", "score", score == null ? "" : `PESQ ${score.toFixed(2)}`));
+    const a = el("audio"); a.controls = true; a.preload = "none"; a.src = src;
+    d.append(a);
+    return d;
+  }
+  const ehost = document.getElementById("encoders");
+  for (const v of voices) {
+    const card = el("section", "voice"); card.append(el("h3", null, v.name));
+    card.append(clip("Original", "the input speech", null, `samples/${v.id}__original.flac`));
+    for (const c of conds) {
+      const [c2, so] = enc[v.id][c.key];
+      card.append(clip("Codec 2 encoder", c.title, c2, `samples/encoder/${v.id}__${c.file}__codec2_2400.flac`));
+      card.append(clip("sotto v0 encoder", c.title, so, `samples/encoder/${v.id}__${c.file}__sotto_v0.flac`, true));
+    }
+    ehost.append(card);
+  }
   // Only one clip plays at a time.
   document.addEventListener("play", e => {
     for (const a of document.querySelectorAll("audio")) if (a !== e.target) a.pause();

@@ -21,6 +21,10 @@ PESQ for these conditions (mean of 3 fading seeds; the files are from the first 
 | Male (LibriSpeech 3436) | 2.91 | 2.28 | 1.73 | 1.35 | 2.10 |
 | Male (ve9qrp) | 2.85 | 2.50 | 1.84 | 1.48 | 1.94 |
 
+## Encoder against encoder (`encoder/`)
+
+`encoder/<voice>__<condition>__codec2_2400.flac` and `...__sotto_v0.flac` are the same voice sent through the identical chain (sotto VW payload, C4FM softmodem, same channel and fading seed, same receiver). Only the encoder and decoder differ. The conditions are no radio channel; 446 MHz, 60 km/h, 52 dB-Hz; and 146 MHz, 30 km/h, 56 dB-Hz. Scores are in `docs/encoder-v0.md`.
+
 ## Sources
 
 - `male_ve9qrp_15s`: 15 s from `ve9qrp.raw` in the Codec 2 repository (`codec/codec2/raw/`, LGPL-2.1).
