@@ -290,7 +290,8 @@ The shape quantizer is trained on about 2 minutes of speech, nearly all from one
 
 ## Next
 
-1. More training and test speech, ideally 30+ minutes from at least 10 speakers, half of them female. With that: a trained (split or multistage) VQ for the shape, and re-tuning the tracker on a held-out set.
-2. A bounded-lookahead version of the v2 tracker (it now searches a whole utterance), so it can run in real time.
-3. Listening checks for band voicing and the postfilter, which PESQ can't judge.
-4. The C port of v1 (deferred).
+1. Listening round 7: fading 2 m pairs, v3.4 against Codec 2 and against v3.3. If the concealment holds up by ear, move the public listening page to v3.5 (renders are ready).
+2. The C port of v3.5 for the C5517 (deferred at Jeff's request). Use a fixed tracker look-ahead of 8 frames (80 ms).
+3. Longer interleaving across two YSF frames (200 ms) for 30 to 60 km/h. At walking pace, fades outlast any usable interleaver, so concealment carries that case.
+4. Retrain the codebook on VCTK or more LibriSpeech (train-clean-100) when someone can upload it.
+5. Still open by ear: the 390 Hz voice (Codec 2 preferred twice, though v3 is closer to that band-limited original).
