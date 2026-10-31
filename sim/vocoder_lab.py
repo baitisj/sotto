@@ -52,15 +52,17 @@ def analyse(x, pitch="c2"):
         Sw = sn.spectra(xi)
         wo = sn.track_pitch(Sw, m["Wo"], m["voiced"], **TRACK)
         return sn.analyse(xi, wo, voicing=m["voiced"], do_refine=False)[:len(m)]
-    if pitch in ("tracked2", "tracked2t"):
+    if pitch in ("tracked2", "tracked2t", "tracked3"):
         # v2: pitch up to 500 Hz, and voicing re-checked at the corrected pitch
         import sinusoid as sn
         m = analyse(x)
         xi = np.round(x * 32767)
         Sw = sn.spectra(xi)
-        wo, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"], **TRACK2)
+        # v3.3: penalise sub-octave candidates (every other harmonic missing)
+        opts = {"sub": 2.0, **TRACK2} if pitch == "tracked3" else TRACK2
+        wo, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"], **opts)
         m2 = sn.analyse(xi, wo, voicing=v, do_refine=False)[:len(m)]
-        if pitch == "tracked2t":
+        if pitch in ("tracked2t", "tracked3"):
             # v3.1: fading voiced-fricative tails played as noise
             m2["voiced"] = sn.unvoice_tails(Sw, m2)
         return m2
@@ -747,6 +749,14 @@ class SottoV32(SottoV31):
         if code < 3:
             return code, code
         return (0, MIXED) if prev == 0 else (MIXED, 0)
+
+
+class SottoV33(SottoV32):
+    """v3.2 with the pitch tracker's sub-octave check (sinusoid.odd_even_db): a candidate
+    whose odd harmonics sit far below its even ones is half the true pitch. Fixes a
+    "grumbly" word where v2-v3.2 tracked 129 Hz for a 258 Hz voice."""
+
+    PITCH = "tracked3"
 
 
 class _VQAdapter:

@@ -194,6 +194,10 @@ Neither lost a pair. PESQ calls both even with v3 (3.26 against 3.27 over 15 voi
 
 **v3.2** (`SottoV32`) sends mixed excitation without new bits. The two voicing bits become one code per 20 ms frame: U U, V V, M M, or an edge (one half unvoiced, the other mixed). An edge's order follows the previous frame: after an unvoiced half it is an onset. Plain U V and V U edges are only about 1% of frames and become U M and M U. V M and M V (about 9%) are sent as V V. PESQ over 15 voices is 3.25, against 3.27 for v3.1. Round 6 compares the two by ear.
 
+Round 6 (one listener, original in every pair): v3.2 was preferred on 2 of 10 pairs (the female clip from 6 s, and the voice with the "th" crackle), and the other 8 were ties. The null pair was called correctly.
+
+**v3.3** (`SottoV33`) fixes a "grumbly" word the listener found on the null pair. On "two" from one higher voice, the tracker chose 129 Hz where the pitch is 258 Hz: the breathy vowel fits better with twice as many harmonics. At the half pitch, the odd harmonics (from the 3rd up) sit 18 to 28 dB below the even ones. `sinusoid.odd_even_db` measures that, and the tracker now adds 2 per 10 dB below -10 dB to such a candidate. Over 15 voices that changes "two" to 258 Hz and gives PESQ 3.26 (v3.2: 3.25). Over the channels it is level with v3.2 or slightly up (female 2.38-2.86 against 2.38-2.78, LibriSpeech male 2.66-3.29 against 2.68-3.24).
+
 The remaining "anuh" on one voice is partly the formant postfilter. In the "v" of "five" it cuts 1 to 2 kHz by 6 to 10 dB, which makes the frication sound nasal. Unquantized synthesis keeps that band. Weakening the postfilter on quiet or mixed frames restores the band but costs 0.06 to 0.1 PESQ everywhere, so it is parked.
 
 ## What limits the next step: speech data

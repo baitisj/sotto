@@ -125,3 +125,13 @@ def test_v31_only_unvoices_quiet_tails():
         assert e[k] < e[max(0, k - 30):k + 1].max() - 20
     bits = vl.SottoV31().encode(x)
     assert bits.shape == (len(x) // 160, 48)
+
+
+def test_odd_even_flags_half_pitch():
+    # harmonics of 250 Hz: at 125 Hz every odd "harmonic" is missing
+    t = np.arange(4000) / 8000
+    x = sum(np.cos(2 * np.pi * 250 * k * t) / k for k in range(1, 12))
+    Sw = sn.spectra(np.round(x / np.abs(x).max() * 16000))
+    w = 2 * np.pi * 250 / 8000
+    assert sn.odd_even_db(Sw[20], w / 2) < -15
+    assert sn.odd_even_db(Sw[20], w) > -6

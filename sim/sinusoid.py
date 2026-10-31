@@ -225,8 +225,24 @@ def noise_logerr(w):
     return np.interp(np.log(w * FS / (2 * np.pi)), np.log(NOISE_F0), NOISE_LOGERR)
 
 
+def odd_even_db(S, w, fmax=1500.0, first=3):
+    """Energy at odd multiples of w over energy at even multiples (dB), harmonics `first`
+    and up to fmax. Far below 0 dB means w is half the true pitch: every other "harmonic"
+    is missing. Starts at the 3rd so a microphone's bass roll-off doesn't count."""
+    P = np.abs(S) ** 2
+    h = max(1, int(w * NFFT / (2 * np.pi) / 4))
+    def peak(f):
+        c = int(f * NFFT / (2 * np.pi))
+        return P[max(c - h, 1):c + h + 1].max() if c < NFFT // 2 else 0.0
+    L = int(fmax / (w * FS / (2 * np.pi)))
+    odd = sum(peak(j * w) for j in range(first, L + 1) if j % 2)
+    even = sum(peak(j * w) for j in range(first, L + 1) if not j % 2)
+    return 10 * np.log10((odd + 1e-9) / (even + 1e-9))
+
+
 def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=WO_MAX_HI,
-                        uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias", tilt=0.0):
+                        uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias", tilt=0.0,
+                        sub=0.0, sub_db=10.0):
     """Joint pitch and voicing track over the whole utterance (Viterbi).
 
     States per frame: unvoiced, or voiced at one of the candidates refine(wo0[t+d] * mu)
@@ -236,6 +252,7 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
       unvoiced        uv_cost, plus `prior` if Codec 2 said voiced
       voiced->voiced  lam * |log jump|, plus jump * excess over a third of an octave
       voiced<->uv     switch
+      sub-octave      sub per 10 dB that odd_even_db(w) falls below -sub_db
     Returns (wo, voiced)."""
     n = len(wo0)
     v0 = np.asarray(voiced0) > 0
@@ -253,6 +270,9 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
         le = np.array([np.log(fit_error(Sw[t], w)) for w in ws])
         le = le - noise_logerr(ws) if norm == "noise" else le - bias * np.log(ws)
         c = le + prior * (not v0[t])
+        if sub:
+            oe = np.array([odd_even_db(Sw[t], w) for w in ws])
+            c = c + sub * np.maximum(0.0, -oe - sub_db) / 10
         if tilt:
             # fricatives (s, sh, th) put most energy above 2 kHz; penalise voicing there
             P = np.abs(Sw[t]) ** 2
