@@ -140,7 +140,7 @@ static void min_phase(const int32_t *A, int L, uint32_t wo, uint32_t *ph) {
   }
   /* real cepstrum (x 128): c[n] = G0 + (-1)^n G64 + 2 sum_j G_j cos(2 pi j n / 128), Q4 */
   for (int n = 1; n < 64; n++) {
-    fx_acc a = (fx_acc)(G[0] + ((n & 1) ? -G[64] : G[64])) << 15;
+    fx_acc a = (fx_acc)(G[0] + ((n & 1) ? -G[64] : G[64])) * 32768;
     for (int j = 1; j < 64; j++) a += (fx_acc)(2 * G[j]) * fx_cos512[((j * n) & 127) * 4];
     FX_ACC_CHECK(a);
     cc[n] = fx_rshr(a, 19);

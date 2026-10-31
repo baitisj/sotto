@@ -37,6 +37,10 @@ static inline int16_t fx_sin(uint32_t ph) { return fx_cos(ph - 0x40000000u); }
 
 /* log2(x) for x > 0, Q16 */
 int32_t fx_log2(uint32_t x);
+/* log2(x) of a 64-bit x > 0, Q16 */
+int32_t fx_log2_64(uint64_t x);
+/* in-place radix-2 FFT (n <= 512, a power of 2), forward, output = DFT / n */
+void fx_fft(int32_t *re, int32_t *im, int n);
 /* 2^(y / 2^16) * 2^q, rounded and saturated to int32 (q may be negative) */
 int32_t fx_exp2(int32_t y, int q);
 

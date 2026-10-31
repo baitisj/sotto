@@ -65,8 +65,42 @@ def main(cb_path, out):
         x = np.arange(257) / 256
         arr(f, "int32_t", "fx_log2_tab", rnd(np.log2(1 + x) * 2 ** 30), per_line=8,
             comment="log2(1 + i/256), Q30")
-        arr(f, "int32_t", "fx_exp2_tab", rnd(2 ** x * 2 ** 30), per_line=8,
+        arr(f, "uint32_t", "fx_exp2_tab", rnd(2 ** x * 2 ** 30), per_line=8,
             comment="2^(i/256), Q30")
+        # ---- encoder
+        nw, mp = 279, 320
+        j = np.arange(2 * (nw // 2))
+        hann = (0.5 - 0.5 * np.cos(2 * np.pi * j / (nw - 1))).astype(np.float32).astype(float)
+        arr(f, "int16_t", "fx_hann", rnd(np.minimum(hann * 32768, 32767)), per_line=12,
+            comment="Codec 2's 279-point analysis window (samples 21..298 of 320, Hann), Q15")
+        wn = 1 / np.sqrt(np.sum(hann ** 2) * 512)          # Codec 2's normalisation
+        f.write("/* log2(512 wn / 32768), Q16, wn being Codec 2's window normalisation: the float\n"
+                "   spectrum is the fixed one x 2^(frame exponent) x 2^(this) (sotto_fx_enc.c, analyse) */\n")
+        f.write("const int32_t fx_sw_l2 = %d;\n\n" % int(rnd(np.log2(wn * 512 / 32768) * 65536)))
+        ws = np.zeros(512)
+        w = np.zeros(mp)
+        w[mp // 2 - nw // 2:mp // 2 - nw // 2 + len(hann)] = hann * wn
+        ws[:nw // 2] = w[mp // 2:mp // 2 + nw // 2]
+        ws[512 - nw // 2:] = w[mp // 2 - nw // 2:mp // 2]
+        W = np.fft.fft(ws).real
+        W = np.concatenate([W[256:], W[:256]])
+        arr(f, "int16_t", "fx_W", rnd(W / W[256] * 32767), per_line=12,
+            comment="frequency response of the analysis window, centred on 256, peak 32767")
+        n = np.arange(48) - 23.5
+        h = np.sinc(2 * 600 / 8000 * n) * np.hamming(48)
+        h /= h.sum()
+        arr(f, "int16_t", "fx_nlp_fir", rnd(h * 32768), per_line=12,
+            comment="NLP decimation filter: 48-tap 600 Hz low-pass, Hamming window, Q15")
+        arr(f, "int16_t", "fx_nlp_win", rnd(np.minimum((0.5 - 0.5 * np.cos(2 * np.pi * np.arange(64) / 63)) * 32768, 32767)),
+            per_line=16, comment="NLP DFT window, 64-point Hann, Q15")
+        bb = np.arange(65)
+        arr(f, "int16_t", "fx_nlp_bmin", [int(0.8 * b) for b in bb], per_line=16,
+            comment="(int)(0.8 b) and (int)(1.2 b) in double precision, for the NLP's sub-multiple search")
+        arr(f, "int16_t", "fx_nlp_bmax", [int(1.2 * b) for b in bb], per_line=16)
+        lo, hi = np.log(WO_MIN), np.log(WO_HI)
+        thr = np.exp(lo + (np.arange(127) + 0.5) * (hi - lo) / 127)
+        arr(f, "uint32_t", "fx_wo_thr", np.ceil(thr / (2 * np.pi) * 2 ** 32), per_line=8,
+            comment="pitch index decision levels: index = number of levels <= Wo (Q32 turns)")
         f.write("const int16_t fx_cb_stages = %d;\n" % len(bits))
         f.write("const int16_t fx_cb_bits[] = {%s};\n" % ", ".join(map(str, bits)))
         scales = []
@@ -79,8 +113,9 @@ def main(cb_path, out):
             scales.append(step)
             arr(f, "int8_t", "fx_cb%d" % s, q, per_line=19)
         f.write("const int8_t *const fx_cb[] = {%s};\n" % ", ".join("fx_cb%d" % s for s in range(len(bits))))
-        f.write("/* value of one codebook step, dB x 2^16 */\n")
+        f.write("/* value of one codebook step, dB x 2^16, and its inverse, x 2^22 / dB Q8 */\n")
         f.write("const int32_t fx_cb_step[] = {%s};\n" % ", ".join(str(int(rnd(s * 65536))) for s in scales))
+        f.write("const int32_t fx_cb_istep[] = {%s};\n" % ", ".join(str(int(rnd(2 ** 22 / (s * 256)))) for s in scales))
 
 
 if __name__ == "__main__":

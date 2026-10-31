@@ -15,11 +15,21 @@ extern const int32_t fx_pre[FX_K];
 extern const int16_t fx_dct[FX_K * FX_K];
 extern const int16_t fx_pn[160];
 extern const int32_t fx_log2_tab[257];
-extern const int32_t fx_exp2_tab[257];
+extern const uint32_t fx_exp2_tab[257];   /* the last entry, 2^31, needs 32 unsigned bits */
 /* shape codebook: fx_cb_stages stages of 2^fx_cb_bits[s] vectors of FX_NC 8-bit values.
  * On the C55x (16-bit char) these would be packed two to a word. */
 extern const int16_t fx_cb_stages;
 extern const int16_t fx_cb_bits[];
 extern const int8_t *const fx_cb[];
 extern const int32_t fx_cb_step[];
+extern const int32_t fx_cb_istep[];
+/* encoder */
+extern const int16_t fx_hann[278];
+extern const int32_t fx_sw_l2;
+extern const int16_t fx_W[512];
+extern const int16_t fx_nlp_fir[48];
+extern const int16_t fx_nlp_win[64];
+extern const int16_t fx_nlp_bmin[65];
+extern const int16_t fx_nlp_bmax[65];
+extern const uint32_t fx_wo_thr[127];
 #endif

@@ -37,12 +37,14 @@ all: libsotto.so libsotto.a sotto_enc sotto_dec
 FX_CODEBOOK = sim/data/shape_msvq_9988.npz
 FXFLAGS ?= -DFX_CHECK
 FX_OBJS = fixed/fx_math.o fixed/fx_tables.o
-fixed: fixed/sotto_dec_fx
+fixed: fixed/sotto_dec_fx fixed/sotto_enc_fx
 fixed/fx_tables.c: ../$(FX_CODEBOOK) ../tools/gen_fx_tables.py
 	cd .. && $(PYTHON) tools/gen_fx_tables.py --codebook $(FX_CODEBOOK) c/fixed/fx_tables.c
 fixed/%.o: fixed/%.c fixed/fx.h fixed/fx_tables.h sotto.h
 	$(CC) $(CFLAGS) $(FXFLAGS) -c -o $@ $<
 fixed/sotto_dec_fx: sotto_dec.o fixed/sotto_fx_dec.o $(FX_OBJS)
+	$(CC) -o $@ $^
+fixed/sotto_enc_fx: sotto_enc.o fixed/sotto_fx_enc.o $(FX_OBJS)
 	$(CC) -o $@ $^
 
 sotto_codebook.c: ../$(CODEBOOK) ../tools/export_codebook_c.py
@@ -89,6 +91,6 @@ install: libsotto.so libsotto.a sotto.pc
 
 clean:
 	rm -f *.o libsotto.a libsotto.so* sotto_enc sotto_dec test_api sotto_codebook.c sotto.pc
-	rm -f fixed/*.o fixed/fx_tables.c fixed/sotto_dec_fx
+	rm -f fixed/*.o fixed/fx_tables.c fixed/sotto_dec_fx fixed/sotto_enc_fx
 
 .PHONY: all fixed check install clean

@@ -42,17 +42,51 @@ int32_t fx_log2(uint32_t x) {
   return (int32_t)e * 65536 + ((l + 8192) >> 14);
 }
 
+int32_t fx_log2_64(uint64_t x) {
+  int sh = 0;
+  while (x >> 32) { x >>= 1; sh++; }
+  return fx_log2((uint32_t)x) + (int32_t)sh * 65536;
+}
+
+/* in-place radix-2 FFT, decimation in time, forward (e^-j), every stage halves, so the
+   output is the DFT / n. |input| <= 2^23 keeps every product inside 40 bits. */
+void fx_fft(int32_t *re, int32_t *im, int n) {
+  for (int i = 0, j = 0; i < n; i++) {        /* bit reversal */
+    if (i < j) {
+      int32_t t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+    int m = n >> 1;
+    while (m >= 1 && (j & m)) { j ^= m; m >>= 1; }
+    j |= m;
+  }
+  for (int len = 2; len <= n; len <<= 1) {
+    int step = 512 / len, half = len >> 1;
+    for (int i = 0; i < n; i += len)
+      for (int k = 0; k < half; k++) {
+        int32_t c = fx_cos512[(k * step) & 511], s = fx_cos512[((k * step) - 128) & 511];
+        int32_t *ar = &re[i + k], *ai = &im[i + k], *br = &re[i + k + half], *bi = &im[i + k + half];
+        fx_acc tr = (fx_acc)*br * c + (fx_acc)*bi * s, ti = (fx_acc)*bi * c - (fx_acc)*br * s;
+        FX_ACC_CHECK(tr); FX_ACC_CHECK(ti);
+        int32_t xr = fx_rshr(tr, 15), xi = fx_rshr(ti, 15);
+        int32_t a0 = *ar, a1 = *ai;
+        *ar = (a0 + xr + 1) >> 1; *ai = (a1 + xi + 1) >> 1;
+        *br = (a0 - xr + 1) >> 1; *bi = (a1 - xi + 1) >> 1;
+      }
+  }
+}
+
 int32_t fx_exp2(int32_t y, int q) {
   int32_t t = y + (int32_t)q * 65536;
   int32_t i = t >> 16;                        /* floor (arithmetic shift) */
   int32_t f = t & 0xFFFF;
   int j = (int)(f >> 8);
   int32_t r = f & 255;
-  int32_t a = fx_exp2_tab[j], b = fx_exp2_tab[j + 1];
-  int32_t m = a + (((b - a) * r + 128) >> 8);  /* Q30, [2^30, 2^31) */
+  uint32_t a = fx_exp2_tab[j], b = fx_exp2_tab[j + 1];
+  uint32_t m = a + (((b - a) * (uint32_t)r + 128) >> 8);   /* Q30, [2^30, 2^31] */
   if (i >= 31) return INT32_MAX;
   int s = (int)(30 - i);
-  if (s <= 0) return m;                        /* i == 30 */
+  if (s <= 0) return m > INT32_MAX ? INT32_MAX : (int32_t)m;   /* i == 30 */
   if (s >= 32) return 0;
   return (int32_t)(((fx_acc)m + ((fx_acc)1 << (s - 1))) >> s);
 }
