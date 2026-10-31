@@ -11,11 +11,13 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 ### A
 **A (amplitudes)**: `A` in the model. The loudness of each harmonic in one 10 ms frame. `A[1]` is the first harmonic, `A[L]` the last. [2]
 
-**Analysis**: the encoder's first job: measuring pitch, voicing and harmonic amplitudes from the microphone signal. sotto v0 uses Codec 2's analysis (`analyse()` in `sim/vocoder_lab.py`). [2]
+**Analysis**: the encoder's first job: measuring pitch, voicing and harmonic amplitudes from the microphone signal. sotto uses Codec 2's analysis, with its own pitch tracker since v1 (`analyse()` in `sim/vocoder_lab.py`, `sim/sinusoid.py`). [2]
 
 **AMBE / AMBE+2**: the closed, licensed vocoder used by Yaesu System Fusion and other digital radios. sotto aims to match its quality with open code.
 
 ### B
+**Band voicing**: mixed voicing done simply: harmonics below a cutoff frequency are voiced and those above it get random phases. Tested for v1; no PESQ gain, so parked until listening tests. [2]
+
 **Bit**: a single 0 or 1. With n bits you can send one of 2ⁿ messages. [1, 4]
 
 **Bit allocation**: deciding how many bits each number in a frame gets. sotto's shape quantizer uses **greedy bit allocation**: it hands out bits one at a time, each to whichever number it helps most. [4]
@@ -59,7 +61,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 ### E
 **Encoder**: the sending half of a codec. `SottoV0.encode()`. [1]
 
-**Encoder race**: an experiment where two encoders (Codec 2 2400 and sotto v0) send through the identical radio chain with the same fading, and are scored the same way. `sim/encoder_race.py`. [7]
+**Encoder race**: an experiment where encoders (Codec 2 2400, sotto v0 and sotto v1) send through the identical radio chain with the same fading, and are scored the same way. `sim/encoder_race.py`. [7]
 
 **Energy**: how loud a frame is: the sum of the harmonics' powers, in dB. Sent with 5 bits from 10 to 80 dB. [4]
 
@@ -107,18 +109,20 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 **LSP**: "line spectral pairs". Another way of writing the 10 LPC numbers that is easier to round off safely. Codec 2 2400 quantizes LSPs. [7]
 
 ### M
+**Lookahead**: how far into the future an encoder must see before deciding about the present. sotto v1's pitch tracker waits for the end of each voiced stretch; a real-time version will be limited to about 40 to 60 ms. [2]
+
 **Mel scale**: a frequency scale that matches human hearing, finer at low frequencies and coarser at high ones. sotto's 20 envelope points are evenly spaced on it, from 200 to 3,700 Hz. [3]
 
-**Memoryless**: each frame can be decoded on its own, without the frames before it. sotto v0 is memoryless so that one lost frame can't damage the next ones. [4]
+**Memoryless**: each frame can be decoded on its own, without the frames before it. sotto is memoryless so that one lost frame can't damage the next ones. [4]
 
-**Mixed voicing (MBE, MELP)**: describing voicing separately in several frequency bands, so a sound can be partly buzz and partly hiss (like "z"). Not in v0; on the to-do list. [2]
+**Mixed voicing (MBE, MELP)**: describing voicing separately in several frequency bands, so a sound can be partly buzz and partly hiss (like "z"). Not used in sotto yet; see band voicing. [2]
 
 **Model**: the vocoder's description of one 10 ms frame: `Wo`, `L`, `A`, `phi` and `voiced`. Stored in the `MODEL` record type in `sim/vocoder_lab.py`. [2]
 
 ### N
-**newamp1**: an experimental Codec 2 mode that introduced the rate-K mel envelope and the formant postfilter that sotto v0 builds on. [3]
+**newamp1**: an experimental Codec 2 mode that introduced the rate-K mel envelope and the formant postfilter that sotto builds on. [3]
 
-**NLP**: "non-linear pitch". Codec 2's pitch tracker, which sotto v0 uses. [2]
+**NLP**: "non-linear pitch". Codec 2's pitch tracker. sotto v0 used it as is; sotto v1 starts from its answer and corrects octave errors. [2]
 
 ### O
 **Oracle**: in an experiment, a helper that uses the true, perfect value instead of an estimate or a rounded value. Comparing with and without an oracle shows how much that part costs. [7]
@@ -140,13 +144,17 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Pitch oracle**: an oracle test for pitch: the decoder is given the true (or carefully checked) pitch instead of the rounded or estimated one, to measure how much pitch errors cost. [7]
 
-**Pitch tracker (pitch estimator)**: the part of the encoder that measures pitch. Errors where it reports double or half the true pitch are called octave errors. [2]
+**Pitch tracker (pitch estimator)**: the part of the encoder that measures pitch. Errors where it reports double or half the true pitch are called **octave errors**. [2]
+
+**pYIN**: a well-known offline pitch tracker, used as a reference to count Codec 2's octave errors. Not perfect either. [2]
 
 **PN9**: a fixed pseudo-random bit pattern that sotto mixes into the payload (scrambling). [6]
 
 **Postfilter (Codec 2)**: Codec 2's `--postfilter`: a zero-bit trick that gives random phases to harmonics quieter than the background noise, so noise sounds like noise. [5]
 
 **Puncturing**: deleting some of a code's output bits in a fixed pattern, to make exactly the right number of bits. sotto's code makes 3 bits per input bit and punctures down to 18 for every 7 ("rate 7/18"). [6]
+
+**Predictive quantizer**: one that guesses each frame from the previous one and sends only the difference. Tried in v0 and v1 (the `SottoV1` class in the code) and rejected, because a lost frame throws the decoder's guesses off for several frames. [4]
 
 ### Q
 **Quantization**: rounding a number to one of a small set of allowed values, so it can be sent as a few bits. [4]
@@ -174,6 +182,10 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 **Shape**: the 20-point envelope with its average removed, so only the ups and downs are left. [3]
 
 **Shape quantizer**: `ShapeQ`. The part of sotto that rounds the envelope shape into 34 bits: it takes the DCT of the shape, gives each cosine-wave size its own uniform quantizer with a trained step size, and splits the bits by greedy allocation (5, 4, 3, 3, 2, ... bits). [4]
+
+**sotto tracker**: sotto v1's pitch tracker (`track_pitch()` in `sim/sinusoid.py`). For each voiced stretch it considers Codec 2's pitch, double it and half it, and uses the Viterbi algorithm to pick the path that fits the harmonics best without jumping around. [2]
+
+**sotto v0, v1**: versions of the sotto encoder. v0 introduced the 20-point envelope and the 48-bit frame; v1 keeps the same frame and adds the octave-correcting pitch tracker. In the code, v1 is `SottoV0(pitch="tracked")`. [1, 2]
 
 **Sine wave**: the smoothest possible repeating wiggle, with a frequency, amplitude and phase. [2]
 
@@ -206,7 +218,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 **Unvoiced**: a sound made by hissing air with no vocal-cord buzz, like "s", "f", "sh", or whispering. [2]
 
 ### V
-**Viterbi algorithm**: the method the receiver uses to decode the convolutional code, by finding the input sequence that best explains the received soft bits. [6]
+**Viterbi algorithm**: a method for finding the best path through a long chain of choices without trying every path. The receiver uses it to decode the convolutional code, and sotto's pitch tracker uses it to choose between pitch candidates. [2, 6]
 
 **Vocoder**: "voice coder". A codec that sends a description of how a voice is being made, instead of the sound wave itself. [1]
 

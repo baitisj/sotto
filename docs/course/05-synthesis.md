@@ -14,7 +14,7 @@ The decoder turns the 48 bits back into pitch, voicing, energy and envelope, and
 
 For each 10 ms piece of sound the decoder:
 
-1. **Unpacks the bits** into voicing, pitch (Wo), energy and the 17 shape numbers (chapter 4).
+1. **Unpacks the bits** into voicing, pitch (Wo), energy and the 16 shape numbers (chapter 4).
 2. **Rebuilds the envelope**: turns the shape numbers back into 20 points with the inverse DCT, and adds the level.
 3. **Sharpens the envelope** with a *formant postfilter* (see below).
 4. **Places the harmonics**: with pitch Wo, there are L = ⌊π ÷ Wo⌋ harmonics. Each one's loudness is read off the envelope at its frequency.
@@ -45,7 +45,7 @@ The word *postfilter* (a filter applied after decoding) means two different thin
 - **sotto's formant postfilter.** Before placing the harmonics, sotto stretches the envelope's ups and downs by a factor of 1.5 (in decibels), and then puts the total loudness back. Peaks get sharper and valleys get deeper. Rounding in the quantizer tends to blur the envelope, and this undoes some of the blur. The idea comes from Codec 2's newamp1 experiments.
 - **Codec 2's `--postfilter`.** This one doesn't touch the envelope. It keeps a running estimate of the background noise level. In voiced frames, any harmonic quieter than that noise gets a random phase, so background noise sounds like noise instead of a clicky buzz. It costs zero bits.
 
-sotto v0 uses both.
+sotto uses both.
 
 ## Listen: break one piece at a time
 
@@ -58,7 +58,7 @@ The best way to understand each part is to switch it off and listen. Each of the
 | <audio controls preload="none" src="audio/whisper.flac"></audio><br>[whisper.flac](audio/whisper.flac) | Every frame forced to *unvoiced* | Voicing off: a whisper. Still understandable! |
 | <audio controls preload="none" src="audio/monotone.flac"></audio><br>[monotone.flac](audio/monotone.flac) | Pitch fixed at 110 Hz; envelope kept | Pitch off: a robot. The words survive, the melody doesn't |
 | <audio controls preload="none" src="audio/flat_envelope.flac"></audio><br>[flat_envelope.flac](audio/flat_envelope.flac) | All harmonics equally loud; pitch and voicing kept | Envelope off: a buzz with a tune, and the words get much harder to make out |
-| <audio controls preload="none" src="audio/sotto_v0.flac"></audio><br>[sotto_v0.flac](audio/sotto_v0.flac) | The real thing: sotto v0, 48 bits per 20 ms | Everything rounded to fit 2,400 bits per second |
+| <audio controls preload="none" src="audio/sotto_v1.flac"></audio><br>[sotto_v1.flac](audio/sotto_v1.flac) | The real thing: sotto v1, 48 bits per 20 ms | Everything rounded to fit 2,400 bits per second |
 
 What these show:
 
@@ -70,11 +70,11 @@ What these show:
 
 Here are spectrograms of the woman's voice, before and after.
 
-![Spectrograms: original, Codec 2, sotto v0, and sotto v0 over a radio](figures/rebuild.svg)
+![Spectrograms: original, Codec 2, sotto v1, and sotto v1 over a radio](figures/rebuild.svg)
 
 - **Original**: sharp harmonic stripes and clear formant bands.
-- **Codec 2 2400** and **sotto v0**: both keep the stripes and the main bands, but finer detail is blurred, and both struggle in places where the pitch tracker made errors (chapter 2). The difference is easier to hear than to see: PESQ scores this voice 2.16 for Codec 2 and 2.50 for sotto v0.
-- **sotto v0 over a weak, fading 446 MHz signal** from a moving car: close to the no-radio version, with short smudges where frames were lost and hidden (chapter 6).
+- **Codec 2 2400** and **sotto v1**: both keep the stripes and the main bands, but finer detail is blurred. Where Codec 2's pitch tracker made octave errors, its stripes land in the wrong places; sotto v1's tracker avoids many of those (chapter 2). The difference is easier to hear than to see: PESQ scores this voice 2.16 for Codec 2 and 2.68 for sotto v1.
+- **sotto v1 over a weak, fading 446 MHz signal** from a moving car: close to the no-radio version, with short smudges where frames were lost and hidden (chapter 6).
 
 You can hear all of these, for three voices, on the [listening page](../index.html).
 

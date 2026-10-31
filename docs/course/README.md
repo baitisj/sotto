@@ -32,7 +32,7 @@ Each chapter ends with **Try it** questions. Answers to the number questions are
 
 ## A note on what's real
 
-sotto is a research project and it is changing quickly. This course describes **sotto v0**, the first version of the encoder (October 2026), as described in [`docs/encoder-v0.md`](../encoder-v0.md). Right now v0 is a Python prototype that borrows its pitch tracker, voicing detector and synthesizer from [Codec 2](https://github.com/drowe67/codec2), an older open-source vocoder. Its new part is how it describes and packs the shape of the voice (chapters 3 and 4). Everything has been tested in simulation, not yet on the air.
+sotto is a research project and it is changing quickly. This course describes **sotto v1** (October 2026), as described in [`docs/encoder-v0.md`](../encoder-v0.md) and [`docs/encoder-v1.md`](../encoder-v1.md). v1 is a Python prototype built on [Codec 2](https://github.com/drowe67/codec2), an older open-source vocoder: it borrows Codec 2's voicing detector and synthesizer. Its new parts are a pitch tracker that catches octave errors (chapter 2, new in v1), and the way it describes and packs the shape of the voice (chapters 3 and 4, from v0). The 48-bit frame is the same in v0 and v1. Everything has been tested in simulation, not yet on the air.
 
 ## Rebuilding the figures
 

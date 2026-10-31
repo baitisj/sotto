@@ -193,27 +193,35 @@ def fig_harmonics(out, x, m, i):
     save(fig, out, "harmonics.svg")
 
 
-def fig_pitch(out, xm, mm, xf, mf):
+def fig_pitch(out, xm, mm, xf, mf, mf_c2):
+    """mm, mf: sotto v1 analysis (octave-corrected tracker); mf_c2: Codec 2's own track."""
     t0, t1 = 0.0, 4.0
-    fig, axs = plt.subplots(3, 1, figsize=(9, 7.4), sharex=True,
-                            gridspec_kw=dict(height_ratios=[1.2, 1.2, 1], hspace=0.32))
+    fig, axs = plt.subplots(4, 1, figsize=(9, 9.4), sharex=True,
+                            gridspec_kw=dict(height_ratios=[1.2, 1.2, 1, 1], hspace=0.36))
     for ax, x, title in ((axs[0], xm, "Man (ve9qrp)"), (axs[1], xf, "Woman (LibriSpeech 198)")):
         spectrogram(ax, x, t0, t1)
         ax.set_title(f"{title}: spectrogram. The thin stripes are harmonics.")
         ax.set_ylabel("frequency (Hz)")
-    ax = axs[2]
-    for m, col, lab in ((mm, BLUE, "man"), (mf, ORANGE, "woman")):
+
+    def track(ax, m, col, lab, **kw):
         t = np.array([centre(i) for i in range(len(m))]) / FS
-        f0 = m["Wo"] * FS / (2 * np.pi)
         e = vl.frame_energy_db(m)
-        f0 = np.where((m["voiced"] > 0) & (e > np.percentile(e, 95) - 30), f0, np.nan)
+        f0 = np.where((m["voiced"] > 0) & (e > np.percentile(e, 95) - 30), m["Wo"] * FS / (2 * np.pi), np.nan)
         sel = (t >= t0) & (t < t1)
-        ax.plot(t[sel], f0[sel], color=col, lw=2, label=lab)
-    ax.set_ylim(50, 400)
-    ax.set_ylabel("pitch (Hz)")
+        ax.plot(t[sel], f0[sel], color=col, label=lab, **kw)
+    ax = axs[2]
+    track(ax, mm, BLUE, "man", lw=2)
+    track(ax, mf, ORANGE, "woman", lw=2)
+    ax.set_title("Pitch tracks from sotto's tracker (gaps = unvoiced or silent)")
+    ax = axs[3]
+    track(ax, mf_c2, INK2, "Codec 2's tracker", lw=1.2)
+    track(ax, mf, ORANGE, "sotto's tracker", lw=2)
+    ax.set_title("The woman's pitch: sotto's tracker removes many of Codec 2's octave jumps")
     ax.set_xlabel("time (seconds)")
-    ax.set_title("Pitch track from Codec 2's estimator (gaps = unvoiced or silent)")
-    ax.legend(loc="upper right", ncol=2)
+    for ax in axs[2:]:
+        ax.set_ylim(50, 400)
+        ax.set_ylabel("pitch (Hz)")
+        ax.legend(loc="upper right", ncol=2, fontsize=9)
     save(fig, out, "pitch.svg")
 
 
@@ -267,7 +275,7 @@ def fig_dct(out, m, i, sq):
     ax.bar(np.arange(vl.K), bits, color=AQUA, width=0.7)
     ax.set_xlabel("which cosine wave (0 = average level)")
     ax.set_ylabel("bits spent")
-    ax.set_title(f"sotto v0's {int(sq.bits.sum())} shape bits")
+    ax.set_title(f"sotto v1's {int(sq.bits.sum())} shape bits")
     ax.set_xticks([0, 5, 10, 15, 19])
     ax.grid(axis="x", visible=False)
     for k, b in enumerate(bits):
@@ -346,9 +354,9 @@ def fig_rebuild(out, voice):
     x = load(voice + "__original")
     files = [("Original speech", x),
              ("Codec 2 2400, no radio", load(f"{voice}__No_radio_channel__codec2_2400", "encoder")),
-             ("sotto v0, no radio", load(f"{voice}__No_radio_channel__sotto_v0", "encoder")),
-             ("sotto v0 over a weak 446 MHz mobile signal",
-              load(f"{voice}__446_MHz_60_kmh_52_dB-Hz__sotto_v0", "encoder"))]
+             ("sotto v1, no radio", load(f"{voice}__No_radio_channel__sotto_v1", "encoder")),
+             ("sotto v1 over a weak 446 MHz mobile signal",
+              load(f"{voice}__446_MHz_60_kmh_52_dB-Hz__sotto_v1", "encoder"))]
     t0, t1 = 1.0, 3.5
     fig, axs = plt.subplots(len(files), 1, figsize=(9, 9), sharex=True, gridspec_kw=dict(hspace=0.32))
     top = None
@@ -370,8 +378,8 @@ def best_lag(r, y, max_lag=400):
 
 
 def fig_ladder(out):
-    """The quantization (oracle) ladder from docs/results/oracle_ladder_15s.json, with sotto v0
-    from docs/results/encoder_race.json as the last rung."""
+    """The quantization (oracle) ladder for Codec 2 from docs/results/oracle_ladder_15s.json,
+    with sotto v1 from docs/results/encoder_race.json as the last rung."""
     import json
     res = os.path.join(ROOT, "docs", "results")
     lad = json.load(open(os.path.join(res, "oracle_ladder_15s.json")))
@@ -387,19 +395,44 @@ def fig_ladder(out):
         y = [p for p, _ in lad[v].values()]
         ax.plot(x, y, "-o", color=col, ms=7, mec=BG, mew=1.5, label=lab)
         s0 = next(r["per_clip"][v]["pesq"] for r in race
-                  if r["codec"] == "sotto_v0" and r["cond"] == "No radio channel")
+                  if r["codec"] == "sotto_v1" and r["cond"] == "No radio channel")
         ax.plot(len(labels), s0, "D", ms=8, color=col, mec=BG, mew=1.5)
         ax.plot([len(labels) - 1, len(labels)], [y[-1], s0], color=col, lw=1.2, ls=(0, (3, 3)))
     ax.set_xticks(list(x) + [len(labels)])
-    ax.set_xticklabels(labels + ["sotto v0\n(48 bits)"], fontsize=8.5)
+    ax.set_xticklabels(labels + ["sotto v1\n(48 bits)"], fontsize=8.5)
     ax.axvspan(2.6, 3.4, color=VIOLET, alpha=0.1, lw=0)
     ax.text(3, 4.05, "biggest step\ndown for men", ha="center", va="top", fontsize=9, color=VIOLET)
     ax.set_ylabel("PESQ score (higher = better)")
     ax.set_ylim(1.9, 4.1)
-    ax.set_title("The quantization ladder: one simplification per rung")
+    ax.set_title("The quantization ladder for Codec 2: one simplification per rung")
     ax.legend(loc="lower left", fontsize=9)
     ax.grid(axis="x", visible=False)
     save(fig, out, "ladder.svg")
+
+
+# PESQ per step, from the table "Where the 48-bit codec loses quality" in docs/encoder-v1.md
+V1_LADDER = [("Harmonic model,\nsotto tracker", (3.10, 3.60, 3.56)),
+             ("+ 20-point\nenvelope", (2.90, 3.46, 3.17)),
+             ("+ envelope sent\nevery 20 ms", (2.76, 3.35, 2.96)),
+             ("+ pitch sent\nevery 20 ms", (2.65, 3.25, 2.96)),
+             ("+ 7-bit pitch,\n34-bit shape", (2.45, 3.00, 2.55)),
+             ("+ formant\npostfilter (= v1)", (2.62, 3.24, 2.69))]
+
+
+def fig_ladder_v1(out):
+    voices = ((BLUE, "man (ve9qrp)", 2), (AQUA, "man (LibriSpeech)", 1), (ORANGE, "woman (LibriSpeech)", 0))
+    fig, ax = plt.subplots(figsize=(9.5, 4.3))
+    x = np.arange(len(V1_LADDER))
+    for col, lab, k in voices:
+        ax.plot(x, [v[k] for _, v in V1_LADDER], "-o", color=col, ms=7, mec=BG, mew=1.5, label=lab)
+    ax.set_xticks(x)
+    ax.set_xticklabels([l for l, _ in V1_LADDER], fontsize=8.5)
+    ax.set_ylabel("PESQ score (higher = better)")
+    ax.set_ylim(2.3, 3.75)
+    ax.set_title("The quantization ladder for sotto v1")
+    ax.legend(loc="lower left", fontsize=9)
+    ax.grid(axis="x", visible=False)
+    save(fig, out, "ladder-v1.svg")
 
 
 def fig_c4fm(out):
@@ -504,8 +537,8 @@ def demos(out, x, sq):
     x = x[:int(6 * FS)]
     d = os.path.join(out, "audio")
     os.makedirs(d, exist_ok=True)
-    m = vl.analyse(x)
-    v0 = vl.SottoV0(sq)
+    m = vl.analyse(x, "tracked")
+    v1 = vl.SottoV0(sq, pitch="tracked")          # sotto v1: v0's layout with the octave-corrected tracker
     robot = vl.set_wo(m, np.full(len(m), 2 * np.pi * 110 / FS), m["voiced"])
     robot = vl.from_rate_k(robot, vl.to_rate_k(m))
     whisper = m.copy()
@@ -520,7 +553,7 @@ def demos(out, x, sq):
         "whisper": vl.synthesise(whisper),
         "monotone": vl.synthesise(robot),
         "flat_envelope": vl.synthesise(flat, postfilter=False),
-        "sotto_v0": v0.decode_audio(v0.encode(x)),
+        "sotto_v1": v1.decode_audio(v1.encode(x)),
     }
     for name, y in clips.items():
         y = np.asarray(y)[:len(x)]
@@ -532,17 +565,19 @@ def demos(out, x, sq):
 def main(out):
     os.makedirs(os.path.join(out, "figures"), exist_ok=True)
     xm, xf = load(MALE + "__original"), load(FEMALE + "__original")
-    mm, mf = vl.analyse(xm), vl.analyse(xf)
+    mm, mf = vl.analyse(xm, "tracked"), vl.analyse(xf, "tracked")      # sotto v1's analysis
     iv, _ = fig_waveform(out, xm, mm)
     fig_harmonics(out, xm, mm, iv)
-    fig_pitch(out, xm, mm, xf, mf)
+    fig_pitch(out, xm, mm, xf, mf, vl.analyse(xf))
     fig_envelope(out, xm, mm, iv)
-    sq = vl.ShapeQ(vl.training_set())
+    sq = vl.ShapeQ(vl.training_set("tracked"))
+    print("shape bits:", sq.bits.tolist())
     fig_dct(out, mm, iv, sq)
     fig_quantize(out, mm)
     fig_synthesis(out, xm, mm, iv)
     fig_rebuild(out, FEMALE)
     fig_ladder(out)
+    fig_ladder_v1(out)
     fig_c4fm(out)
     fig_fading(out)
     print("spread demo (plain, spread):", *fig_spread(out))

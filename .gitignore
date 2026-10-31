@@ -8,3 +8,4 @@ build/
 .pytest_cache/
 *.flac
 !docs/samples/**/*.flac
+!docs/course/audio/*.flac

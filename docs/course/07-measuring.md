@@ -33,7 +33,7 @@ Now stack the oracles. Start at the top rung with everything perfect: the true h
 
 The team built this ladder for Codec 2 2400 (the code calls it the **oracle ladder**; "quantization ladder" means the same thing):
 
-![The quantization ladder for three voices, with sotto v0 at the end](figures/ladder.svg)
+![The quantization ladder for Codec 2, with sotto v1 at the end](figures/ladder.svg)
 
 Reading it from left to right:
 
@@ -47,32 +47,52 @@ Reading it from left to right:
 | + quantized pitch and energy, 20 ms | Pitch and energy rounded, every other frame sent | 0 to 0.2 |
 | Codec 2 2400 | The actual codec, start to finish | |
 
-The tallest step down for both men is the LPC-10 envelope. That is the single finding that shaped sotto v0: replace the envelope first (chapter 3). The diamonds at the right are sotto v0, the actual 48-bit codec. It beats Codec 2 for all three voices.
+The tallest step down for both men is the LPC-10 envelope. That is the single finding that shaped sotto v0: replace the envelope first (chapter 3). The diamonds at the right are sotto v1, the actual 48-bit codec today. It beats Codec 2 clearly for the woman and the LibriSpeech man, and is about level for VE9QRP.
 
 Two other things jump out:
 
-- **The woman starts low.** Even at the top rung, with perfect harmonics, she scores only 3.08, against 3.8 to 4.0 for the men. Rounding can't be the reason, because nothing is rounded yet. The problem is earlier, in the *analysis*: pitch errors (chapter 2), or too few harmonics to read her envelope from (chapter 3).
+- **The woman starts low.** Even at the top rung, with perfect harmonics, she scores only 3.08, against 3.8 to 4.0 for the men. Rounding can't be the reason, because nothing is rounded yet. The problem is earlier, in the *analysis*: pitch errors (chapter 2), or too few harmonics to read her envelope from (chapter 3). This finding led to sotto v1's pitch tracker, which raised her top-rung score from 2.77 to 3.10 (with made-up phases).
 - **Made-up phases are the second biggest loss.** That points at better voicing and phase models (like mixed voicing) as a future step.
+
+## A ladder for sotto v1
+
+The team built a second ladder for sotto v1 itself. It starts from the harmonic model with sotto's pitch tracker, and adds one step of the real codec at a time:
+
+![The quantization ladder for sotto v1](figures/ladder-v1.svg)
+
+| Step | What became realistic | What it cost |
+|---|---|---|
+| Harmonic model, sotto tracker | Made-up phases, nothing rounded | (starting point) |
+| + 20-point envelope | The envelope is read at 20 mel points (chapter 3) | 0.15 to 0.4 |
+| + envelope sent every 20 ms | Every other envelope is filled in by interpolation | 0.1 to 0.2 |
+| + pitch sent every 20 ms | The same for pitch | 0 to 0.1 |
+| + 7-bit pitch, 34-bit shape | Everything rounded to fit 48 bits (chapter 4) | **0.2 to 0.4** |
+| + formant postfilter (= v1) | The decoder sharpens the envelope (chapter 5) | a *gain* of 0.14 to 0.24 |
+
+Now the biggest single loss is the rounding step, the shape quantizer in particular. That tells the team where to work next: a smarter quantizer. But training one needs much more speech than they have (about 2 minutes, nearly all from one man).
 
 ## Encoder against encoder
 
-A ladder tells you where to work. A **race** tells you whether the result is better. In the encoder race, Codec 2 2400 and sotto v0 each sent 48 bits every 20 ms through the identical radio chain, with the same simulated fading, and the scores were averaged over three different random fading patterns. The results are the table at the end of chapter 6: sotto v0 wins every condition, by 0.03 to 0.34 with no radio and by 0.2 to 0.55 over fading channels.
+A ladder tells you where to work. A **race** tells you whether the result is better. In the encoder race, Codec 2 2400, sotto v0 and sotto v1 each sent 48 bits every 20 ms through the identical radio chain, with the same simulated fading, and the scores were averaged over three different random fading patterns. The results are the table at the end of chapter 6. Over the radio channels, both sotto versions win every condition. Against Codec 2, v1 is about 0.5 to 0.6 better for the woman.
 
 ## Being honest about the results
 
-Good science says what it *didn't* test. The v0 design notes list:
+Good science says what it *didn't* test. The design notes list:
 
 - PESQ only, three clips, and no human listening panel yet.
 - One training speaker (VE9QRP) is also a test speaker, though a different part of the recording.
-- v0 is still a Python prototype using Codec 2's analysis and synthesis, not yet a fast C program on the radio's chip.
+- Only about 2 minutes of training speech, nearly all from one man. Small changes (like retraining the shape quantizer) move one voice's score by about ±0.1, so differences that small aren't meaningful.
+- The new pitch tracker looks ahead to the end of each voiced stretch, which a real-time radio can't do yet.
+- sotto is still a Python prototype using parts of Codec 2, not yet a fast C program on the radio's chip.
 
 ## What's next for sotto
 
-From `docs/encoder-v0.md`:
+From `docs/encoder-v1.md`:
 
-1. Better pitch tracking and voicing for higher voices, including mixed voicing.
-2. A smarter shape quantizer, trained on more speech.
-3. Rewriting v0 in C so it runs in real time on the radio's DSP chip (a TI C5517).
+1. Much more training and test speech (30 minutes or more, from at least 10 speakers, half of them women), then a smarter shape quantizer (a trained *vector quantizer*) and a re-tuned pitch tracker.
+2. A pitch tracker that only looks a short way ahead, so it can run in real time.
+3. Listening tests for band voicing and the postfilter, which PESQ can't judge.
+4. Rewriting sotto in C so it runs in real time on the radio's DSP chip (a TI C5517).
 
 ## Try it
 
@@ -83,7 +103,7 @@ From `docs/encoder-v0.md`:
 ## Where this is in the code
 
 - `sim/oracle_ladder.py`: builds the ladder. Results in `docs/results/oracle_ladder_15s.json`.
-- `sim/encoder_race.py`: the encoder race. Results in `docs/results/encoder_race.json`.
+- `sim/encoder_race.py`: the encoder race (`--codecs` picks which codecs race). Results in `docs/results/encoder_race.json`.
 - `sim/vocoder_lab.py`: the oracle lab (edit the model in Python, synthesize with `c2sim`).
 - `tools/score_samples.py` and `sim/audio_race.py`: PESQ and ESTOI scoring.
 

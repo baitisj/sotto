@@ -79,7 +79,7 @@ The receiver runs the steps backwards:
 4. **Check each frame's CRC.**
 5. **Hide the damage.** A frame that fails its CRC is replaced by the last good frame (up to 3 times in a row), then by silence. This is called **concealment**. A repeated 20 ms frame is much less annoying than a burst of garbage noise.
 
-Because sotto v0 is memoryless (chapter 4), a lost frame doesn't damage the frames after it.
+Because sotto is memoryless (chapter 4), a lost frame doesn't damage the frames after it.
 
 ## The software modem
 
@@ -87,18 +87,21 @@ sotto includes a **softmodem**: a program that does all of this in software. It 
 
 ## How well does it work?
 
-From `docs/encoder-v0.md`, both codecs sent through the identical radio chain (scores are PESQ, chapter 7; higher is better):
+From `docs/encoder-v0.md` and `docs/encoder-v1.md`, all three codecs sent through the identical radio chain (scores are PESQ, chapter 7; higher is better):
 
 | Condition | Codec | Woman | Man (LibriSpeech) | Man (VE9QRP) |
 |---|---|---:|---:|---:|
 | No radio | Codec 2 2400 | 2.16 | 2.91 | 2.85 |
 | | sotto v0 | 2.50 | 3.14 | 2.88 |
+| | **sotto v1** | **2.68** | **3.28** | 2.83 |
 | 446 MHz, 60 km/h, weak signal | Codec 2 2400 | 1.69 | 2.29 | 2.49 |
 | | sotto v0 | 2.11 | 2.68 | 2.69 |
+| | **sotto v1** | **2.27** | **2.77** | 2.62 |
 | 146 MHz, 30 km/h | Codec 2 2400 | 1.82 | 2.06 | 1.91 |
 | | sotto v0 | 2.19 | 2.61 | 2.31 |
+| | **sotto v1** | **2.28** | **2.66** | 2.25 |
 
-sotto v0 is ahead in every case. The slow VHF fades are the hardest, as the fading picture suggests.
+Both sotto versions beat Codec 2 over the radio in every case. v1's better pitch tracking helps the woman most (+0.1 to +0.2 over v0). The VE9QRP voice scores slightly lower in v1, by an amount the team considers within the noise of these tests, and is level with Codec 2 with no radio. The slow VHF fades are the hardest, as the fading picture suggests.
 
 ## Try it
 

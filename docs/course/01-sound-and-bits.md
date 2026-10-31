@@ -62,7 +62,7 @@ The receiver's **decoder** takes those 48 bits and rebuilds 20 ms of sound with 
 
 The rebuilt voice is *not* the same as the original wiggle-for-wiggle. It only has to *sound* similar to a listener. Some things are thrown away on purpose (for example, the exact timing of each vocal-cord pulse), and some are lost to rounding. Much of this course is about which losses people notice and which they don't.
 
-You can hear a sotto v0 decode right now on the [listening page](../index.html), or in chapter 5.
+You can hear sotto v1 right now on the [listening page](../index.html), or in chapter 5.
 
 ## Try it
 
@@ -72,8 +72,8 @@ You can hear a sotto v0 decode right now on the [listening page](../index.html),
 
 ## Where this is in the code
 
-- `sim/vocoder_lab.py`: the `SottoV0` class, with `encode()` and `decode()`.
-- `docs/encoder-v0.md`: the design notes for v0.
+- `sim/vocoder_lab.py`: the `SottoV0` class, with `encode()` and `decode()`. sotto v1 is this same class with `pitch="tracked"`.
+- `docs/encoder-v0.md` and `docs/encoder-v1.md`: the design notes for v0 and v1.
 
 <details markdown="1"><summary>Answers</summary>
 

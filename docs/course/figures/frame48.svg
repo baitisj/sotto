@@ -5,7 +5,7 @@
     .n { font-size: 10px; fill: #0b0b0b; text-anchor: middle; }
   </style>
   <rect width="900" height="200" fill="#fcfcfb"/>
-  <text x="20" y="26" style="font-size:14px;font-weight:bold;fill:#0b0b0b">One sotto v0 frame: 48 bits for 20 milliseconds of speech</text>
+  <text x="20" y="26" style="font-size:14px;font-weight:bold;fill:#0b0b0b">One sotto v1 frame: 48 bits for 20 milliseconds of speech</text>
   <!-- 48 bits * 17.5 px = 840 px, from x=30 -->
   <rect x="30" y="50" width="35" height="56" fill="#f9dcc9" stroke="#fcfcfb" stroke-width="2"/>
   <rect x="65" y="50" width="122.5" height="56" fill="#cfe2f8" stroke="#fcfcfb" stroke-width="2"/>
@@ -18,11 +18,11 @@
   <text x="47.5" y="126" class="s">voicing</text>
   <text x="126" y="126" class="s">pitch</text>
   <text x="231" y="126" class="s">energy</text>
-  <text x="572" y="126" class="s">envelope shape (17 cosine-wave sizes)</text>
+  <text x="572" y="126" class="s">envelope shape (16 cosine-wave sizes)</text>
   <text x="47.5" y="142" class="s">yes/no</text><text x="47.5" y="156" class="s">×2</text>
   <text x="126" y="142" class="s">128 levels,</text><text x="126" y="156" class="s">50–400 Hz</text>
   <text x="231" y="142" class="s">32 levels,</text><text x="231" y="156" class="s">10–80 dB</text>
-  <text x="572" y="142" class="s">5 + 4 + 3 + 3 + 2 + 2 + 2 + 2 + 2 + 2 + 1 + 1 + 1 + 1 + 1 + 1 + 1 bits</text>
+  <text x="572" y="142" class="s">5 + 4 + 3 + 3 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 1 + 1 + 1 + 1 + 1 bits</text>
   <text x="572" y="156" class="s">more bits for the slow, wide curves; fewer for fine detail</text>
   <text x="30" y="186" style="font-size:11.5px;fill:#52514e">Sent most important first. 50 frames a second × 48 bits = 2,400 bits per second.</text>
 </svg>
