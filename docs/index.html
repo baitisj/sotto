@@ -97,7 +97,7 @@
     const d = el("div", "row" + (r.best ? " best" : ""));
     d.append(el("div", "label", `<b>${r.title}</b><span>${r.sub}</span>`));
     d.append(el("div", "score", r.key ? `PESQ ${v.s[r.key].toFixed(2)}` : ""));
-    const a = el("audio"); a.controls = true; a.preload = "none"; a.src = `samples/${v.id}__${r.file}.flac`;
+    const a = el("audio"); a.controls = true; a.preload = "metadata"; a.src = `samples/${v.id}__${r.file}.flac`;
     d.append(a);
     return d;
   }
@@ -122,7 +122,7 @@
     const d = el("div", "row" + (best ? " best" : ""));
     d.append(el("div", "label", `<b>${label}</b><span>${sub}</span>`));
     d.append(el("div", "score", score == null ? "" : `PESQ ${score.toFixed(2)}`));
-    const a = el("audio"); a.controls = true; a.preload = "none"; a.src = src;
+    const a = el("audio"); a.controls = true; a.preload = "metadata"; a.src = src;
     d.append(a);
     return d;
   }
