@@ -57,7 +57,9 @@ Versions v0 to v2 used a **scalar** quantizer (the `ShapeQ` class): it rounded e
 
 ### Since v3: a vector quantizer
 
-A **vector quantizer** (VQ) rounds all the numbers *together*. Picture a book of typical envelope shapes, learned from real speech: the **codebook**. The encoder finds the entry closest to this frame's shape and sends just its page number. With 12 bits, the codebook can have 2¹² = 4,096 entries.
+A **vector quantizer** (VQ) rounds all the numbers *together*. Picture a book of typical envelope shapes, learned from real speech: the **codebook**. Each page holds one shape, written as a list of 19 numbers. The encoder and the decoder have identical copies of the book. The encoder finds the page closest to this frame's shape and sends just its page number; the decoder looks up that page and reads the shape back out. The shape itself never travels, only the page number. With 12 bits, the codebook can have 2¹² = 4,096 pages.
+
+It's like ordering paint by its number on a color chart: you don't describe the color, you say "number 2417", and the store has the same chart.
 
 4,096 shapes still can't match every frame closely. So sotto uses **three stages**:
 
@@ -86,6 +88,25 @@ Stage 2 is trained the same way, on what stage 1 left over, and so on. sotto's c
 
 To keep the tests fair, the voices used for testing are never used for training. That's called keeping test data **held out**. On 16 held-out voices from LibriSpeech and another studio collection (EARS), sotto beat Codec 2 on every one, by about 0.45 to 0.6 PESQ.
 
+### Shrinking the codebook for the radio (v3.6)
+
+The codebook has to be stored inside the radio. All three stages together have 8,192 pages × 19 numbers = 155,648 numbers. The DSP chip in the radio (a TI C5517) has only 320 KB of memory, and the radio modem needs to share it. Even with each number squeezed into 8 bits (one byte), the codebook would take 152 KB, about half of the chip.
+
+The codebook is also slow. To find the best pages, the encoder compares the shape with every page in every stage, keeping 8 paths. That's about 700,000 multiply-and-add steps every 20 ms, and **90% of the encoder's work**.
+
+So for v3.6 the team rebuilt it with **four smaller stages** instead of three big ones:
+
+| | Stages (bits) | Pages | Size (8-bit numbers) | Work per frame | PESQ |
+|---|---|---|---|---|---|
+| v3.5 | 12 + 11 + 11 | 8,192 | 152 KB | 700,000 | 2.917 |
+| v3.6 | 9 + 9 + 8 + 8 | 1,536 | **29 KB** | **165,000** | 2.913 |
+
+It's still 34 bits, so the frame doesn't change. Each stage is much smaller (512 or 256 pages), and the extra stage makes up for it by adding one more correction. The codebook is now a fifth of the size, and the search needs about a quarter of the work. Each number is also rounded to 8 bits, the way the chip will store it.
+
+Why doesn't it sound worse? Adding pages helps less and less: the first few hundred pages capture the common mouth shapes, and thousands more mostly split hairs. Four small stages, each fixing what the last one missed, can still combine into 2³⁴ different final shapes, the same number as before. The PESQ change (2.917 to 2.913) is too small to matter, and two blind listening rounds agreed: the small codebook against the big one gave 5 ties out of 5 (round 9), and the full v3.6 against v3.5 gave 2 wins for v3.6 and 8 ties (round 10).
+
+v3.6 also changed how **energy** is measured. The envelope only covers 200 to 3,700 Hz, so the encoder now sends only the loudness the decoder can actually rebuild in that range. Before, a voice with a strong hum below 200 Hz had that hum's loudness spread across the whole envelope, which made a buzzy "chirp" at the start of one clip.
+
 ## Putting the 48 bits together
 
 ![The 48 bits of one frame](figures/frame48.svg)
@@ -103,16 +124,18 @@ The bits go out in order of importance: voicing first, then pitch, then energy, 
 1. If energy had 6 bits instead of 5 over the same 10–80 dB range, what would the step size be? Where could that extra bit come from?
 2. sotto's pitch levels are each 1.83% apart. Starting at 50 Hz, what are the next two levels? How many steps make one octave (doubling)?
 3. A friend says: "Why not one stage with 34 bits instead of three stages?" How many codebook entries would that need? Why might that be a problem?
+4. Check the v3.6 codebook: how many pages do stages of 9, 9, 8 and 8 bits have in total? With 19 numbers per page and one byte per number, how many bytes is that?
 
 ## Where this is in the code
 
 - `sim/vocoder_lab.py`: `q_uniform()` (uniform quantizer), `q_wo()` (log pitch quantizer), `ShapeMSVQ` (the 3-stage VQ and its M-best search), `ShapeQ` (the older scalar quantizer), `SottoV0.encode()` and `SottoV0.decode()` (the 48-bit layout), `decimate_interp()` and `interp_wo()` (filling in the 10 ms frames).
-- `tools/train_shape_vq.py`, `tools/sc_corpus.py`, `tools/clean_corpus.py`: building the training data and the codebook. `sim/data/shape_msvq_34.npz`: the codebook itself.
+- `tools/train_shape_vq.py`, `tools/sc_corpus.py`, `tools/clean_corpus.py`: building the training data and the codebook. `sim/data/shape_msvq_34.npz`: the v3.5 codebook. `sim/data/shape_msvq_9988.npz`: the smaller v3.6 codebook, used by `SottoV36` and the C port (`docs/c-port.md` has the memory and speed numbers).
 
 <details markdown="1"><summary>Answers</summary>
 
 1. 70 ÷ 63 ≈ 1.11 dB. It would have to come from another field, for example one less bit for the shape (33 instead of 34).
 2. 50 × 1.0183 ≈ 50.9 Hz, then ≈ 51.8 Hz. An octave takes about 38 steps (1.0183³⁸ ≈ 2). From 50 to 500 Hz is a factor of 10, about 3.3 octaves, and 3.3 × 38 ≈ 127 steps, which is why 128 levels cover it.
 3. 2³⁴ is about 17 billion entries. That's far too many to store on a small radio chip or to search 50 times a second, and there isn't nearly enough training speech to learn them. Three stages need only 4,096 + 2,048 + 2,048 = 8,192 entries.
+4. 512 + 512 + 256 + 256 = 1,536 pages. 1,536 × 19 = 29,184 bytes, about 29 KB (one KB is 1,024 bytes).
 
 </details>
