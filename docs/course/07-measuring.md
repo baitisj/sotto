@@ -112,14 +112,14 @@ Good science says what it *didn't* test, and fixes its own mistakes:
 - **A scoring bug.** PESQ and ESTOI compare the decoded clip with the original, so the two must be lined up in time. The scripts used to line them up by matching waveforms, but vocoders with made-up phases don't follow the original waveform, so the match picked delays anywhere from 50 to 180 samples when the right answer is about 160. That made scores wrong by up to ±0.1 (and ESTOI too low). Now every codec is scored with the same fixed delay of 160 samples. Old write-ups got their rankings right but some numbers wrong, and the course uses the corrected numbers.
 - **Few listeners.** Most listening rounds had one listener. That's enough to find problems, not to prove small differences.
 - **Training speech.** The codebook is trained on CC BY speech only, so it can be shipped. Another collection (EARS) is used only for testing because its license doesn't allow shipping.
-- **Not real time yet.** sotto is still a Python prototype using parts of Codec 2, not yet a fast C program on the radio's chip.
+- **Not on the radio yet.** sotto now has a C version (`c/`) that gives the same bits as the Python on 99.97% of frames, but it still uses floating-point math. The radio's chip needs a fixed-point version, which isn't written yet.
 
 ## What's next for sotto
 
 From `docs/encoder-v1.md`:
 
-1. Rewriting sotto v3.5 in C for the radio's DSP chip (a TI C5517), with the tracker's look-ahead fixed at 80 ms.
-2. Spreading each frame's bits across *two* radio frames (200 ms) to ride out longer fades at 30 to 60 km/h.
+1. Turning the C version (now v3.6, with the smaller codebook from chapter 4) into fixed-point code for the radio's DSP chip, a TI C5517.
+2. Deciding whether to spread each frame's bits across *two* radio frames (200 ms). It's built, and PESQ says it helps from 30 km/h up, but in the first listening round it won 3, lost 2 and tied 1, so more tests come first.
 3. Retraining the codebook on more speech when it's available.
 4. Working out, by ear, what listeners want for very high voices.
 

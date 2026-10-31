@@ -31,11 +31,11 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **C4FM**: "4-level FM". The radio signal sotto sends: the frequency hops between four values (±600 and ±1,800 Hz) 4,800 times a second, carrying 2 bits per hop. [6]
 
-**C5517**: the TI digital signal processor (DSP) chip inside the Yaesu FTM-300D radio, where sotto is meant to run one day.
+**C5517**: the TI digital signal processor (DSP) chip inside the Yaesu FTM-300D radio, where sotto is meant to run one day. It has 320 KB of memory, which is why v3.6 shrank the codebook to 29 KB. [4]
 
 **c2sim, c2enc, c2dec**: Codec 2's command-line programs. `c2sim` runs the analysis and synthesis separately, so experiments can edit the model in between (`--modelout`, `--modelin`). `c2enc` and `c2dec` are the full Codec 2 encoder and decoder. [7]
 
-**Codebook**: the list of allowed patterns in a vector quantizer. The encoder sends the *number* of the closest entry instead of the pattern itself. sotto's three codebooks have 4,096, 2,048 and 2,048 entries of 19 numbers each. [4]
+**Codebook**: the list of allowed patterns in a vector quantizer, like a numbered color chart. The encoder and decoder have identical copies; the encoder sends the *number* of the closest entry instead of the pattern itself. In v3.5 the three stages have 4,096, 2,048 and 2,048 entries of 19 numbers each (152 KB at one byte per number). v3.6 shrank it to four stages of 512, 512, 256 and 256 entries (29 KB) so it fits in the radio's DSP chip and searches about four times faster, with no audible loss. [4]
 
 **CODEC_DELAY**: the fixed 160-sample (20 ms) delay used to line up every decoded clip with the original before scoring (`sim/audio_race.py`). It replaced a waveform-matching search that picked wrong delays for vocoders with made-up phases. [7]
 
@@ -75,7 +75,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Encoder race**: an experiment where encoders (Codec 2 2400 and the sotto versions) send through the identical radio chain with the same fading, averaged over three fading patterns, and are scored the same way. `sim/encoder_race.py`, results in `docs/results/encoder_race.json`. [6, 7]
 
-**Energy**: how loud a frame is: the sum of the harmonics' powers, in dB. Sent with 5 bits from 10 to 80 dB. Since v3, code 0 means true silence (see silence). [4]
+**Energy**: how loud a frame is: the sum of the harmonics' powers, in dB. Sent with 5 bits from 10 to 80 dB. Since v3, code 0 means true silence (see silence). Since v3.6 it measures only the loudness inside the envelope's range (200 to 3,700 Hz), so a hum below 200 Hz isn't spread over the whole band. [4]
 
 **Envelope (spectral envelope)**: the smooth outline across the tops of the harmonics. It describes the shape of the throat and mouth, and carries most of the words. [3]
 
@@ -142,7 +142,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Mixed voicing (mixed excitation, MBE, MELP)**: letting a sound be partly buzz and partly hiss, like "z" or "v". Since v3.2, sotto has three kinds of frame: **U** (unvoiced, all noise), **V** (voiced, all harmonics) and **M** (mixed: harmonics below 1,000 Hz, noise above). A frame becomes M when it's voiced but its harmonics fit poorly below 1,000 Hz (`voicing_classes()`). MBE and MELP split voicing into more bands. [2, 5]
 
-**Multistage VQ (MSVQ)**: a vector quantizer done in steps. Stage 1 picks the closest codebook entry; stage 2 picks an entry that best corrects what stage 1 got wrong; stage 3 corrects what's left. sotto's shape quantizer uses 3 stages of 12, 11 and 11 bits (`ShapeMSVQ`). [4]
+**Multistage VQ (MSVQ)**: a vector quantizer done in steps. Stage 1 picks the closest codebook entry; stage 2 picks an entry that best corrects what stage 1 got wrong; stage 3 corrects what's left. sotto's shape quantizer uses 3 stages of 12, 11 and 11 bits in v3.5 and 4 stages of 9, 9, 8 and 8 bits in v3.6, 34 bits either way (`ShapeMSVQ`). [4]
 
 **Model**: the vocoder's description of one 10 ms frame: `Wo`, `L`, `A`, `phi` and `voiced`. Stored in the `MODEL` record type in `sim/vocoder_lab.py`. [2]
 
@@ -214,13 +214,13 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Shape**: the 20-point envelope with its average removed, so only the ups and downs are left. [3]
 
-**Shape quantizer**: the part of sotto that squeezes the envelope shape into 34 bits. Since v3 it's a 3-stage vector quantizer (`ShapeMSVQ`, codebook in `sim/data/shape_msvq_34.npz`) with 45% less error than before. Up to v2 it was `ShapeQ`, a scalar quantizer: it took the DCT of the shape, gave each cosine-wave size its own uniform quantizer with a trained step size, and split the bits by greedy allocation (5, 4, 3, 3, 2, ... bits). [4]
+**Shape quantizer**: the part of sotto that squeezes the envelope shape into 34 bits. Since v3 it's a multistage vector quantizer (`ShapeMSVQ`) with 45% less error than before: 3 stages in `sim/data/shape_msvq_34.npz` up to v3.5, 4 smaller stages in `sim/data/shape_msvq_9988.npz` from v3.6. Up to v2 it was `ShapeQ`, a scalar quantizer: it took the DCT of the shape, gave each cosine-wave size its own uniform quantizer with a trained step size, and split the bits by greedy allocation (5, 4, 3, 3, 2, ... bits). [4]
 
 **Silence (true silence)**: since v3, energy code 0 tells the decoder to output nothing at all, instead of a faint buzz or hiss. Listeners had heard a "floor" of noise between words. [4]
 
 **sotto tracker**: sotto's joint pitch and voicing tracker (`track_pitch_voicing()` in `sim/sinusoid.py`). For every 10 ms frame it lists "unvoiced" plus several pitch candidates (Codec 2's estimates nearby, doubled and halved), adds up six kinds of cost (bad fit, low pitch, disagreeing with Codec 2's voicing, switching, jumping, missing odd harmonics), and uses the Viterbi algorithm to pick the cheapest path. Pitch is kept between 70 Hz (for doubled and halved candidates) and 500 Hz. v1 had a simpler pitch-only version, `track_pitch()`. [2]
 
-**sotto v0 to v3.5**: versions of the sotto encoder, all with the same 48-bit, 20 ms frame. v0: the 20-point envelope. v1: the octave-correcting pitch tracker (`SottoV0(pitch="tracked")` in the code). v2: joint pitch and voicing tracking, and a 500 Hz pitch limit. v3: the trained vector quantizer and true silence. v3.1: the tail rule. v3.2: mixed voicing. v3.3: odd/even check. v3.4: concealment in the decoder. v3.5: lighter postfilter (1.35) and short concealment; `SottoV35` in `sim/vocoder_lab.py`. [1, 2, 4, 6]
+**sotto v0 to v3.6**: versions of the sotto encoder, all with the same 48-bit, 20 ms frame. v0: the 20-point envelope. v1: the octave-correcting pitch tracker (`SottoV0(pitch="tracked")` in the code). v2: joint pitch and voicing tracking, and a 500 Hz pitch limit. v3: the trained vector quantizer and true silence. v3.1: the tail rule. v3.2: mixed voicing. v3.3: odd/even check. v3.4: concealment in the decoder. v3.5: lighter postfilter (1.35) and short concealment; `SottoV35` in `sim/vocoder_lab.py`. v3.6: the smaller 29 KB codebook for the radio's chip, and energy measured only over the envelope's 200 to 3,700 Hz; `SottoV36`, the C port's default. [1, 2, 4, 6]
 
 **Sine wave**: the smoothest possible repeating wiggle, with a frequency, amplitude and phase. [2]
 
