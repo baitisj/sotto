@@ -177,7 +177,9 @@ No radio channel, 15 voices (`docs/results/clean_15voices.json`), mean PESQ (EST
 
 v3 beats v2 on 12 of the 15 voices. Over the radio channels it ties v2 on average (PESQ 2.72 for both over 9 condition × voice cells). It is up to +0.12 on the men and down 0.15 on the female at UHF 52 dB-Hz. ESTOI is equal or better in every cell. The female loss may come from the mute after three lost frames, which is now true silence rather than faint noise.
 
-Round 4 (v3 against Codec 2 on the pitch-edge voices, v3 against v2 with and without the channel) is with the club.
+Round 4 (one listener so far). v3 beat Codec 2 on 3 of 4 counting voices, including the 80 Hz voice that Codec 2 won in round 3. Codec 2 again won the 390 Hz voice. That voice was recorded on a heavily band-limited microphone, and the listener judged v3 the closer match to the original, so future rounds put the original next to every pair. v3 against v2 was a tie in all five pairs, with and without the channel. The null pair was called a tie. Since v3 never lost to v2 by ear and scores higher clean, the public listening page now uses v3.
+
+Both v2 and v3 have a fault on "five" ("five-anuh", or a reverb tail). The final /v/ is a voiced fricative: the low harmonics are clean, but above 1 kHz the harmonic fit SNR is only 2 to 4 dB. Binary voicing renders it as a fully voiced vowel. On one voice the tracker also follows it down to about 100 Hz and keeps it voiced for 200 ms as it fades to -80 dB. Mixed (band) voicing on fricative tails, or ending the voiced run once the high-band fit collapses, is the next thing to try.
 
 ## What limits the next step: speech data
 
