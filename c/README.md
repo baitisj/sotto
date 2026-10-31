@@ -10,6 +10,8 @@ built from `codec/codec2/` by `tools/build_codec2.sh`). The code in this directo
 
 ## Build and run
 
+The top-level `make` does the first two steps (see the main README). By hand:
+
 ```sh
 tools/build_codec2.sh          # once: builds build/codec2/src/libcodec2.so
 make -C c                      # needs python3 + numpy to generate the codebook source
