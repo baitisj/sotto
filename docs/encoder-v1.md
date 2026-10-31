@@ -136,6 +136,23 @@ Jeff's answers: v2 beat v1 in 3 of the 4 pairs, with the fourth a tie, and won t
 
 `soften_pauses` (a `SottoV2(quiet=...)` option, off by default) is a decoder-only fix. It gives unvoiced frames well below the recent speech peak a high-frequency roll-off. At a 20 dB margin and 6 dB/octave above 1 kHz it is PESQ-neutral. It goes into the next listening round before becoming the default.
 
+### Predicted envelope with resets (`SottoV2P`)
+
+Jeff suggested coding the envelope's change between frames, since articulators move at bounded speed (the idea behind IMBE/AMBE's predicted amplitudes and Atal's temporal decomposition). To stop channel errors carrying over, the predictor resets on frames where both 10 ms halves are unvoiced. `SottoV2P(every=N)` adds a forced reset every N frames. Reset frames use v2's memoryless quantizer, and the others use one trained on prediction residuals. The bit layout is unchanged, and the decoder holds the predictor on CRC-failed frames.
+
+PESQ, female / male LibriSpeech / ve9qrp, mean of 3 seeds:
+
+| Condition | v2 (memoryless) | resets on unvoiced only | + every 10 frames |
+|---|---|---|---|
+| No radio channel | **2.91** / 3.21 / **3.00** | 2.83 / 3.21 / 2.94 | 2.84 / **3.25** / 2.94 |
+| 446 MHz 60 km/h, 52 dB-Hz | **2.44 / 2.91 / 2.78** | 2.26 / 2.58 / 2.64 | 2.25 / 2.72 / 2.73 |
+| 446 MHz 60 km/h, 56 dB-Hz | **2.86** / 3.12 / **2.98** | 2.80 / **3.13** / 2.87 | 2.80 / 3.06 / 2.90 |
+| 146 MHz 30 km/h, 56 dB-Hz | **2.51** / 2.61 / 2.30 | 2.39 / 2.57 / 2.29 | 2.38 / **2.72** / **2.35** |
+
+- **The resets work.** At UHF 52 dB-Hz the loss against memoryless is now 0.05 to 0.2, about half what plain prediction lost before (v1: 0.1 to 0.26). The forced reset every 10 frames helps further on the men.
+- **Prediction itself gains nothing yet.** Even with no channel, the predicted variants are within ±0.08 of v2. With this 34-bit scalar DCT quantizer, coding a residual is no cheaper than coding the frame. Resets are on 12 to 48% of frames (more for ve9qrp, which pauses more).
+- **Next:** revisit with a trained vector quantizer, where prediction does pay off in AMBE. The resets and the CRC hold make it safe to try.
+
 ## What limits the next step: speech data
 
 The shape quantizer is trained on about 2 minutes of speech, nearly all from one male (ve9qrp), and scored on three clips. That is enough to compare structures, but not to train a vector quantizer, which is the obvious next gain (the quantizer step above costs 0.15 to 0.4). Nor is it enough to tune the tracker without fitting the noise. The sandbox can't reach LibriSpeech, VCTK or CMU ARCTIC, only GitHub.

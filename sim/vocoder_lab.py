@@ -505,3 +505,76 @@ def soften_pauses(m, margin=25.0, tilt=6.0, atten=0.0, release=0.995):
         a *= np.sqrt(np.sum(m[i]["A"][1:L + 1] ** 2) / (np.sum(a ** 2) + 1e-12)) * 10 ** (-atten / 20)
         m[i]["A"][1:L + 1] = a
     return m
+
+
+class SottoV2P(SottoV2):
+    """v2 with the shape predicted from the previous frame, except on reset frames: frames
+    whose two voicing bits are both unvoiced, and every `every`-th frame (None = never).
+    Reset frames use v2's memoryless quantizer, the rest a quantizer trained on prediction
+    residuals, so the bit layout doesn't change. Errors from a lost frame stop at the next
+    reset. decode(bits, good) holds the predictor on frames flagged bad."""
+
+    def __init__(self, every=10, shrink=1.0, max_alpha=0.8, pf=1.5, quiet=None):
+        super().__init__(pf=pf, quiet=quiet)
+        self.every = every
+        p, c = training_pairs("tracked2")
+        a = np.sum(p * c, 0) / np.maximum(np.sum(p * p, 0), 1e-9)
+        self.alpha = np.clip(a * shrink, 0, max_alpha)
+        self.alpha[0] = 0
+        self.sq_abs, self.sq_res = self.sq, ShapeQ((c - self.alpha * p) @ DCT)
+
+    def _reset(self, f, v0, v1):
+        return bool((not v0 and not v1) or (self.every and f % self.every == 0))
+
+    def _use(self, sq):
+        self.sq, self.fields = sq, [b for b in sq.bits if b]
+
+    def encode(self, x):
+        m = analyse(x, self.pitch)
+        if len(m) % 2:
+            m = np.concatenate([m, m[-1:]])
+        rk = to_rate_k(m)
+        en = frame_energy_db(m)
+        prev = np.zeros(K)
+        frames = []
+        for f, i in enumerate(range(0, len(m), 2)):
+            v = [int(m[i]["voiced"] > 0), int(m[i + 1]["voiced"] > 0)]
+            wi, _ = q_wo(np.array([m[i]["Wo"]]), hi=self.WO_HI)
+            ei, _ = q_uniform(np.array([en[i]]), self.E_LO, self.E_HI, 5)
+            c = (rk[i] - rk[i].mean()) @ DCT.T
+            if self._reset(f, *v):
+                self._use(self.sq_abs)
+                pred = np.zeros(K)
+            else:
+                self._use(self.sq_res)
+                pred = self.alpha * prev
+            si = self._shape_idx((c - pred) @ DCT)
+            prev = pred + self._shape_val(si) @ DCT.T
+            frames.append(self._pack([(v[0], 1), (v[1], 1), (wi[0], 7), (ei[0], 5)]
+                                     + list(zip(si, self.fields))))
+        self._use(self.sq_abs)
+        return np.array(frames, np.int8)
+
+    def decode(self, bits, good=None):
+        bits = np.asarray(bits)
+        good = np.ones(len(bits), bool) if good is None else np.asarray(good, bool)
+        prev = np.zeros(K)
+        shapes = []
+        for f, b in enumerate(bits):
+            if good[f]:
+                reset = self._reset(f, b[0], b[1])
+                self._use(self.sq_abs if reset else self.sq_res)
+                p, idx = 14, []
+                for bb in self.fields:
+                    idx.append(int("".join(map(str, b[p:p + bb])), 2))
+                    p += bb
+                prev = (0 if reset else self.alpha * prev) + self._shape_val(idx) @ DCT.T
+            shapes.append(prev.copy())
+        self._use(self.sq_abs)
+        m = SottoV0.decode(self, bits)                 # voicing, pitch, energy
+        rk = np.zeros((2 * len(bits), K))
+        rk[0::2] = np.array(shapes) @ DCT
+        if self.pf:
+            rk[0::2] = postfilter_rk(rk[0::2], self.pf)
+        m = set_energy(from_rate_k(m, decimate_interp(rk)), frame_energy_db(m))
+        return soften_pauses(m, **self.quiet) if self.quiet else m
