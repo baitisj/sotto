@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sotto: listen</title>
+<meta name="description" content="Open 2400 bps digital voice for FM radios. Compare sotto against Fusion-style protection over a simulated mobile radio channel.">
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1d1d1b; --muted: #66645e; --line: #e2dfd7; --card: #ffffff;
+    --accent: #2f6f5e; --accent-soft: #e5f0ec; --warn: #9a4b2f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151614; --fg: #ecebe6; --muted: #a3a29b; --line: #2e302c; --card: #1d1f1c;
+            --accent: #7fc4ac; --accent-soft: #1f2e29; --warn: #e0a080; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 2.2rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.25rem; margin: 40px 0 8px; }
+  p { margin: 8px 0; }
+  .lede { color: var(--muted); font-size: 1.1rem; margin-bottom: 20px; }
+  .note { color: var(--muted); font-size: 0.92rem; }
+  a { color: var(--accent); }
+  .voice { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+           padding: 16px 18px; margin: 16px 0; }
+  .voice h3 { margin: 0 0 10px; font-size: 1.05rem; }
+  .row { display: grid; grid-template-columns: 1fr auto 300px; gap: 12px; align-items: center;
+         padding: 8px 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: 0; }
+  .row.best { background: var(--accent-soft); border-radius: 8px; padding: 8px 10px; margin: 0 -10px; }
+  .label b { display: block; }
+  .label span { color: var(--muted); font-size: 0.9rem; }
+  .score { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; text-align: right; min-width: 74px; }
+  audio { width: 100%; height: 36px; }
+  .cond { display: inline-block; font-size: 0.85rem; padding: 2px 8px; border-radius: 99px;
+          border: 1px solid var(--line); color: var(--muted); margin: 0 6px 6px 0; }
+  @media (max-width: 680px) {
+    .row { grid-template-columns: 1fr auto; }
+    .row audio { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>sotto</h1>
+  <p class="lede">Open 2400 bit/s digital voice for FM radios: a vocoder, error correction and a C4FM modem path, built for small fixed-point DSPs.</p>
+
+  <p>Every clip below went through the same chain: Codec 2 at 2400 bit/s, then System Fusion (C4FM) frames, then a simulated mobile radio channel with fading and noise, then our software receiver. The only thing that changes between rows is how the voice bits are protected and where they sit in the frame.</p>
+  <p>
+    <span class="cond">UHF 446 MHz, 60 km/h, 52 dB-Hz (a weak mobile signal)</span>
+    <span class="cond">same transmit power for every row</span>
+  </p>
+  <p class="note">The score is PESQ, an automatic speech-quality estimate from 1 (bad) to 4.5 (excellent), averaged over three fading runs. "No radio channel" is the best any row can reach with today's codec.</p>
+
+  <div id="voices"></div>
+
+  <h2>Slow VHF fading: the hard case</h2>
+  <p>At 146 MHz and town-driving speed (30 km/h), fades last longer than the 100 ms interleaver, so whole frames are lost. This is sotto at 56 dB-Hz. Longer interleaving and better concealment are on the list.</p>
+  <div id="vhf"></div>
+
+  <h2>What you're hearing</h2>
+  <p><b>sotto (VW slot)</b> puts the voice in the full-rate part of the Fusion frame, adds a CRC to each 20 ms frame and protects everything with a strong tail-biting convolutional code. <b>DN slot + our code</b> uses the half-rate slot Fusion radios use for DN mode, with a weaker version of the same code. <b>Fusion-style protection</b> mimics how DN protects its voice bits (the first 27 bits sent three times, the rest unprotected), applied to Codec 2. That's a statement about Codec 2 with that protection, not about AMBE+2, whose decoder is built around it.</p>
+  <p>Today's vocoder is stock Codec 2 2400. The next step for the project is a better open vocoder at the same rate, which should lift every row. The female voice especially: Codec 2 itself costs her about 0.7 PESQ before any radio channel.</p>
+  <p class="note">Simulation only, not yet on the air. Sources: the ve9qrp recording from the Codec 2 project, and LibriSpeech readers (CC BY 4.0; see <a href="samples/README.md">samples/README.md</a>). Details: <a href="https://github.com/baitisj/sotto/blob/main/docs/audio-race.md">audio-race.md</a>. Code: <a href="https://github.com/baitisj/sotto">github.com/baitisj/sotto</a> (MIT; the Codec 2 fork is LGPL-2.1).</p>
+</main>
+<script>
+  const voices = [
+    { id: "female_libri198_14s", name: "Female voice (LibriSpeech reader 198, 14 s)",
+      s: { clean: 2.16, sotto: 1.69, dnconv: 1.35, dnrep: 1.19, vhf: 1.82 } },
+    { id: "male_libri3436_15s", name: "Male voice (LibriSpeech reader 3436, 15 s)",
+      s: { clean: 2.91, sotto: 2.28, dnconv: 1.73, dnrep: 1.35, vhf: 2.10 } },
+    { id: "male_ve9qrp_15s", name: "Male voice (VE9QRP, 15 s)",
+      s: { clean: 2.85, sotto: 2.50, dnconv: 1.84, dnrep: 1.48, vhf: 1.94 } },
+  ];
+  const uhf = "446_MHz_60_kmh_52_dB-Hz";
+  const rows = [
+    { key: null, file: "original", title: "Original", sub: "the input speech" },
+    { key: "clean", file: "codec2_2400_no_channel", title: "Codec 2 2400, no radio channel", sub: "the ceiling for every row below" },
+    { key: "sotto", file: `${uhf}__sotto_vw`, title: "sotto (VW slot)", sub: "CRC + rate 7/18 tail-biting code", best: true },
+    { key: "dnconv", file: `${uhf}__dn_conv`, title: "DN slot + our code", sub: "CRC + rate 7/13 code" },
+    { key: "dnrep", file: `${uhf}__dn_rep`, title: "Fusion-style protection", sub: "27 bits sent three times, the rest bare" },
+  ];
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  function row(v, r) {
+    const d = el("div", "row" + (r.best ? " best" : ""));
+    d.append(el("div", "label", `<b>${r.title}</b><span>${r.sub}</span>`));
+    d.append(el("div", "score", r.key ? `PESQ ${v.s[r.key].toFixed(2)}` : ""));
+    const a = el("audio"); a.controls = true; a.preload = "none"; a.src = `samples/${v.id}__${r.file}.flac`;
+    d.append(a);
+    return d;
+  }
+  const host = document.getElementById("voices");
+  for (const v of voices) {
+    const card = el("section", "voice"); card.append(el("h3", null, v.name));
+    for (const r of rows) card.append(row(v, r));
+    host.append(card);
+  }
+  const vhf = document.getElementById("vhf");
+  const card = el("section", "voice");
+  for (const v of voices)
+    card.append(row(v, { key: "vhf", file: "146_MHz_30_kmh_56_dB-Hz__sotto_vw", title: v.name.split(" (")[0], sub: "sotto, 146 MHz, 30 km/h, 56 dB-Hz" }));
+  vhf.append(card);
+  // Only one clip plays at a time.
+  document.addEventListener("play", e => {
+    for (const a of document.querySelectorAll("audio")) if (a !== e.target) a.pause();
+  }, true);
+</script>
+</body>
+</html>

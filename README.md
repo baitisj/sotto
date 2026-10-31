@@ -4,6 +4,10 @@ Open 2400 bps digital voice for FM radios: a vocoder, channel coding and a
 constant-envelope modem path, built to run on small fixed-point DSPs (first
 target: the TI C5517 in the Yaesu FTM-300D).
 
+## Listen
+
+Compare sotto with Fusion-style protection over a simulated weak mobile signal, for male and female voices: **https://baitisj.github.io/sotto/** (the page is `docs/index.html`; the FLAC files are in `docs/samples/`).
+
 ## Contents
 
 - `modem/`: the **softmodem**. It sends and receives YSF frames carrying sotto voice through a radio's 9600 data port and a sound card, or through an SDR (IQ). `python -m modem tx voice.bit tx.flac`, then `python -m modem rx rx.flac voice.bit`. See `docs/softmodem.md`.
