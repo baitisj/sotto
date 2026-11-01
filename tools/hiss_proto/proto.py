@@ -1,7 +1,7 @@
 from common import *
 DCT = vl.DCT
 
-class Proto(vl.SottoV36):
+class Proto(vl.SottoV37):
     def __init__(self, uv_wo=None, uv_gain=0.0, cb5=None, oracle=False, **kw):
         super().__init__(**kw)
         self.uv_wo, self.uv_gain, self.cb5, self.oracle = uv_wo, uv_gain, cb5, oracle

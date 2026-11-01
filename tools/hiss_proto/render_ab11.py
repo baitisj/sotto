@@ -10,15 +10,15 @@ OUT = sys.argv[1]; os.makedirs(OUT, exist_ok=True)
 C52 = ('446 MHz, 60 km/h, 52 dB-Hz', 52, cs.doppler(446e6, 60))
 C56 = ('446 MHz, 60 km/h, 56 dB-Hz', 56, cs.doppler(446e6, 60))
 V30 = ('146 MHz, 30 km/h, 56 dB-Hz', 56, cs.doppler(146e6, 30))
-plan = [('v36', 'level', 'ears_p051_f', None), ('v36', 'hiss7', 'ears_p020_m', None),
-        ('v36', 'hiss7', 'librispeech_652_m', None), ('level', 'hiss7', 'ears_p095_m', None),
-        ('v36', 'hiss0', 'ears_p047_f', None),
-        ('v36', 'hiss7', 'librispeech_8842_f', C52), ('v36', 'hiss7', 'ears_p047_f', V30),
-        ('v36', 'level', 'librispeech_2428_m', C52), ('level', 'hiss7', 'librispeech_3536_f', V30),
-        ('v36', 'hiss7', 'ears_p051_f', C56), ('hiss7', 'hiss7', 'ears_p020_m', None)]
+plan = [('v37', 'level', 'ears_p051_f', None), ('v37', 'hiss7', 'ears_p020_m', None),
+        ('v37', 'hiss7', 'librispeech_652_m', None), ('level', 'hiss7', 'ears_p095_m', None),
+        ('v37', 'hiss0', 'ears_p047_f', None),
+        ('v37', 'hiss7', 'librispeech_8842_f', C52), ('v37', 'hiss7', 'ears_p047_f', V30),
+        ('v37', 'level', 'librispeech_2428_m', C52), ('level', 'hiss7', 'librispeech_3536_f', V30),
+        ('v37', 'hiss7', 'ears_p051_f', C56), ('hiss7', 'hiss7', 'ears_p020_m', None)]
 rng = random.Random(2026110111); rng.shuffle(plan)
 swaps = [True, False] * 6; rng.shuffle(swaps)
-h = Hiss('hiss_model.npz'); v36 = vl.SottoV36()
+h = Hiss('hiss_model.npz'); v37 = vl.SottoV37()
 def name(c):
     s = 'Female' if c.endswith('f') else 'Male'
     return s + (' (EARS studio)' if c.startswith('ears') else f" (LibriSpeech {c.split('_')[1]})")
@@ -38,14 +38,14 @@ def channel(bits, cond, seed):
 trials, key = [], {}
 for n, (p, q, c, cond) in enumerate(plan, 1):
     x16 = sf.read(f'clips16/{c}.wav')[0]; x16 = x16[:len(x16) // 320 * 320]; ref = cut(x16)
-    b7 = h.encode(x16); b0 = v36.encode(resample_poly(x16, 1, 2))
+    b7 = h.encode(x16); b0 = v37.encode(resample_poly(x16, 1, 2))
     if cond:
         (f7, g7), (f0, g0) = channel(b7, cond, 100 + n), channel(b0, cond, 100 + n)
     else:
         f7, g7, f0, g0 = b7, np.ones(len(b7), bool), b0, np.ones(len(b0), bool)
     def dec(k):
-        if k == 'v36':
-            y8 = vl.synthesise(v36.decode(f0, g0))[160:]; y8 = np.pad(y8, (0, max(0, len(x16)//2 - len(y8))))[:len(x16)//2]
+        if k == 'v37':
+            y8 = vl.synthesise(v37.decode(f0, g0))[160:]; y8 = np.pad(y8, (0, max(0, len(x16)//2 - len(y8))))[:len(x16)//2]
             return resample_poly(y8, 2, 1)
         return h.decode(f7, g7, mode=k, n16=len(x16))
     a, b = lvl(cut(dec(p)), ref), lvl(cut(dec(q)), ref)

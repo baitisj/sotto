@@ -70,7 +70,7 @@ class Hiss:
         n8 = n16 // 2 if n16 else len(y8)
         y8 = np.pad(y8, (0, max(0, n8 - len(y8))))[:n8]
         y16 = resample_poly(y8, 2, 1)
-        if mode in ('level', 'v36'):
+        if mode in ('level', 'v37'):
             return y16
         d = self._dstruct(b2, m, len(y16)); d['y16'] = y16
         p = self.bwe.predict(d)

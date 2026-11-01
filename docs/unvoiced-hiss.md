@@ -2,7 +2,8 @@
 
 Status: prototype and listening round 11, not in the encoder. 2026-11-01.
 Measured against v3.6. v3.7, merged while this ran, changes only the pitch tracker (same
-decoder and bitstream), so the findings carry over; a v3.8 would build on v3.7.
+decoder and bitstream), so the findings carry over; a v3.8 would build on v3.7. Round 11 (version 2 of the page)
+and tools/hiss_proto/ are on v3.7: Jeff spotted v3.6's 490 Hz pitch jump on p020 in pair 1.
 
 Jeff's question: would s, sh and f sound more natural if unvoiced consonants got more
 bandwidth, starting from a default spectral template and refined during pauses or low-rate
