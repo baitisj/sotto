@@ -28,6 +28,15 @@ the build-tree copy is found through an rpath, and an installed copy through the
 library path. `sotto_format()` names the bitstream the library speaks, for example
 `sotto v3.6, shape 9-9-8-8`. A library built with another codebook can't decode its frames.
 
+## Fixed point
+
+`make -C c fixed` builds `c/fixed/sotto_enc_fx` and `c/fixed/sotto_dec_fx`, an integer-only
+encoder and decoder for the radio's DSP with the same API (`c/fixed/sotto_fx_enc.c`,
+`c/fixed/sotto_fx_dec.c`). Their tables come from `tools/gen_fx_tables.py`.
+`tools/check_fx.py` compares them with the float port (`--enc` for the encoder), and
+`tools/fx_profile.sh` counts their inner loops. Results and the cycle estimate are in
+`docs/c-port.md`.
+
 ## Input level
 
 `sotto.h` documents the level scale and gives it as constants. Samples are 16-bit, and

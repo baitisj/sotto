@@ -188,3 +188,44 @@ def test_header_level_constants_match_energy_field():
     step = (hi - lo) / 31
     assert abs(const["SOTTO_LEVEL_SILENT_DBFS"] - (lo + step / 2 - const["SOTTO_ENERGY_OFFSET_DB"])) < 0.1
     assert abs(const["SOTTO_LEVEL_MAX_DBFS"] - (hi - const["SOTTO_ENERGY_OFFSET_DB"])) < 0.1
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "c", "fixed", "sotto_dec_fx")),
+                    reason="fixed-point decoder not built (make -C c fixed)")
+def test_fixed_point_decoder_matches_float():
+    """c/fixed/sotto_dec_fx (integer only) against the float decoder, same bits. The two
+    drift apart only where a harmonic sits on the postfilter's noise threshold and the
+    random-phase sequences fall out of step, so most 10 ms segments match closely."""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import check_c_port as cc
+    import check_fx
+    x16 = np.round(_ve9qrp(4.0) * 32767).astype(np.int16)
+    bits = cc.c_encode(x16[:len(x16) // 160 * 160])
+    good = np.ones(len(bits), bool)
+    good[60:64] = False
+    yf = cc.c_decode(bits, good)
+    yx = check_fx.run_dec(os.path.join(ROOT, "c", "fixed", "sotto_dec_fx"), bits, good)
+    assert len(yx) == len(yf)
+    seg = [cc.snr_db(yf[i:i + 80], yx[i:i + 80]) for i in range(0, len(yf) - 80, 80)
+           if np.sum(yf[i:i + 80] ** 2) > 1e-6]
+    assert np.median(seg) > 40
+    assert abs(10 * np.log10(np.sum(yx ** 2) / np.sum(yf ** 2))) < 0.5
+
+
+def test_fixed_point_encoder_matches_float():
+    """c/fixed/sotto_enc_fx against the float encoder: almost every frame gives the same 48
+    bits (the rest are near-ties at float rounding boundaries), and the fixed decoder gets
+    the same PESQ from them."""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import check_c_port as cc
+    import check_fx
+    x = _ve9qrp(4.0)
+    x16 = np.round(x * 32767).astype(np.int16)[:len(x) // 160 * 160]
+    bf = cc.c_encode(x16)
+    bx = check_fx.run_enc(os.path.join(ROOT, "c", "fixed", "sotto_enc_fx"), x16)
+    assert bx.shape == bf.shape
+    assert np.mean(np.all(bf == bx, 1)) > 0.9
+    y = check_fx.run_dec(os.path.join(ROOT, "c", "fixed", "sotto_dec_fx"), bx)
+    pf = ar.score(x[:len(x16)], cc.c_decode(bf), ar.CODEC_DELAY)[0]
+    px = ar.score(x[:len(x16)], y, ar.CODEC_DELAY)[0]
+    assert px > pf - 0.1

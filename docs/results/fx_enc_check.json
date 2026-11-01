@@ -1,0 +1,287 @@
+[
+ {
+  "clip": "female_libri198_14s.flac",
+  "frames": 695,
+  "frames_fx": 695,
+  "bit_exact": 0.9871,
+  "field_mismatch": {
+   "voicing": 2,
+   "Wo": 4,
+   "energy": 0,
+   "vq": 8
+  },
+  "pesq_float": 2.875,
+  "pesq_fixed": 2.931,
+  "pesq_fxenc_floatdec": 2.919
+ },
+ {
+  "clip": "male_libri3436_15s.flac",
+  "frames": 750,
+  "frames_fx": 750,
+  "bit_exact": 0.9827,
+  "field_mismatch": {
+   "voicing": 0,
+   "Wo": 1,
+   "energy": 1,
+   "vq": 11
+  },
+  "pesq_float": 3.369,
+  "pesq_fixed": 3.363,
+  "pesq_fxenc_floatdec": 3.362
+ },
+ {
+  "clip": "male_ve9qrp_15s.flac",
+  "frames": 750,
+  "frames_fx": 750,
+  "bit_exact": 0.992,
+  "field_mismatch": {
+   "voicing": 0,
+   "Wo": 2,
+   "energy": 0,
+   "vq": 6
+  },
+  "pesq_float": 3.071,
+  "pesq_fixed": 3.167,
+  "pesq_fxenc_floatdec": 3.052
+ },
+ {
+  "clip": "ears_p020_m.flac",
+  "frames": 573,
+  "frames_fx": 573,
+  "bit_exact": 0.9529,
+  "field_mismatch": {
+   "voicing": 6,
+   "Wo": 17,
+   "energy": 6,
+   "vq": 22
+  },
+  "pesq_float": 2.877,
+  "pesq_fixed": 2.935,
+  "pesq_fxenc_floatdec": 2.935
+ },
+ {
+  "clip": "ears_p025_m.flac",
+  "frames": 530,
+  "frames_fx": 530,
+  "bit_exact": 0.9698,
+  "field_mismatch": {
+   "voicing": 1,
+   "Wo": 4,
+   "energy": 0,
+   "vq": 15
+  },
+  "pesq_float": 3.08,
+  "pesq_fixed": 3.183,
+  "pesq_fxenc_floatdec": 3.183
+ },
+ {
+  "clip": "ears_p047_f.flac",
+  "frames": 445,
+  "frames_fx": 445,
+  "bit_exact": 0.991,
+  "field_mismatch": {
+   "voicing": 1,
+   "Wo": 2,
+   "energy": 1,
+   "vq": 3
+  },
+  "pesq_float": 2.811,
+  "pesq_fixed": 2.923,
+  "pesq_fxenc_floatdec": 2.932
+ },
+ {
+  "clip": "ears_p051_f.flac",
+  "frames": 594,
+  "frames_fx": 594,
+  "bit_exact": 0.9781,
+  "field_mismatch": {
+   "voicing": 1,
+   "Wo": 8,
+   "energy": 0,
+   "vq": 11
+  },
+  "pesq_float": 2.788,
+  "pesq_fixed": 2.72,
+  "pesq_fxenc_floatdec": 2.728
+ },
+ {
+  "clip": "ears_p070_f.flac",
+  "frames": 579,
+  "frames_fx": 579,
+  "bit_exact": 0.9689,
+  "field_mismatch": {
+   "voicing": 6,
+   "Wo": 11,
+   "energy": 4,
+   "vq": 14
+  },
+  "pesq_float": 2.653,
+  "pesq_fixed": 2.634,
+  "pesq_fxenc_floatdec": 2.636
+ },
+ {
+  "clip": "ears_p095_m.flac",
+  "frames": 441,
+  "frames_fx": 441,
+  "bit_exact": 0.9864,
+  "field_mismatch": {
+   "voicing": 0,
+   "Wo": 3,
+   "energy": 0,
+   "vq": 4
+  },
+  "pesq_float": 2.871,
+  "pesq_fixed": 2.764,
+  "pesq_fxenc_floatdec": 2.74
+ },
+ {
+  "clip": "ears_p100_f.flac",
+  "frames": 468,
+  "frames_fx": 468,
+  "bit_exact": 0.9722,
+  "field_mismatch": {
+   "voicing": 0,
+   "Wo": 7,
+   "energy": 1,
+   "vq": 13
+  },
+  "pesq_float": 2.694,
+  "pesq_fixed": 2.652,
+  "pesq_fxenc_floatdec": 2.637
+ },
+ {
+  "clip": "ears_p107_m.flac",
+  "frames": 548,
+  "frames_fx": 548,
+  "bit_exact": 0.9818,
+  "field_mismatch": {
+   "voicing": 0,
+   "Wo": 4,
+   "energy": 2,
+   "vq": 8
+  },
+  "pesq_float": 3.145,
+  "pesq_fixed": 3.126,
+  "pesq_fxenc_floatdec": 3.171
+ },
+ {
+  "clip": "librispeech_2428_m.flac",
+  "frames": 600,
+  "frames_fx": 600,
+  "bit_exact": 0.9883,
+  "field_mismatch": {
+   "voicing": 2,
+   "Wo": 3,
+   "energy": 1,
+   "vq": 6
+  },
+  "pesq_float": 3.282,
+  "pesq_fixed": 3.31,
+  "pesq_fxenc_floatdec": 3.31
+ },
+ {
+  "clip": "librispeech_251_m.flac",
+  "frames": 600,
+  "frames_fx": 600,
+  "bit_exact": 0.9867,
+  "field_mismatch": {
+   "voicing": 0,
+   "Wo": 5,
+   "energy": 0,
+   "vq": 8
+  },
+  "pesq_float": 2.923,
+  "pesq_fixed": 2.912,
+  "pesq_fxenc_floatdec": 2.936
+ },
+ {
+  "clip": "librispeech_3081_f.flac",
+  "frames": 600,
+  "frames_fx": 600,
+  "bit_exact": 0.96,
+  "field_mismatch": {
+   "voicing": 13,
+   "Wo": 8,
+   "energy": 2,
+   "vq": 15
+  },
+  "pesq_float": 2.454,
+  "pesq_fixed": 2.462,
+  "pesq_fxenc_floatdec": 2.462
+ },
+ {
+  "clip": "librispeech_3536_f.flac",
+  "frames": 600,
+  "frames_fx": 600,
+  "bit_exact": 0.9767,
+  "field_mismatch": {
+   "voicing": 1,
+   "Wo": 3,
+   "energy": 2,
+   "vq": 10
+  },
+  "pesq_float": 2.979,
+  "pesq_fixed": 2.981,
+  "pesq_fxenc_floatdec": 2.981
+ },
+ {
+  "clip": "librispeech_6313_f.flac",
+  "frames": 600,
+  "frames_fx": 600,
+  "bit_exact": 0.9867,
+  "field_mismatch": {
+   "voicing": 0,
+   "Wo": 4,
+   "energy": 1,
+   "vq": 8
+  },
+  "pesq_float": 2.927,
+  "pesq_fixed": 2.88,
+  "pesq_fxenc_floatdec": 2.88
+ },
+ {
+  "clip": "librispeech_652_m.flac",
+  "frames": 600,
+  "frames_fx": 600,
+  "bit_exact": 0.9817,
+  "field_mismatch": {
+   "voicing": 1,
+   "Wo": 4,
+   "energy": 3,
+   "vq": 9
+  },
+  "pesq_float": 2.764,
+  "pesq_fixed": 2.78,
+  "pesq_fxenc_floatdec": 2.808
+ },
+ {
+  "clip": "librispeech_777_m.flac",
+  "frames": 600,
+  "frames_fx": 600,
+  "bit_exact": 0.9867,
+  "field_mismatch": {
+   "voicing": 0,
+   "Wo": 3,
+   "energy": 0,
+   "vq": 8
+  },
+  "pesq_float": 3.149,
+  "pesq_fixed": 3.093,
+  "pesq_fxenc_floatdec": 3.109
+ },
+ {
+  "clip": "librispeech_8842_f.flac",
+  "frames": 600,
+  "frames_fx": 600,
+  "bit_exact": 0.9567,
+  "field_mismatch": {
+   "voicing": 1,
+   "Wo": 10,
+   "energy": 6,
+   "vq": 23
+  },
+  "pesq_float": 2.838,
+  "pesq_fixed": 2.825,
+  "pesq_fxenc_floatdec": 2.822
+ }
+]
