@@ -150,13 +150,14 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
-    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
         super().__init__(**kw)
         self.vowel, self.voiced_trim, self.texture, self.pulse = vowel, voiced_trim, texture, pulse
         self.vowel_shape, self.smooth_ms = vowel_shape, smooth_ms
+        self.peak_hz, self.peak_db, self.peak_bw, self.peak_floor = peak_hz, peak_db, peak_bw, peak_floor
         if model:                                       # None while training the guess
             z = np.load(model, allow_pickle=True)
             self.W, self.cb = z["W"].item(), z["cb"]
@@ -334,6 +335,11 @@ class SottoV38(vl.SottoV37):
                 wv[t] = w
             lv += fade[:, None] + self.voiced_trim
             lvl2 = np.stack([np.interp(FR, HBC, h) for h in lv])
+            if self.peak_hz:
+                # a whispered vowel keeps a resonance up here (Jeff's bench recording: one
+                # peak per vowel, 4.9-7.3 kHz): add it, Gaussian in dB, on a lower floor
+                pk = self.peak_db * np.exp(-0.5 * ((FR - self.peak_hz) / self.peak_bw) ** 2)
+                lvl2 = lvl2 - self.peak_floor + pk[None, :]
             mag2 = np.sqrt(10 ** (lvl2 / 10)) * np.clip((FR - 3900) / 200, 0, 1) * wv[:, None]
             ph2 = np.exp(2j * np.pi * np.random.default_rng(seed + 1).random(mag2.shape))
             X = X + mag2 * ph2

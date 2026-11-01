@@ -228,3 +228,12 @@ over ~30 ms, faded by a smoothed voiced/mixed weight), no side channel, UU index
 mixed frames no longer get the guess separately. Snippets 9 (-4 dB) and 10 (-8 dB). Jeff
 suggests a better texture: a whispered vowel keeps its resonances, so the high band should be
 noise with resonance peaks ("a high quiet whistle within the vowel envelope"), not flat bands.
+
+Jeff: snippet 10 (smooth layer, -8 dB) improved both pairs. His bench recording (voiced and
+whispered vowels): voiced vowels sit 8-15 dB below 3-4 kHz above 4 kHz, with one resonance
+per vowel at 4.9-7.3 kHz (mostly 5.0-5.3 or 6.0 kHz); whispered vowels have the same
+shape. Per-speaker peaks in the test voices: 4.55-7.1 kHz, 4-14 dB high. Option
+`peak_hz`/`peak_db`: a Gaussian (250 Hz) resonance on a 4 dB lower floor in the smooth
+layer. Comparison page (his recording, pairs 2 and 3; v3.7, consonants only, flat layer,
+whistle): https://claude.ai/artifact/2grQXFJWZTR6v4SfwhiUQ4. The peak is measured from the
+original here; in a link it would go over the side channel (4 bits frequency, 2 bits height).
