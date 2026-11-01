@@ -5,7 +5,7 @@
   P2  'hiss0'  : P1 + 4-8 kHz noise in unvoiced halves at a level guessed by the decoder (no bits)
 """
 from bwe import *
-from proto import Proto
+from proto import Proto, Proto2
 import pickle
 vl.TRACK2["lag"] = 8
 W50 = 2 * np.pi / 160
@@ -24,8 +24,9 @@ def conceal_db(run, half):
     return -6.0 * max(0, run - 2 + half / 2)
 
 class Hiss:
-    def __init__(self, model=None, burst=0):
-        self.codec = Proto(uv_wo=W50); self.burst = burst
+    def __init__(self, model=None, burst=0, fix2=False):
+        self.codec = Proto2(uv_wo=W50, uv_gain=UVG, tilt_gate=True, onset_m=(fix2 == 'onset')) if fix2 else Proto(uv_wo=W50)
+        self.burst, self.fix2 = burst, fix2
         if model:
             z = np.load(model, allow_pickle=True)
             self.bwe = BWE(); self.bwe.W = z['W'].item(); self.cb = z['cb']
@@ -76,7 +77,7 @@ class Hiss:
             if good[f]: last = b2[f].copy()
             elif last is not None: b2[f] = last
         m = self._decode_model(bits, good)
-        md = level_fix(m, uvg, 0)
+        md = m if self.fix2 else level_fix(m, uvg, 0)     # fix2: the codec applies the gated gain
         y8 = vl.synthesise(md)[160:]
         n8 = n16 // 2 if n16 else len(y8)
         y8 = np.pad(y8, (0, max(0, n8 - len(y8))))[:n8]

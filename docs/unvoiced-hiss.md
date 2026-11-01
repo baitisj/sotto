@@ -148,3 +148,22 @@ identical pitch tracks, so the warble comes from the v3.7 tracker, not the hiss.
 pair 10 (p047) has a scratch at the vowel onset, and the "th" of "the rainbow" is weak.
 Across these two clips the burst rule changed only 1-2 frames each. p047 is a bright studio
 voice with strong 4-8 kHz in its vowels too, which none of the variants add.
+
+## The "act" scratch (round 12 pair 10, 3.02-3.17 s)
+
+The vowel of "act" starts with a creaky glottal onset after "they". The v3.7 encoder codes
+the first 50 ms (3.02-3.06 s) as unvoiced, at the 90th-percentile frame energy, so a loud
+vowel onset is played as noise. Both clips of the pair have it. The +3 dB unvoiced boost
+makes it louder, and it costs PESQ on v3.7 (2.953 → 2.917 for the level fix alone).
+`proto.py` Proto2 tests two fixes (`p2_eval.py`, 19 voices):
+
+| Variant | PESQ | ESTOI |
+|---|---|---|
+| v3.7 | 2.953 | 0.819 |
+| level fix (50 Hz noise, +3 dB on all unvoiced) | 2.917 | 0.809 |
+| + boost only unvoiced frames whose envelope tilts upward ("gate") | 2.943 | 0.813 |
+| + encoder recodes loud, low-heavy UU frames as MM with the neighbour's pitch (0.6% of frames) | 2.931 | 0.814 |
+
+The gate is a decoder-only rule and recovers most of the loss. The onset recoding fixes
+two of the five "act" frames and costs PESQ, so it needs ears; really it is a voicing
+decision for the tracker. Snippets (2.5-4.0 s): `/mnt/project-files/vocoder/listening/act/`.
