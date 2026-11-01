@@ -8,12 +8,14 @@ title: "Glossary"
 
 Terms used in the sotto code, the design notes in `docs/`, and this course, in plain words. Names in `code font` are how the term appears in the code. The chapter where each idea is explained is in brackets.
 
+**Saying the words.** Where a word is hard to say, a sound-it-out spelling follows it, like **fricative** (say *FRIK-uh-tiv*). The part in CAPITALS is the one you stress. "Said as letters" means you spell it out, like "D-C-T".
+
 ### A
 **A (amplitudes)**: `A` in the model. The loudness of each harmonic in one 10 ms frame. `A[1]` is the first harmonic, `A[L]` the last. [2]
 
 **Analysis**: the encoder's first job: measuring pitch, voicing and harmonic amplitudes from the microphone signal. sotto uses Codec 2's analysis, with its own pitch and voicing tracker on top (v3.5 uses `analyse(x, "tracked3")` in `sim/vocoder_lab.py`; the tracker is in `sim/sinusoid.py`). [2]
 
-**AMBE / AMBE+2**: the closed, licensed vocoder used by Yaesu System Fusion and other digital radios. sotto aims to match its quality with open code.
+**AMBE / AMBE+2** (say *AM-bee, AM-bee plus two*): the closed, licensed vocoder used by Yaesu System Fusion and other digital radios. sotto aims to match its quality with open code.
 
 ### B
 **Band voicing**: mixed voicing done simply: harmonics below a cutoff frequency are voiced and those above it get random phases. Tested for v1 with no PESQ gain, then brought back in v3.2 after listeners heard "five-anuh". sotto's cutoff is 1,000 Hz (`MIX_HZ`, `mixed_cutoff()`). See mixed voicing. [2, 5]
@@ -29,17 +31,17 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 ### C
 **CC BY**: a Creative Commons license that lets anyone reuse a work if they credit the authors. sotto's codebook is trained only on CC BY speech, so it can be shipped. [4, 7]
 
-**C4FM**: "4-level FM". The radio signal sotto sends: the frequency hops between four values (±600 and ±1,800 Hz) 4,800 times a second, carrying 2 bits per hop. [6]
+**C4FM** (say *see-four-eff-em*): "4-level FM". The radio signal sotto sends: the frequency hops between four values (±600 and ±1,800 Hz) 4,800 times a second, carrying 2 bits per hop. [6]
 
 **C5517**: the TI digital signal processor (DSP) chip inside the Yaesu FTM-300D radio, where sotto is meant to run one day. It has 320 KB of memory, which is why v3.6 shrank the codebook to 29 KB. [4]
 
-**c2sim, c2enc, c2dec**: Codec 2's command-line programs. `c2sim` runs the analysis and synthesis separately, so experiments can edit the model in between (`--modelout`, `--modelin`). `c2enc` and `c2dec` are the full Codec 2 encoder and decoder. [7]
+**c2sim, c2enc, c2dec** (say *see-two-sim, see-two-enk, see-two-dek*): Codec 2's command-line programs. `c2sim` runs the analysis and synthesis separately, so experiments can edit the model in between (`--modelout`, `--modelin`). `c2enc` and `c2dec` are the full Codec 2 encoder and decoder. [7]
 
 **Codebook**: the list of allowed patterns in a vector quantizer, like a numbered color chart. The encoder and decoder have identical copies; the encoder sends the *number* of the closest entry instead of the pattern itself. In v3.5 the three stages have 4,096, 2,048 and 2,048 entries of 19 numbers each (152 KB at one byte per number). v3.6 shrank it to four stages of 512, 512, 256 and 256 entries (29 KB) so it fits in the radio's DSP chip and searches about four times faster, with no audible loss. [4]
 
 **CODEC_DELAY**: the fixed 160-sample (20 ms) delay used to line up every decoded clip with the original before scoring (`sim/audio_race.py`). It replaced a waveform-matching search that picked wrong delays for vocoders with made-up phases. [7]
 
-**Codec**: short for coder-decoder. Any system that packs data into bits and unpacks it again. A vocoder is a codec for voice.
+**Codec** (say *KOH-dek*): short for coder-decoder. Any system that packs data into bits and unpacks it again. A vocoder is a codec for voice.
 
 **Codec 2**: an older open-source vocoder by David Rowe. sotto borrows its analysis (including its pitch and voicing estimates, which sotto's tracker starts from) and its synthesizer, and keeps a copy of its source code in `codec/codec2/` (under its own LGPL license). [1]
 
@@ -50,21 +52,21 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 **CRC (CRC-8, CRC-16)**: "cyclic redundancy check". A short fingerprint (8 or 16 bits) computed from a block of data, which lets the receiver tell whether the block arrived intact. It detects errors but doesn't fix them. [6]
 
 ### D
-**dB (decibel)**: a scale for loudness or power that works by ratios. +10 dB is 10 times the power; +6 dB is about 4 times; +3 dB is about 2 times. [3, 4]
+**dB (decibel)** (dB is said as letters; decibel is *DESS-uh-bel*): a scale for loudness or power that works by ratios. +10 dB is 10 times the power; +6 dB is about 4 times; +3 dB is about 2 times. [3, 4]
 
-**dB-Hz (C/N₀)**: how strong a radio signal is compared with the noise, measured per hertz of bandwidth. In the test conditions, 52 dB-Hz is a weak signal and 56 dB-Hz a somewhat better one. [6]
+**dB-Hz (C/N₀)** (say *dee-bee-HURTS*; C/N₀ is "C over N zero"): how strong a radio signal is compared with the noise, measured per hertz of bandwidth. In the test conditions, 52 dB-Hz is a weak signal and 56 dB-Hz a somewhat better one. [6]
 
-**DCT (discrete cosine transform)**: rewriting a list of numbers as the sizes of cosine waves added together. sotto applies it to the 20-point envelope shape, so most of the shape ends up in the first few numbers. JPEG uses the same idea. `DCT` in the code is the 20 × 20 table. [3]
+**DCT (discrete cosine transform)** (said as letters; cosine is *KOH-sine*): rewriting a list of numbers as the sizes of cosine waves added together. sotto applies it to the 20-point envelope shape, so most of the shape ends up in the first few numbers. JPEG uses the same idea. `DCT` in the code is the 20 × 20 table. [3]
 
-**Decimate / interpolate**: decimating means keeping only every second frame (sotto sends one analysis per 20 ms out of two). Interpolating means filling the missing frames in with values halfway between their neighbors. `decimate_interp()`, `interp_wo()`. [4]
+**Decimate / interpolate** (say *DESS-uh-mate, in-TUR-puh-late*): decimating means keeping only every second frame (sotto sends one analysis per 20 ms out of two). Interpolating means filling the missing frames in with values halfway between their neighbors. `decimate_interp()`, `interp_wo()`. [4]
 
 **Decoder**: the receiving half of a codec. sotto's decoder turns 48 bits into 20 ms of sound. `SottoV35.decode()` (most steps are inherited from `SottoV0.decode()`). [5]
 
-**Discriminator**: the part of an FM receiver that turns frequency back into a voltage. The softmodem reads its output. [6]
+**Discriminator** (say *dis-KRIM-uh-nay-ter*): the part of an FM receiver that turns frequency back into a voltage. The softmodem reads its output. [6]
 
 **DN / VW**: two voice layouts in System Fusion. DN ("digital narrow", also called V/D mode 2) uses part of each frame's payload for voice; VW ("voice wide", also called voice full-rate) uses all 720 payload bits. sotto uses the VW slot, protecting its voice much more strongly. [6]
 
-**Doppler (fd)**: how fast the fading changes, which depends on the radio frequency and how fast you're moving. 446 MHz at 60 km/h gives about 25 Hz; 146 MHz at 30 km/h about 4 Hz. [6]
+**Doppler (fd)** (say *DOP-ler*; fd is said as letters): how fast the fading changes, which depends on the radio frequency and how fast you're moving. 446 MHz at 60 km/h gives about 25 Hz; 146 MHz at 30 km/h about 4 Hz. [6]
 
 ### E
 **Encoder**: the sending half of a codec. `SottoV35.encode()`. [1]
@@ -77,46 +79,48 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Energy**: how loud a frame is: the sum of the harmonics' powers, in dB. Sent with 5 bits from 10 to 80 dB. Since v3, code 0 means true silence (see silence). Since v3.6 it measures only the loudness inside the envelope's range (200 to 3,700 Hz), so a hum below 200 Hz isn't spread over the whole band. [4]
 
-**Envelope (spectral envelope)**: the smooth outline across the tops of the harmonics. It describes the shape of the throat and mouth, and carries most of the words. [3]
+**Envelope (spectral envelope)** (say *EN-vuh-lope*; spectral is *SPEK-trul*): the smooth outline across the tops of the harmonics. It describes the shape of the throat and mouth, and carries most of the words. [3]
 
-**Erasure**: a bit or frame the receiver knows is missing or unreliable, as opposed to one that is silently wrong. [6]
+**Erasure** (say *ih-RAY-shur*): a bit or frame the receiver knows is missing or unreliable, as opposed to one that is silently wrong. [6]
 
-**ESTOI**: a computer score that predicts intelligibility (how many words a listener would get), from 0 to 1. [7]
+**ESTOI** (say *EE-stoy*): a computer score that predicts intelligibility (how many words a listener would get), from 0 to 1. [7]
 
 ### F
 **FEC (forward error correction)**: extra bits added before sending so the receiver can fix errors itself, without asking for a resend. sotto's FEC is a convolutional code. [6]
 
-**FICH**: "frame information channel". The 200-bit header in every System Fusion frame that says what kind of frame it is. sotto marks its frames with one spare bit in the FICH (a provisional choice). [6]
+**FICH** (said as letters): "frame information channel". The 200-bit header in every System Fusion frame that says what kind of frame it is. sotto marks its frames with one spare bit in the FICH (a provisional choice). [6]
 
 **Flywheel**: the receiver's habit of expecting the next frame exactly 100 ms after the last, so it keeps its place through a fade. [6]
 
-**Formant**: a loud bump in the envelope, caused by a resonance of the throat and mouth. Different vowels have formants in different places. [3]
+**Formant** (say *FOR-munt*; plural *FOR-munts*): a loud bump in the envelope, caused by a resonance of the throat and mouth. Different vowels have formants in different places. [3]
 
 **Formant postfilter**: sotto's decoder step that stretches the envelope's peaks and valleys by 1.35 (in dB) to undo blurring from quantization (1.5 before v3.5). `postfilter_rk()`. Not the same as Codec 2's postfilter. [5]
 
 **Frame**: a chunk of data handled as one unit. A sotto vocoder frame is 20 ms and 48 bits. A System Fusion radio frame is 100 ms and 960 bits, carrying 5 vocoder frames. The analysis also works in 10 ms frames, sometimes called subframes. [1, 6]
 
-**Frequency**: how many times per second something repeats, in hertz (Hz). [2]
+**Frequency** (say *FREE-kwun-see*): how many times per second something repeats, in hertz (Hz, said *hurts*). [2]
+
+**Fricative** (say *FRIK-uh-tiv*): a consonant made by pushing air through a narrow gap, so it hisses, like "f", "s", "sh" and "th". The name comes from *friction*: the air rubs past the lips, teeth or tongue. Plain fricatives are unvoiced (all hiss). Ones with vocal-cord buzz as well, like "v" and "z", are voiced fricatives. "s" and "sh" are the loudest and hissiest; in studio recordings most of an "s" is between 4,000 and 8,000 Hz, above the 4,000 Hz that sotto's 8,000 samples per second can hold. That's why sotto's "s" sounds duller than the original. [1, 2]
 
 ### G
 **Glorp**: listeners' word for the gargle heard when the woman's pitch went above Codec 2's 400 Hz limit. It led to sotto's 500 Hz limit (v2). [2, 7]
 
-**Golay code**: a classic error-correcting code that protects the FICH header. [6]
+**Golay code** (say *goh-LAY*): a classic error-correcting code that protects the FICH header. [6]
 
 **Greedy**: an approach that makes the best-looking choice at each step without planning ahead. See bit allocation. [4]
 
 ### H
-**Harmonics**: sine waves at whole-number multiples of the pitch. A voiced sound is the sum of its harmonics. [2]
+**Harmonics** (say *har-MON-iks*): sine waves at whole-number multiples of the pitch. A voiced sound is the sum of its harmonics. [2]
 
 **Held out**: test data kept out of training, so the test is fair. sotto's codebook is tested on 16 held-out voices. [4, 7]
 
 **Hold and fade**: the two halves of sotto's concealment: *hold* repeats the last good frame for a short time, *fade* then lowers it step by step. [6]
 
 ### I
-**Interleaving**: see spreading.
+**Interleaving** (say *IN-ter-leev-ing*): see spreading.
 
 ### K
-**k-means**: a training method for finding a good codebook. Start with random entries, put each training example with its nearest entry, move every entry to the average of its group, and repeat until nothing changes. sotto trains each VQ stage this way, then re-tunes the stages together (`ShapeMSVQ`). [4]
+**k-means** (say *KAY-means*): a training method for finding a good codebook. Start with random entries, put each training example with its nearest entry, move every entry to the average of its group, and repeat until nothing changes. sotto trains each VQ stage this way, then re-tunes the stages together (`ShapeMSVQ`). [4]
 
 ### L
 **L**: the number of harmonics below 4,000 Hz: L = ⌊π ÷ Wo⌋. [2]
@@ -125,7 +129,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Listening round**: one batch of blind A/B tests played to listeners (members of a radio club). Each round includes the original clip next to every pair, and a null pair. [7]
 
-**LLR (log-likelihood ratio)**: a soft bit: a number saying how sure the receiver is that a bit is 0 (positive) or 1 (negative). Bigger means more sure. [6]
+**LLR (log-likelihood ratio)** (said as letters): a soft bit: a number saying how sure the receiver is that a bit is 0 (positive) or 1 (negative). Bigger means more sure. [6]
 
 **Lookahead**: how far into the future an encoder must see before deciding about the present. sotto's tracker can search the whole recording, but tests showed 80 ms of look-ahead loses only 0.003 PESQ, so the real-time version will use 80 ms (`lag` in `track_pitch_voicing()`). See Viterbi algorithm. [2, 7]
 
@@ -136,18 +140,18 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 ### M
 **M-best search**: a shortcut for searching a multistage VQ. Instead of keeping only the single best choice after each stage, keep the 8 best so far and pick the overall winner at the end. It finds nearly the best combination without trying all 17 billion. [4]
 
-**Mel scale**: a frequency scale that matches human hearing, finer at low frequencies and coarser at high ones. sotto's 20 envelope points are evenly spaced on it, from 200 to 3,700 Hz. [3]
+**Mel scale** (rhymes with "bell"): a frequency scale that matches human hearing, finer at low frequencies and coarser at high ones. sotto's 20 envelope points are evenly spaced on it, from 200 to 3,700 Hz. [3]
 
 **Memoryless**: each frame can be decoded on its own, without the frames before it. sotto is memoryless so that one lost frame can't damage the next ones. (The voicing edge code peeks at the frame before, but only to choose between two orderings.) [4]
 
-**Mixed voicing (mixed excitation, MBE, MELP)**: letting a sound be partly buzz and partly hiss, like "z" or "v". Since v3.2, sotto has three kinds of frame: **U** (unvoiced, all noise), **V** (voiced, all harmonics) and **M** (mixed: harmonics below 1,000 Hz, noise above). A frame becomes M when it's voiced but its harmonics fit poorly below 1,000 Hz (`voicing_classes()`). MBE and MELP split voicing into more bands. [2, 5]
+**Mixed voicing (mixed excitation, MBE, MELP)** (MBE is said as letters; MELP rhymes with "help"): letting a sound be partly buzz and partly hiss, like "z" or "v". Since v3.2, sotto has three kinds of frame: **U** (unvoiced, all noise), **V** (voiced, all harmonics) and **M** (mixed: harmonics below 1,000 Hz, noise above). A frame becomes M when it's voiced but its harmonics fit poorly below 1,000 Hz (`voicing_classes()`). MBE and MELP split voicing into more bands. [2, 5]
 
 **Multistage VQ (MSVQ)**: a vector quantizer done in steps. Stage 1 picks the closest codebook entry; stage 2 picks an entry that best corrects what stage 1 got wrong; stage 3 corrects what's left. sotto's shape quantizer uses 3 stages of 12, 11 and 11 bits in v3.5 and 4 stages of 9, 9, 8 and 8 bits in v3.6, 34 bits either way (`ShapeMSVQ`). [4]
 
 **Model**: the vocoder's description of one 10 ms frame: `Wo`, `L`, `A`, `phi` and `voiced`. Stored in the `MODEL` record type in `sim/vocoder_lab.py`. [2]
 
 ### N
-**newamp1**: an experimental Codec 2 mode that introduced the rate-K mel envelope and the formant postfilter that sotto builds on. [3]
+**newamp1** (say *new-amp-one*): an experimental Codec 2 mode that introduced the rate-K mel envelope and the formant postfilter that sotto builds on. [3]
 
 **NLP**: "non-linear pitch". Codec 2's pitch tracker. sotto v0 used it as is; later versions start from its answers and correct octave errors. [2]
 
@@ -165,13 +169,13 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 **Oracle lab**: `sim/vocoder_lab.py`: tools for editing Codec 2's model in Python and listening to the result. [7]
 
 ### P
-**Payload**: the part of a frame that carries the actual data (as opposed to sync and headers). In System Fusion, 720 bits per 100 ms. [6]
+**Payload** (say *PAY-lode*): the part of a frame that carries the actual data (as opposed to sync and headers). In System Fusion, 720 bits per 100 ms. [6]
 
-**PESQ**: "perceptual evaluation of speech quality". A computer score that predicts how listeners would rate quality, from about 1 (bad) to 4.5 (perfect). [7]
+**PESQ** (say *PESK*): "perceptual evaluation of speech quality". A computer score that predicts how listeners would rate quality, from about 1 (bad) to 4.5 (perfect). [7]
 
-**Phase (phi)**: `phi` in the model. Where in its cycle a sine wave starts. sotto doesn't send phases; the decoder invents them. [5]
+**Phase (phi)** (phi is said *FYE*, like "pie"): `phi` in the model. Where in its cycle a sine wave starts. sotto doesn't send phases; the decoder invents them. [5]
 
-**phase0 (synthetic phase)**: Codec 2's way of inventing phases: imagine each vocal-cord pulse as a click played through the envelope filter. Unvoiced frames get random phases. [5]
+**phase0 (synthetic phase)** (say *phase-zero*): Codec 2's way of inventing phases: imagine each vocal-cord pulse as a click played through the envelope filter. Unvoiced frames get random phases. [5]
 
 **Pitch (F0)**: how fast the vocal cords buzz, in Hz. About 85–155 Hz for men and 165–255 Hz for women. [2]
 
@@ -179,7 +183,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Pitch tracker (pitch estimator)**: the part of the encoder that measures pitch. Errors where it reports double or half the true pitch are called **octave errors**. See sotto tracker. [2]
 
-**pYIN**: a well-known offline pitch tracker, used as a reference to count Codec 2's octave errors. Not perfect either. [2]
+**pYIN** (say *pee-YIN*): a well-known offline pitch tracker, used as a reference to count Codec 2's octave errors. Not perfect either. [2]
 
 **PN9**: a fixed pseudo-random bit pattern that sotto mixes into the payload (scrambling). [6]
 
@@ -190,18 +194,18 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 **Predictive quantizer**: one that guesses each frame from the previous one and sends only the difference. Tried twice (the `SottoV1` and `SottoV2P` classes in the code, the second with regular resets) and rejected both times, because a lost frame throws the decoder's guesses off for several frames. [4]
 
 ### Q
-**Quantization**: rounding a number to one of a small set of allowed values, so it can be sent as a few bits. [4]
+**Quantization** (say *kwon-tuh-ZAY-shun*): rounding a number to one of a small set of allowed values, so it can be sent as a few bits. [4]
 
 **Quantization error**: the difference between the true value and the rounded one. [4]
 
 **Quantization ladder**: an experiment that starts with a perfect (all-oracle) vocoder and makes one piece realistic per step (made-up phases, then the LPC envelope, then rounding...). The drop at each rung shows what that piece costs. The code calls it the oracle ladder (`sim/oracle_ladder.py`). [7]
 
-**Quantizer**: the rule for rounding. A **uniform** quantizer has equal steps (sotto's energy); a **log-uniform** one has equal *ratios* between steps (sotto's pitch). [4]
+**Quantizer** (say *KWON-tize-er*): the rule for rounding. A **uniform** quantizer has equal steps (sotto's energy); a **log-uniform** one has equal *ratios* between steps (sotto's pitch). [4]
 
 ### R
 **Rate-K envelope**: the envelope sampled at K fixed frequencies (K = 20 in sotto), instead of at the harmonics. "Rate-K" as opposed to "rate-L", the L harmonic amplitudes. `to_rate_k()`, `from_rate_k()`, `KFREQ`. [3]
 
-**Rayleigh fading**: the rapid dips in signal strength in a moving vehicle, caused by reflections adding and canceling. [6]
+**Rayleigh fading** (say *RAY-lee*): the rapid dips in signal strength in a moving vehicle, caused by reflections adding and canceling. [6]
 
 **RRC filter**: "root-raised-cosine". The filter that smooths the C4FM hops at the transmitter and matches them at the receiver. [6]
 
@@ -218,13 +222,15 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Silence (true silence)**: since v3, energy code 0 tells the decoder to output nothing at all, instead of a faint buzz or hiss. Listeners had heard a "floor" of noise between words. [4]
 
+**sotto** (say *SOT-toh*): the name of this vocoder. It's an Italian word meaning "under"; speaking *sotto voce* means speaking quietly. [1]
+
 **sotto tracker**: sotto's joint pitch and voicing tracker (`track_pitch_voicing()` in `sim/sinusoid.py`). For every 10 ms frame it lists "unvoiced" plus several pitch candidates (Codec 2's estimates nearby, doubled and halved), adds up six kinds of cost (bad fit, low pitch, disagreeing with Codec 2's voicing, switching, jumping, missing odd harmonics), and uses the Viterbi algorithm to pick the cheapest path. Pitch is kept between 70 Hz (for doubled and halved candidates) and 500 Hz. v1 had a simpler pitch-only version, `track_pitch()`. [2]
 
 **sotto v0 to v3.6**: versions of the sotto encoder, all with the same 48-bit, 20 ms frame. v0: the 20-point envelope. v1: the octave-correcting pitch tracker (`SottoV0(pitch="tracked")` in the code). v2: joint pitch and voicing tracking, and a 500 Hz pitch limit. v3: the trained vector quantizer and true silence. v3.1: the tail rule. v3.2: mixed voicing. v3.3: odd/even check. v3.4: concealment in the decoder. v3.5: lighter postfilter (1.35) and short concealment; `SottoV35` in `sim/vocoder_lab.py`. v3.6: the smaller 29 KB codebook for the radio's chip, and energy measured only over the envelope's 200 to 3,700 Hz; `SottoV36`, the C port's default. [1, 2, 4, 6]
 
 **Sine wave**: the smoothest possible repeating wiggle, with a frequency, amplitude and phase. [2]
 
-**Sinusoidal model**: describing speech as a sum of sine waves (the harmonics). Codec 2 and sotto are both sinusoidal vocoders. [2, 5]
+**Sinusoidal model** (say *sye-nuh-SOY-dul*): describing speech as a sum of sine waves (the harmonics). Codec 2 and sotto are both sinusoidal vocoders. [2, 5]
 
 **Softmodem**: sotto's software modem (`modem/`), which sends and receives System Fusion frames through a sound card or SDR. [6]
 
@@ -234,9 +240,9 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Springs**: listeners' word for the twangy sound when a decoder holds a buzzy vowel steady through a lost signal. v3.5's short concealment avoids it. [6]
 
-**Spectrogram**: a picture of sound with time across, frequency up, and loudness as darkness. [2]
+**Spectrogram** (say *SPEK-truh-gram*): a picture of sound with time across, frequency up, and loudness as darkness. [2]
 
-**Spectrum**: loudness at each frequency at one moment. [2]
+**Spectrum** (say *SPEK-trum*; plural *spectra*): loudness at each frequency at one moment. [2]
 
 **Spreading (interleaving)**: shuffling bit positions so each vocoder frame's bits are sprinkled across the whole 100 ms radio frame. Then one short fade damages a little of every frame instead of all of one frame. [6]
 
@@ -246,7 +252,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Sync**: a fixed bit pattern at the start of each radio frame that the receiver searches for. [6]
 
-**Synthesis**: the decoder's last job: turning the model back into sound by adding up sine waves. [5]
+**Synthesis** (say *SIN-thuh-sis*): the decoder's last job: turning the model back into sound by adding up sine waves. [5]
 
 **System Fusion (YSF)**: Yaesu's digital radio standard. sotto uses its C4FM signal and frame layout, carrying sotto voice instead of AMBE. [6]
 
@@ -258,20 +264,20 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 **Training**: tuning a quantizer's settings by running it on lots of real speech. The old scalar quantizer trained step sizes and bit allocation (`training_set()`); the vector quantizer's codebooks are trained with k-means on about 480,000 frames from more than 600 speakers. [4]
 
 ### U
-**Unvoiced**: a sound made by hissing air with no vocal-cord buzz, like "s", "f", "sh", or whispering. [2]
+**Unvoiced**: a sound made by hissing air with no vocal-cord buzz, like "s", "f", "sh", or whispering. The hissing consonants are called fricatives. [2]
 
 ### V
-**Viterbi algorithm**: a method for finding the best path through a long chain of choices without trying every path. The receiver uses it to decode the convolutional code, and sotto's tracker uses it to choose pitch and voicing. A **fixed-lag** Viterbi decides each frame after looking only a fixed time ahead (80 ms for sotto) instead of waiting for the end. [2, 6]
+**Viterbi algorithm** (say *vih-TER-bee*): a method for finding the best path through a long chain of choices without trying every path. The receiver uses it to decode the convolutional code, and sotto's tracker uses it to choose pitch and voicing. A **fixed-lag** Viterbi decides each frame after looking only a fixed time ahead (80 ms for sotto) instead of waiting for the end. [2, 6]
 
 **Vector quantizer (VQ)**: rounding a whole list of numbers at once, by picking the closest pattern from a codebook and sending its number. It can learn which combinations really happen in speech, so it wastes fewer bits than rounding each number separately. [4]
 
-**Vocoder**: "voice coder". A codec that sends a description of how a voice is being made, instead of the sound wave itself. [1]
+**Vocoder** (say *VOH-koh-der*): "voice coder". A codec that sends a description of how a voice is being made, instead of the sound wave itself. [1]
 
 **Voiced**: a sound with vocal-cord buzz, like vowels, "m", "n". [2]
 
-**Voiced fricative**: a sound that is buzz and hiss at once, like "v", "z" or the "s" in "measure". sotto sends these as mixed frames. [2]
+**Voiced fricative** (say *FRIK-uh-tiv*): a fricative with vocal-cord buzz added, so it is buzz and hiss at once, like "v", "z" or the "s" in "measure". sotto sends these as mixed frames. [2]
 
 **Voicing**: whether a frame is buzz, hiss or both. sotto sends 2 bits per 20 ms frame as one of four codes: U U, V V, M M, or an edge between U and M. Up to v3.1 the 2 bits were one yes/no for each 10 ms half. In the model it's the `voiced` value: 0, 1, or 2 and up for mixed (the harmonic where the noise starts). [2, 4]
 
 ### W
-**Wo** ("omega-zero"): the pitch written as an angle per sample: Wo = 2π × pitch ÷ 8000. sotto sends it with 7 bits, from 50 to 500 Hz in steps of 1.83% (400 Hz and 1.65% in v0 and v1). [2, 4]
+**Wo** ("omega-zero", said *oh-MAY-guh ZEER-oh*): the pitch written as an angle per sample: Wo = 2π × pitch ÷ 8000. sotto sends it with 7 bits, from 50 to 500 Hz in steps of 1.83% (400 Hz and 1.65% in v0 and v1). [2, 4]
