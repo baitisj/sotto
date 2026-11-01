@@ -106,3 +106,36 @@ https://claude.ai/artifact/V8Y9EfZ32XLFFQ8kvXSAqh, key
 `/mnt/project-files/vocoder/listening/ab-11-key.json`. Pairs: v3.6 vs level (2), v3.6 vs
 hiss7 (5), level vs hiss7 (2), v3.6 vs hiss0 (1), null (1). Original in every pair; 5 of
 the 11 pairs over fading 70 cm and 2 m.
+
+Round 11 result (Jeff): the hiss version (hiss7) won every pair answered: 4 of 4 against
+v3.7 (two clean, two fading) and 2 of 2 against the level fix alone. The decoder guess beat
+v3.7 1 of 1. Level fix vs v3.7: 2 ties, so the 3 dB alone isn't audible. Notes: t (pair 1,
+p020) and p (pair 7, p095) need more high-frequency hiss; Jeff asked to keep watching p047
+(pair 8), where all consonants sound thin.
+
+## t, p and k bursts (round 12)
+
+Stop bursts usually run straight into the vowel, so their frame is coded mixed or edge and
+gets no hiss index. Over the 12 test voices, the first 30 ms after a burst onset (4-8 kHz
+jumps by more than 12 dB in 10 ms and is within 15 dB of 0-4 kHz) came out 7.1 dB short
+(`bursts2.py`):
+
+| Variant | Burst shortfall, 4-8 kHz | Band error, all live frames | Narrowband PESQ |
+|---|---|---|---|
+| hiss7 | -7.1 dB | 19.1 dB | 2.810 |
+| + decoder guess in mixed frames (-3 dB), "m" | -5.3 | 17.4 | 2.810 |
+| + burst frames sent as UU, "b" | -2.8 | 18.9 | 2.801 |
+| both, "bm" | -2.4 | 17.3 | 2.801 |
+
+The burst rule turns about 6 frames per 12 s into UU, so they lose 20 ms of low-frequency
+voicing at the vowel onset (that stretch is mostly aspiration anyway) and gain an index.
+
+p047 (`p047.py`): its 135 mixed frames outnumber its 86 unvoiced ones. Unvoiced frames are
+now right (4-8 kHz within 0.2 dB). Mixed frames are 3 dB low at 2-3.9 kHz and 19 dB short
+at 4-8 kHz with hiss7, 10 dB short with "bm". The rest of the gap is the conservative -3 dB
+on the guess, and the mixed frames' noise harmonics losing the same 1.76 dB as unvoiced
+ones.
+
+Round 12: https://claude.ai/artifact/6Jafb6jidSvJncesyjgS7J, key `ab-12-key.json`:
+hiss7 vs bm (5, including p047 clean as pair 10 and fading as pair 8), hiss7 vs b (2), b vs
+bm (2), null pair 1.

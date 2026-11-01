@@ -24,8 +24,8 @@ def conceal_db(run, half):
     return -6.0 * max(0, run - 2 + half / 2)
 
 class Hiss:
-    def __init__(self, model=None):
-        self.codec = Proto(uv_wo=W50)
+    def __init__(self, model=None, burst=0):
+        self.codec = Proto(uv_wo=W50); self.burst = burst
         if model:
             z = np.load(model, allow_pickle=True)
             self.bwe = BWE(); self.bwe.W = z['W'].item(); self.cb = z['cb']
@@ -44,9 +44,20 @@ class Hiss:
         bits = self.codec.encode(x8)
         if not side:
             return bits
+        P16 = np.abs(stft(x16)) ** 2
+        hb = bands_db(P16, HB)
+        if self.burst:                                 # stop bursts/aspiration: send as UU
+            m = self._decode_model(bits); d = self._dstruct(bits, m, len(x16))
+            hbt = bands_db(P16, [(4000, 8000)])[:, 0]; lbt = bands_db(P16, [(0, 3900)])[:, 0]
+            ev = np.where((hbt[1:] - hbt[:-1] > self.burst) & (hbt[1:] > lbt[1:] - 15))[0] + 1
+            self.forced = []
+            for t in ev:
+                if t >= len(d['frame']): continue
+                f = d['frame'][t]
+                if bits[f, 0] or bits[f, 1]:
+                    bits[f, 0] = bits[f, 1] = 0; self.forced.append(f)
         m = self._decode_model(bits)                   # the encoder's local decoder
         d = self._dstruct(bits, m, len(x16))
-        hb = bands_db(np.abs(stft(x16)) ** 2, HB)
         d['hb'] = hb[:len(d['E'])]
         p = self.bwe.predict(d)
         for f, r in frame_resid(d, p).items():
@@ -57,7 +68,7 @@ class Hiss:
                 bits[f, 2:9] = 0
         return bits
 
-    def decode(self, bits, good=None, mode='hiss7', uvg=UVG, n16=None):
+    def decode(self, bits, good=None, mode='hiss7', uvg=UVG, n16=None, mixed_hb=None):
         """-> 16 kHz output aligned with the input (codec delay removed)."""
         good = np.ones(len(bits), bool) if good is None else np.asarray(good)
         b2 = bits.copy(); last = None
@@ -88,6 +99,8 @@ class Hiss:
                 else: src = None
                 if src is not None:
                     p[t] += self.cb[int(''.join(map(str, b2[src, 2:9])), 2)]; mask[t] = 1
+                elif mixed_hb is not None and d['v'][t] == 2:
+                    p[t] += mixed_hb; mask[t] = 1        # decoder guess in mixed frames
         else:                                          # hiss0: decoder guess, 3 dB down
             p -= 3.0; mask = (d['v'] == 0).astype(float)
         p += g[:, None] + uvg                          # same level step as the narrowband
