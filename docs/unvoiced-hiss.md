@@ -206,3 +206,18 @@ decoder options in SottoV38: `voiced_trim` (dB on voiced frames' high band) and
 `texture="fold"` (voiced/mixed high band = the 0-4 kHz spectrum mirrored about 4 kHz,
 scaled to the band levels, so it keeps the pitch pulses instead of plain noise). Snippets
 (4-10 s of pairs 2 and 3): `/mnt/project-files/vocoder/listening/vowel/`.
+
+Follow-up on "scratchy": the -4 dB trim and the folded texture didn't help (folded was
+"terrible"; Jeff: "scratchy high harmonics, like a tambourine full of BBs"). Measured on
+the vowel frames of four voices, adaptive put 5-7 kHz 4-10 dB above the original, with a
+bump the original doesn't have: EARS vowels sit near the 3.5-4 kHz level at 4-5 kHz, then
+drop about 11 dB above 5 kHz. Two fixes in SottoV38:
+- the +3 dB unvoiced boost now applies only to frames whose index comes from a UU frame
+  (it had been added to voiced and mixed frames too);
+- `vowel_shape="template"`: voiced frames' high band = the decoded 3.0-3.5 kHz level +
+  a fixed per-band template + a term in the vowel's own 2-3.5 kHz slope (trained on
+  LibriSpeech vowels, `vtemplate.py`; template -8, -15, -18, -21 dB). That follows each
+  vowel's shape and sits at or a little below the original. Snippets 7 and 8 (template,
+  and template -4 dB) in `/mnt/project-files/vocoder/listening/vowel/`.
+The pitch-pulse texture (`texture="pulsed"`) overshoots the original's pulse depth (0.54
+vs 0.42) and wasn't sent.

@@ -9,7 +9,7 @@ def channel(bits, cn0, fd, seed):
     rx = Receiver('sotto_vw', mute=mute).receive(disc, t0=ar.LEAD + 4800)
     fr = np.concatenate([rx['frames'], np.repeat(mute[None], max(0, n - len(rx['frames'])), 0)])[:n]
     return fr, np.concatenate([rx['good'], np.zeros(max(0, n - len(rx['good'])), bool)])[:n]
-V = [('1_A_as_heard', 0, 'noise'), ('2_A_minus4dB', -4, 'noise'), ('3_pitch_texture', 0, 'fold'), ('4_pitch_texture_minus4dB', -4, 'fold')]
+V = [('7_vowel_shaped', 0, 'noise', 1.0), ('8_vowel_shaped_minus4dB', -4, 'noise', 1.0)]
 for pair, c, ch in [(2, 'librispeech_8842_f', (52, cs.doppler(446e6, 60), 102)), (3, 'ears_p051_f', None)]:
     x = sf.read(f'/tmp/claude-0/hiss/clips16/{c}.wav')[0]; x = x[:len(x)//320*320]
     b = hb.SottoV38(vowel='adaptive').encode(x)
@@ -19,7 +19,7 @@ for pair, c, ch in [(2, 'librispeech_8842_f', (52, cs.doppler(446e6, 60), 102)),
         y = y[a:e].copy(); y[:320] *= np.linspace(0, 1, 320); y[-320:] *= np.linspace(1, 0, 320)
         return y * np.sqrt(np.mean(x[a:e] ** 2) / np.mean(y ** 2))
     sf.write(f'{D}/pair{pair}_0_original.wav', snip(x), 16000, subtype='PCM_16')
-    for n, tr, tx in V:
-        y = hb.SottoV38(vowel='adaptive', voiced_trim=tr, texture=tx).decode_audio16(fr, gd, n16=len(x))
+    for n, tr, tx, pu in V:
+        y = hb.SottoV38(vowel='adaptive', voiced_trim=tr, texture=tx, pulse=pu, vowel_shape='template').decode_audio16(fr, gd, n16=len(x))
         sf.write(f'{D}/pair{pair}_{n}.wav', snip(y), 16000, subtype='PCM_16')
 print(sorted(os.listdir(D)))
