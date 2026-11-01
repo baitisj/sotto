@@ -10,6 +10,8 @@ Previous: [Sound and bits](01-sound-and-bits.md) · [Course home](README.md) · 
 
 Your vocal cords open and close many times a second, like a very fast buzzer. How fast they buzz is your **pitch**. When they aren't buzzing (as in "s", "f" or a whisper), the sound is **unvoiced** hiss. sotto measures both every 10 milliseconds.
 
+Hissing consonants like "f", "s", "sh" and "th" have a name: **fricatives** (say *FRIK-uh-tivs*). You make one by pushing air through a narrow gap, between your top teeth and lower lip for "f", or between your tongue and the ridge behind your top teeth for "s". The air rubs past and turns noisy, which is where the name comes from: *friction*.
+
 ## A quick review: sine waves and frequency
 
 A **sine wave** is the smoothest possible wiggle. It has:
@@ -97,7 +99,7 @@ It then double-checks with a simple rule: buzzes have most of their energy at lo
 
 ### Mixed voicing: buzz and hiss at once
 
-Real speech isn't always one or the other. A "z" or a "v" is a buzz *and* a hiss at the same time: your vocal cords buzz while air hisses past your teeth. Listeners heard the problem: the "v" at the end of "five" came out as a vowel, "five-anuh". The low harmonics of that "v" are clean, but above 1,000 Hz it's mostly hiss.
+Real speech isn't always one or the other. A "z" or a "v" is a buzz *and* a hiss at the same time: your vocal cords buzz while air hisses past your teeth. These are called **voiced fricatives**. Listeners heard the problem: the "v" at the end of "five" came out as a vowel, "five-anuh". The low harmonics of that "v" are clean, but above 1,000 Hz it's mostly hiss.
 
 So sotto now has three kinds of frame:
 
