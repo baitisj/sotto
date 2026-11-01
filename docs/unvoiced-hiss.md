@@ -221,3 +221,10 @@ drop about 11 dB above 5 kHz. Two fixes in SottoV38:
   and template -4 dB) in `/mnt/project-files/vocoder/listening/vowel/`.
 The pitch-pulse texture (`texture="pulsed"`) overshoots the original's pulse depth (0.54
 vs 0.42) and wasn't sent.
+
+Jeff on snippets 7/8: the vowel high band pops in and out and adds no clarity; he chose one
+more try. `vowel_shape="smooth"`: one continuous vowel layer (template levels smoothed
+over ~30 ms, faded by a smoothed voiced/mixed weight), no side channel, UU index 7 bits;
+mixed frames no longer get the guess separately. Snippets 9 (-4 dB) and 10 (-8 dB). Jeff
+suggests a better texture: a whispered vowel keeps its resonances, so the high band should be
+noise with resonance peaks ("a high quiet whistle within the vowel envelope"), not flat bands.

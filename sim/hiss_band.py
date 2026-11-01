@@ -150,13 +150,13 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
-    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
         super().__init__(**kw)
         self.vowel, self.voiced_trim, self.texture, self.pulse = vowel, voiced_trim, texture, pulse
-        self.vowel_shape = vowel_shape
+        self.vowel_shape, self.smooth_ms = vowel_shape, smooth_ms
         if model:                                       # None while training the guess
             z = np.load(model, allow_pickle=True)
             self.W, self.cb = z["W"].item(), z["cb"]
@@ -226,7 +226,13 @@ class SottoV38(vl.SottoV37):
             m = np.concatenate([m, m[-1:]])
         rk = vl.to_rate_k(m)
         en = rk.mean(1)
-        loud = en > np.percentile(en, 90) - loud_db
+        # causal loudness reference (for a streaming encoder): a peak follower that decays
+        # 0.05 dB per 10 ms, standing in for the clip's 90th percentile
+        ref, pk = np.zeros(len(en)), -1e9
+        for k, e in enumerate(en):
+            pk = max(e, pk - 0.05)
+            ref[k] = pk - 6.0
+        loud = en > ref - loud_db
         code = bits[:, 0] * 2 + bits[:, 1]
         for g in range(len(bits)):
             k = 2 * g
@@ -276,7 +282,7 @@ class SottoV38(vl.SottoV37):
         p = guess(self.W, E, v)
         code = b2[:, 0] * 2 + b2[:, 1]
         off = self._read_side(bits, good) if self.vowel == "adaptive" else None
-        if self.vowel_shape == "template" and nfr:
+        if self.vowel_shape in ("template", "smooth") and nfr:
             Ld = bands_db(np.abs(stft(y16)[:nfr]) ** 2, [(2000, 2500), (2500, 3000), (3000, 3500)])
             sl = np.clip(np.polyfit(np.array([2.25, 2.75, 3.25]), Ld.T, 1)[0], -30, 10)
             vt = Ld[:, 2:3] + VT_A + VT_C * sl[:, None]
@@ -305,7 +311,7 @@ class SottoV38(vl.SottoV37):
                 mask[t] = 2
             elif v[t] == 2 or (self.vowel == "guess" and v[t] == 1):
                 p[t] += MIXED_DB
-                mask[t] = 1
+                mask[t] = 3
         fade = np.array([0.0 if run[g] == 0 else -80.0 if run[g] > 4 else -6.0 * max(0, run[g] - 2)
                          for g in f])
         p += fade[:, None] + np.where(mask == 1, UV_GAIN, 0.0)[:, None]   # the boost matches the 0-4 kHz one
@@ -313,6 +319,24 @@ class SottoV38(vl.SottoV37):
         mag = np.sqrt(10 ** (lvl / 10)) * np.clip((FR - 3900) / 200, 0, 1) * mask[:, None]
         ph = np.exp(2j * np.pi * np.random.default_rng(seed).random(mag.shape))
         X = mag * ph
+        if self.vowel_shape == "smooth" and nfr:
+            # one continuous vowel layer under the consonant hiss: the template level for
+            # every frame, smoothed in time (one pole, ~30 ms) and faded in and out by a
+            # smoothed voiced/mixed weight, so it never switches on or off in one frame
+            X[mask >= 2] = 0                            # drop the per-frame vowel/mixed hiss
+            a = np.exp(-10.0 / self.smooth_ms)
+            lv, wv = vt.copy(), np.zeros(nfr)
+            want = ((v == 1) | (v == 2)) & (mask != 1)
+            w = 0.0
+            for t in range(nfr):
+                if t: lv[t] = a * lv[t - 1] + (1 - a) * vt[t]
+                w = a * w + (1 - a) * float(want[t])
+                wv[t] = w
+            lv += fade[:, None] + self.voiced_trim
+            lvl2 = np.stack([np.interp(FR, HBC, h) for h in lv])
+            mag2 = np.sqrt(10 ** (lvl2 / 10)) * np.clip((FR - 3900) / 200, 0, 1) * wv[:, None]
+            ph2 = np.exp(2j * np.pi * np.random.default_rng(seed + 1).random(mag2.shape))
+            X = X + mag2 * ph2
         if self.texture == "pulsed" and nfr:
             # voiced/mixed frames: noise shaped in time by the pitch pulses of the decoded
             # 2-3.8 kHz band (real voiced high band is pulsed; steady noise sounds scratchy)
