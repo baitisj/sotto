@@ -52,17 +52,20 @@ def analyse(x, pitch="c2"):
         Sw = sn.spectra(xi)
         wo = sn.track_pitch(Sw, m["Wo"], m["voiced"], **TRACK)
         return sn.analyse(xi, wo, voicing=m["voiced"], do_refine=False)[:len(m)]
-    if pitch in ("tracked2", "tracked2t", "tracked3"):
+    if pitch in ("tracked2", "tracked2t", "tracked3", "tracked4"):
         # v2: pitch up to 500 Hz, and voicing re-checked at the corrected pitch
         import sinusoid as sn
         m = analyse(x)
         xi = np.round(x * 32767)
         Sw = sn.spectra(xi)
         # v3.3: penalise sub-octave candidates (every other harmonic missing)
-        opts = {"sub": 2.0, **TRACK2} if pitch == "tracked3" else TRACK2
+        opts = {"sub": 2.0, **TRACK2} if pitch in ("tracked3", "tracked4") else TRACK2
+        if pitch == "tracked4":
+            # v3.7: also a third of Codec 2's estimate as a candidate
+            opts = {"third": True, **opts}
         wo, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"], **opts)
         m2 = sn.analyse(xi, wo, voicing=v, do_refine=False)[:len(m)]
-        if pitch in ("tracked2t", "tracked3"):
+        if pitch in ("tracked2t", "tracked3", "tracked4"):
             # v3.1: fading voiced-fricative tails played as noise
             m2["voiced"] = sn.unvoice_tails(Sw, m2)
         return m2
@@ -852,6 +855,17 @@ class SottoV36(SottoV35):
     def __init__(self, vq=None, **kw):
         vq = vq or round_codebook(ShapeMSVQ.load(os.path.join(HERE, "data", "shape_msvq_9988.npz")))
         super().__init__(vq=vq, **kw)
+
+
+class SottoV37(SottoV36):
+    """v3.6 with one more pitch candidate in the encoder: a third of Codec 2's estimate
+    (sinusoid.track_pitch_voicing third=True). Codec 2 sometimes says three times the true
+    pitch for several frames, and the tracker then had no candidate near the true pitch:
+    listening round 10, pair 2 (EARS p020) jumped to ~490 Hz for 100 ms at 0.4 s, heard as
+    high-pitched pops. Gross pitch errors over 19 voices 51 -> 26 frames. Same frame and
+    decoder as v3.6."""
+
+    PITCH = "tracked4"
 
 
 class _VQAdapter:

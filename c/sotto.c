@@ -30,7 +30,7 @@
 
 /* pitch and voicing tracker (sinusoid.track_pitch_voicing with sotto v3.3's options) */
 #define LAG 8             /* fixed-lag decision: 80 ms */
-#define NCAND 9           /* candidates: 3 neighbours x {1, 2, 1/2} */
+#define NCAND 10          /* candidates: 3 neighbours x {1, 2, 1/2}, and 1/3 of frame t's own (v3.7) */
 #define NST (NCAND + 1)   /* state 0 = unvoiced */
 #define RING 16           /* frames kept: > LAG + 2 */
 #define LAMBDA 3.0
@@ -70,6 +70,13 @@
 #define SOTTO_ENERGY_RK 1
 #else
 #define SOTTO_ENERGY_RK 0
+#endif
+/* v3.7 (make VARIANT=v3.7, the default): v3.6 plus a pitch candidate at a third of Codec 2's
+   estimate (vocoder_lab.SottoV37). Encoder only; the frame and decoder are v3.6's. */
+#ifdef SOTTO_PITCH_THIRD
+#define N_MU 4
+#else
+#define N_MU 3
 #endif
 
 static const double PI_D = 3.14159265358979323846;
@@ -287,13 +294,14 @@ static void amplitudes(const COMP *Sw, double wo, MODEL *m) {
 /* candidates and costs of frame t (needs frames t-1..t+1 analysed when they exist) */
 static void frame_costs(struct sotto_enc *e, long t, int has_next) {
   frame_t *f = R(e, t);
-  static const double mu[3] = {1.0, 2.0, 0.5};
+  static const double mu[4] = {1.0, 2.0, 0.5, 1.0 / 3};
   static const int dd[3] = {0, -1, 1};
   f->nc = 0;
   for (int i = 0; i < 3; i++) {
     long u = t + dd[i];
     if (u < 0 || (dd[i] == 1 && !has_next)) continue;
-    for (int j = 0; j < 3; j++) {
+    for (int j = 0; j < (dd[i] == 0 ? N_MU : 3); j++) {
+      if (j == 3 && wo_hz(R(e, u)->wo0 * mu[j]) < FMIN) continue;
       double w0 = R(e, u)->wo0 * mu[j];
       w0 = w0 < WO_MIN ? WO_MIN : w0 > WO_HI ? WO_HI : w0;
       double w = refine(f->Sw, w0, WO_HI);

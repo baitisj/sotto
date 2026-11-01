@@ -1,7 +1,8 @@
 # sotto in C
 
-A C port of the sotto codec (`sim/vocoder_lab.py`), floating point. It builds v3.6 (`SottoV36`, the
-29 KB codebook for the radio's DSP) by default, and v3.5 (`SottoV35`) with `make VARIANT=v3.5`.
+A C port of the sotto codec (`sim/vocoder_lab.py`), floating point. It builds v3.7 (`SottoV37`: the
+29 KB codebook for the radio's DSP, and v3.6's frames with a better pitch tracker) by default,
+v3.6 (`SottoV36`) with `make VARIANT=v3.6`, and v3.5 (`SottoV35`) with `make VARIANT=v3.5`.
 It encodes 8 kHz speech into 48-bit frames every 20 ms (2400 bit/s) and decodes them back,
 with the same bits as the Python model.
 
@@ -69,6 +70,8 @@ random 10% frame loss). On 19 voices with v3.5 (`docs/results/c_port_check.json`
   concealment included.
 - v3.6 (`docs/results/c_port_check_v36.json`): the same 11,170 of 11,173 frames bit-exact,
   decoders within 96 dB.
+- v3.7 (`docs/results/c_port_check_v37.json`): again 11,170 of 11,173 frames bit-exact,
+  decoders within 98 dB.
 
 ## Speed
 

@@ -128,15 +128,16 @@ top of `c/fixed/fx.h`.
 - The codebook search, the largest cost, is written as one 16 × 16-bit multiply-add per
   value: |r − y|² = |r|² − 2 r·y + |y|², with |y|² from a table. That gives exactly the same
   distances as the direct form.
-- Over 19 voices, 11,173 frames (`tools/check_fx.py --enc`, `docs/results/fx_enc_check.json`):
+- Over 19 voices, 11,173 frames (`tools/check_fx.py --enc`, `docs/results/fx_enc_check.json`),
+  with v3.7's pitch tracker (v3.6 gave the same 97.8%):
 
   | | Result |
   |---|---:|
   | Frames whose 48 bits match the float encoder | 97.8% |
-  | Frames differing in voicing / pitch / energy / shape | 35 / 103 / 30 / 202 |
-  | PESQ, float encoder + float decoder | 2.924 |
-  | PESQ, fixed encoder + fixed decoder | 2.928 |
-  | PESQ, fixed encoder + float decoder | 2.926 |
+  | Frames differing in voicing / pitch / energy / shape | 34 / 103 / 30 / 203 |
+  | PESQ, float encoder + float decoder | 2.947 |
+  | PESQ, fixed encoder + fixed decoder | 2.944 |
+  | PESQ, fixed encoder + float decoder | 2.934 |
 
   The frames that differ are near-ties: a pitch or band edge exactly on a grid point, or two
   codebook paths at almost the same distance, where float rounding decides. Integer code
