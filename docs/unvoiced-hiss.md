@@ -139,3 +139,12 @@ ones.
 Round 12: https://claude.ai/artifact/6Jafb6jidSvJncesyjgS7J, key `ab-12-key.json`:
 hiss7 vs bm (5, including p047 clean as pair 10 and fading as pair 8), hiss7 vs b (2), b vs
 bm (2), null pair 1.
+
+Round 12 result. Tyler: bm beat hiss7 4-1 (lost the 70 cm fading pair 3), b beat hiss7 1-0
+with 1 tie, bm beat b 2-0; he picked a side on the null pair. Jeff: bm beat hiss7 2-0
+(p047 fading, p095 clean), b vs bm 1 tie. So bm (burst rule + mixed-frame guess) is ahead,
+6-1 against hiss7 overall. Notes from Jeff: pitch warble in pair 9 (p095); its two clips have
+identical pitch tracks, so the warble comes from the v3.7 tracker, not the hiss. "act" in
+pair 10 (p047) has a scratch at the vowel onset, and the "th" of "the rainbow" is weak.
+Across these two clips the burst rule changed only 1-2 frames each. p047 is a bright studio
+voice with strong 4-8 kHz in its vowels too, which none of the variants add.
