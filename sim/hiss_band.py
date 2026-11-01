@@ -145,12 +145,12 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
-    def __init__(self, model=MODEL, vowel=None, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
         super().__init__(**kw)
-        self.vowel = vowel
+        self.vowel, self.voiced_trim, self.texture = vowel, voiced_trim, texture
         if model:                                       # None while training the guess
             z = np.load(model, allow_pickle=True)
             self.W, self.cb = z["W"].item(), z["cb"]
@@ -279,8 +279,8 @@ class SottoV38(vl.SottoV37):
                 p[t] += self.cb[index_of(b2[src], self.nb)]
                 mask[t] = 1
             elif self.vowel == "adaptive" and v[t] in (1, 2):
-                p[t] += off[f[t] // WIN_FRAMES][v[t]]
-                mask[t] = 1
+                p[t] += off[f[t] // WIN_FRAMES][v[t]] + (self.voiced_trim if v[t] == 1 else 0.0)
+                mask[t] = 2
             elif v[t] == 2 or (self.vowel == "guess" and v[t] == 1):
                 p[t] += MIXED_DB
                 mask[t] = 1
@@ -290,4 +290,16 @@ class SottoV38(vl.SottoV37):
         lvl = np.stack([np.interp(FR, HBC, h) for h in p]) if nfr else np.zeros((0, len(FR)))
         mag = np.sqrt(10 ** (lvl / 10)) * np.clip((FR - 3900) / 200, 0, 1) * mask[:, None]
         ph = np.exp(2j * np.pi * np.random.default_rng(seed).random(mag.shape))
-        return y16 + istft(mag * ph, len(y16))
+        X = mag * ph
+        if self.texture == "fold" and nfr:
+            # voiced/mixed frames: the 0-4 kHz spectrum mirrored about 4 kHz, so the high band
+            # keeps the pitch pulses, scaled to the band levels (smoothed over 500 Hz)
+            Y = stft(y16)[:nfr]
+            k4 = int(np.argmin(np.abs(FR - 4000)))
+            src = np.clip(2 * k4 - np.arange(len(FR)), 0, len(FR) - 1)
+            C = Y[:, src]
+            pw = np.apply_along_axis(lambda r: np.convolve(r, np.ones(11) / 11, "same"), 1, np.abs(C) ** 2)
+            Cn = C / np.sqrt(pw + 1e-12)
+            sel = mask == 2
+            X[sel] = mag[sel] * Cn[sel]
+        return y16 + istft(X, len(y16))

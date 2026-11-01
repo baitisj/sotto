@@ -198,3 +198,11 @@ Offsets start at the default (the guess), so the first ~4 s use it.
 Round 13 (https://claude.ai/artifact/WffNrXkvcz13cgGkKNWwLr, `ab-13-key.json`,
 `tools/listening/render_ab13.py`): C (no vowel high band) vs G (guess - 3 dB in voiced
 frames, no bits) vs A (adaptive offsets), null pair 1.
+
+Round 13 result (Jeff): adaptive beat C 4-0 (pairs 2, 5, 7, 8), adaptive vs guess 1 win and
+2 ties, guess beat C 1-0, null correct. Notes: adaptive sounds "scratchy" but clearer and a
+better blend of voiced and unvoiced; the ideal is between adaptive and none. Follow-up
+decoder options in SottoV38: `voiced_trim` (dB on voiced frames' high band) and
+`texture="fold"` (voiced/mixed high band = the 0-4 kHz spectrum mirrored about 4 kHz,
+scaled to the band levels, so it keeps the pitch pulses instead of plain noise). Snippets
+(4-10 s of pairs 2 and 3): `/mnt/project-files/vocoder/listening/vowel/`.
