@@ -167,3 +167,6 @@ makes it louder, and it costs PESQ on v3.7 (2.953 → 2.917 for the level fix al
 The gate is a decoder-only rule and recovers most of the loss. The onset recoding fixes
 two of the five "act" frames and costs PESQ, so it needs ears; really it is a voicing
 decision for the tracker. Snippets (2.5-4.0 s): `/mnt/project-files/vocoder/listening/act/`.
+
+Jeff (2026-11-01) preferred act_3 (gate + onset recoding) as least distracting, so the
+current candidate is hiss7 + burst rule + mixed-frame guess + gated boost + onset recoding.
