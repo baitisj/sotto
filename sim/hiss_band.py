@@ -101,6 +101,50 @@ def uu_residuals(hb, p, f, uu):
     return out
 
 
+# vowel_shape="fine": ridge from the decoded 0-4 kHz shape (250 Hz bands, re 3.0-3.5 kHz)
+# to 250 Hz bands at 4-8 kHz, plus a per-speaker shape (3 PCA coefficients of the speaker's
+# mean miss, sent slowly). Trained on LibriSpeech dev-clean (tools/hiss_proto/vfine*.py).
+FLO = [(f, f + 250) for f in range(250, 3750, 250)] + [(3750, 3950)]
+FHI = [(f, f + 250) for f in range(4000, 8000, 250)]
+FHC = np.array([a + 125.0 for a, _ in FHI])
+_FINE = None
+
+
+def fine_model():
+    global _FINE
+    if _FINE is None:
+        _FINE = dict(np.load(os.path.join(HERE, "data", "hiss_vowel_fine.npz")))
+    return _FINE
+
+
+def fine_predict(P):
+    """Per-frame 4-8 kHz prediction (dB re 3.0-3.5 kHz) and the reference level."""
+    F = fine_model()
+    ref = bands_db(P, [(3000, 3500)])[:, 0]
+    X = bands_db(P, FLO) - ref[:, None]
+    return np.column_stack([np.ones(len(X)), X]) @ F["W"], ref
+
+
+def fine_levels(y16, nfr, spk_pc=None):
+    F = fine_model()
+    pr, ref = fine_predict(np.abs(stft(y16)[:nfr]) ** 2)
+    corr = F["m0"] + (F["Vt"].T @ np.asarray(spk_pc) if spk_pc is not None else 0.0)
+    return pr + ref[:, None] + corr[None, :]
+
+
+def fine_speaker(x16, y16, nfr):
+    """Encoder side: the speaker's mean miss over vowel frames, as 3 PCA coefficients."""
+    F = fine_model()
+    P = np.abs(stft(x16)[:nfr]) ** 2
+    lo = bands_db(P, [(0, 1000)])[:, 0]
+    tot = 10 * np.log10(P.sum(1) + 1e-12)
+    vow = (lo - bands_db(P, [(2500, 3000)])[:, 0] > 10) & (tot > np.percentile(tot, 60))
+    Y = bands_db(P, FHI) - bands_db(P, [(3000, 3500)])[:, 0][:, None]
+    pr, _ = fine_predict(np.abs(stft(y16)[:nfr]) ** 2)
+    miss = (Y[vow] - pr[vow]).mean(0) - F["m0"]
+    return F["Vt"] @ miss
+
+
 def index_of(bits_row, nb=7):
     return int("".join(map(str, bits_row[2:2 + nb])), 2)
 
@@ -150,7 +194,7 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
-    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
@@ -158,6 +202,7 @@ class SottoV38(vl.SottoV37):
         self.vowel, self.voiced_trim, self.texture, self.pulse = vowel, voiced_trim, texture, pulse
         self.vowel_shape, self.smooth_ms = vowel_shape, smooth_ms
         self.peak_hz, self.peak_db, self.peak_bw, self.peak_floor = peak_hz, peak_db, peak_bw, peak_floor
+        self.spk_pc = spk_pc                  # vowel_shape="fine": 3 speaker-shape coefficients (side channel)
         if model:                                       # None while training the guess
             z = np.load(model, allow_pickle=True)
             self.W, self.cb = z["W"].item(), z["cb"]
@@ -287,6 +332,8 @@ class SottoV38(vl.SottoV37):
             Ld = bands_db(np.abs(stft(y16)[:nfr]) ** 2, [(2000, 2500), (2500, 3000), (3000, 3500)])
             sl = np.clip(np.polyfit(np.array([2.25, 2.75, 3.25]), Ld.T, 1)[0], -30, 10)
             vt = Ld[:, 2:3] + VT_A + VT_C * sl[:, None]
+        if self.vowel_shape == "fine" and nfr:
+            vt = fine_levels(y16, nfr, self.spk_pc)     # 16 bands of 250 Hz, not 4
         mask = np.zeros(nfr)
         for t in range(nfr):
             src = f[t] if uu[t] else None
@@ -320,7 +367,7 @@ class SottoV38(vl.SottoV37):
         mag = np.sqrt(10 ** (lvl / 10)) * np.clip((FR - 3900) / 200, 0, 1) * mask[:, None]
         ph = np.exp(2j * np.pi * np.random.default_rng(seed).random(mag.shape))
         X = mag * ph
-        if self.vowel_shape == "smooth" and nfr:
+        if self.vowel_shape in ("smooth", "fine") and nfr:
             # one continuous vowel layer under the consonant hiss: the template level for
             # every frame, smoothed in time (one pole, ~30 ms) and faded in and out by a
             # smoothed voiced/mixed weight, so it never switches on or off in one frame
@@ -334,7 +381,7 @@ class SottoV38(vl.SottoV37):
                 w = a * w + (1 - a) * float(want[t])
                 wv[t] = w
             lv += fade[:, None] + self.voiced_trim
-            lvl2 = np.stack([np.interp(FR, HBC, h) for h in lv])
+            lvl2 = np.stack([np.interp(FR, FHC if self.vowel_shape == "fine" else HBC, h) for h in lv])
             if self.peak_hz:
                 # a whispered vowel keeps a resonance up here (Jeff's bench recording: one
                 # peak per vowel, 4.9-7.3 kHz): add it, Gaussian in dB, on a lower floor
