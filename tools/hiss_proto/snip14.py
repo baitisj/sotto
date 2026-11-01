@@ -12,11 +12,12 @@ def channel(bits, cn0, fd, seed):
     fr=np.concatenate([rx['frames'],np.repeat(mute[None],max(0,n-len(rx['frames'])),0)])[:n]
     return fr, np.concatenate([rx['good'],np.zeros(max(0,n-len(rx['good'])),bool)])[:n]
 jx=resample_poly(sf.read('/tmp/claude-0/jeff/vowelvoice.flac')[0],1,3); jx=0.5*jx/np.abs(resample_poly(jx,1,2)).max(); jx=jx[:len(jx)//320*320]
-SRC={'jeff':(jx,None,(9.4,17.0)),'jeffwhisper':(jx,None,(2.0,9.0)),'pair2':(sf.read('clips16/librispeech_8842_f.wav')[0],(52,cs.doppler(446e6,60),102),(4,10)),'pair3':(sf.read('clips16/ears_p051_f.wav')[0],None,(4,10))}
+# Cache key is the source name: id() of a sliced temp array can be reused after it is freed,
+# which once made pair2/pair3 decode Jeff's recording.
+SRC={'jeff':('jeff',jx,None,(9.4,17.0)),'jeffwhisper':('jeff',jx,None,(2.0,9.0)),'pair2':('8842',sf.read('clips16/librispeech_8842_f.wav')[0],(52,cs.doppler(446e6,60),102),(4,10)),'pair3':('p051',sf.read('clips16/ears_p051_f.wav')[0],None,(4,10))}
 cache={}
-for name,(x,ch,(a,e)) in SRC.items():
+for name,(key,x,ch,(a,e)) in SRC.items():
     x=x[:len(x)//320*320]; pf,pdb=peak_of(x)
-    key=id(x)
     if key not in cache:
         b=hb.SottoV38().encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
         v=vl.SottoV37(); b7=v.encode(resample_poly(x,1,2)); f7,g7=channel(b7,*ch) if ch else (b7,np.ones(len(b7),bool))
