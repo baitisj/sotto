@@ -374,11 +374,14 @@ class SottoV0:
                 v = int("".join(map(str, b[p:p + k])), 2)
                 p += k
                 return v
-            voiced[2 * f], voiced[2 * f + 1] = self._read_voicing(take(2), voiced[2 * f - 1] if f else 0)
-            wo[2 * f] = np.exp(np.log(WO_MIN) + take(7) * (np.log(self.WO_HI) - np.log(WO_MIN)) / 127)
+            vcode = take(2)
+            voiced[2 * f], voiced[2 * f + 1] = self._read_voicing(vcode, voiced[2 * f - 1] if f else 0)
+            wi = take(7)
+            wo[2 * f] = np.exp(np.log(WO_MIN) + wi * (np.log(self.WO_HI) - np.log(WO_MIN)) / 127)
             ei = take(5)
             en[2 * f] = -60.0 if ei == 0 and self.SILENT0 else self.E_LO + ei * (self.E_HI - self.E_LO) / 31
             shape = self._shape_val([take(bb) for bb in self.fields])
+            shape = self._frame_hook(f, vcode, wi, shape)
             if self.pf:
                 shape = postfilter_rk(shape[None], self.pf)[0]
             rk[2 * f] = shape
@@ -392,6 +395,14 @@ class SottoV0:
         m = set_energy(from_rate_k(m, rk), en)
         for k in np.where(voiced == MIXED)[0]:
             m[k]["voiced"] = mixed_cutoff(m[k]["Wo"])
+        return self._model_hook(m, rk, en)
+
+    def _frame_hook(self, f, vcode, wi, shape):
+        """Per 20 ms frame after the shape is decoded (before the postfilter). v3.7 uses
+        the pitch field of all-unvoiced frames here."""
+        return shape
+
+    def _model_hook(self, m, rk, en):
         return m
 
     @staticmethod
