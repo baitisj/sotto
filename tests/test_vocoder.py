@@ -65,6 +65,23 @@ def test_tracker_undoes_doubled_pitch():
     assert np.all(np.abs(np.log(wo[mid] / wo_true)) < 0.05)
 
 
+def test_v37_tracker_undoes_tripled_pitch():
+    """Codec 2 saying three times the true pitch for 10 frames running (listening round 10,
+    EARS p020 at 0.4 s): v3.6's candidates (x1, x2, x1/2 of three neighbours) are then
+    all far from the true pitch, so it played ~3x the voice's pitch. v3.7 adds a third."""
+    x = _vowel(120)
+    Sw = sn.spectra(np.round(x * 32767))
+    wo_true = 2 * np.pi * 120 / FS
+    wo0 = np.full(len(Sw), wo_true)
+    wo0[40:50] = 3 * wo_true
+    track = lambda third: sn.track_pitch_voicing(Sw, wo0, np.ones(len(Sw), int), sub=2.0, lag=8, third=third)
+    wo, v = track(False)
+    assert np.any((v[40:50] > 0) & (np.abs(np.log(wo[40:50] / wo_true)) > 0.3))   # 180 Hz here
+    wo, v = track(True)
+    assert np.all(v[40:50] > 0)
+    assert np.all(np.abs(np.log(wo[40:50] / wo_true)) < 0.1)
+
+
 def test_tracker_keeps_low_male_pitch():
     x = _vowel(95)
     Sw = sn.spectra(np.round(x * 32767))
@@ -159,7 +176,7 @@ def test_c_port_matches_python():
     x16 = x16[:len(x16) // 160 * 160]
     vl.TRACK2["lag"] = 8
     try:
-        v = vl.SottoV36()                                 # the C build's default variant
+        v = vl.SottoV37()                                 # the C build's default variant
         bp = v.encode(x16 / 32767.0)
     finally:
         vl.TRACK2.pop("lag")

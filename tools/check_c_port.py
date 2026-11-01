@@ -1,13 +1,13 @@
-"""Check the C port (c/) against the Python model (sim/vocoder_lab.py SottoV36, or SottoV35, with the
+"""Check the C port (c/) against the Python model (sim/vocoder_lab.py SottoV37, or SottoV36 or SottoV35, with the
 fixed-lag tracker, TRACK2["lag"] = 8).
 
-Usage: python tools/check_c_port.py CLIP.flac [...] [--loss 0.1] [--json OUT.json] [--codebook CB.npz] [--variant v3.5]
+Usage: python tools/check_c_port.py CLIP.flac [...] [--loss 0.1] [--json OUT.json] [--codebook CB.npz] [--variant v3.6]
 
 Encoder: the fraction of 20 ms frames whose 48 bits match exactly, and which fields differ.
 Decoder: both decoders get the same (Python) bits, with a random frame-loss pattern when
 --loss is set; reports the sample SNR of the C output against the Python output, plus
 PESQ of each against the original so a mismatch can be judged by its effect.
-Build c/ first (make -C c), with CODEBOOK=CB.npz when checking another codebook, or VARIANT=v3.5 to match --variant v3.5.
+Build c/ first (make -C c), with CODEBOOK=CB.npz when checking another codebook, or VARIANT=v3.6 (or v3.5) to match --variant v3.6.
 """
 import argparse, json, os, subprocess, sys, tempfile
 import numpy as np, soundfile as sf
@@ -45,9 +45,9 @@ def snr_db(ref, y):
     return 10 * np.log10(np.sum(ref[:n] ** 2) / (np.sum((ref[:n] - y[:n]) ** 2) + 1e-20))
 
 
-def main(clips, loss, out, codebook=None, variant="v3.6"):
+def main(clips, loss, out, codebook=None, variant="v3.7"):
     vl.TRACK2["lag"] = 8
-    cls = vl.SottoV36 if variant == "v3.6" else vl.SottoV35
+    cls = {"v3.7": vl.SottoV37, "v3.6": vl.SottoV36, "v3.5": vl.SottoV35}[variant]
     v = cls(vq=vl.ShapeMSVQ.load(codebook) if codebook else None)
     import audio_race as ar
 
@@ -90,6 +90,6 @@ if __name__ == "__main__":
     a.add_argument("--loss", type=float, default=0.0)
     a.add_argument("--json")
     a.add_argument("--codebook")
-    a.add_argument("--variant", default="v3.6", choices=["v3.5", "v3.6"])
+    a.add_argument("--variant", default="v3.7", choices=["v3.5", "v3.6", "v3.7"])
     a = a.parse_args()
     main(a.clips, a.loss, a.json, a.codebook, a.variant)

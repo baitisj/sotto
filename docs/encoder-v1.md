@@ -353,8 +353,54 @@ ESTOI improves on 14 of 19 voices, most on the EARS studio voices. PESQ drops on
 **`SottoV36`** = v3.5 + the 9 + 9 + 8 + 8 codebook in 8-bit values (round 9: 5 ties of 5) + envelope-band energy. The C port builds it (now by default; `make -C c VARIANT=v3.5` for the old one). Listening round 10 put v3.5 against v3.6 on 10 voices, including p020 and p047. Jeff picked v3.6 twice: LibriSpeech 652, and p020, where v3.6 "has much better sound as the speaker inhales" and the opening buzz is gone. The other 8 were ties, including p047, and the null pair was answered correctly. **v3.6 is now the C port's default.**
 
 Still open from round 10:
-- Faint high-frequency "squeaks" in p020's first second in both versions.
+- Faint high-frequency "squeaks" in p020's first second in both versions. Fixed in v3.7,
+  below.
 - A rough rendering of background noise in LibriSpeech 3081, in both versions.
+
+### v3.7: a third of Codec 2's pitch as a candidate
+
+Jeff came back to round 10 on 2026-11-01: pair 2 (the null pair, p020 with v3.6 on both
+sides) "still brings out some higher pitched pops in the first second, and again at two
+seconds", and pair 3 (LibriSpeech 8842) slightly.
+
+**Cause (pair 2).** From 0.38 to 0.44 s, at the end of a vowel, Codec 2's pitch estimator
+says 400 Hz for a 120 Hz voice, seven frames running. The tracker's candidates for a frame
+are Codec 2's estimate for that frame and its two neighbours, each times 1, 2 and 1/2, so
+every candidate was near 200, 400 or 800 Hz and none near 120 Hz. The track jumped to
+about 490 Hz for 100 ms, then back: a short high-pitched tone. The same thing happened for
+single frames at 1.80 s (400 Hz) and 2.08 s (146 Hz for 104 Hz).
+
+**Fix.** `SottoV37` (`sinusoid.track_pitch_voicing(third=True)`) adds one candidate,
+refine(Codec 2's estimate / 3), for the frame's own estimate when that is at least 70 Hz.
+With it the track stays at 108-124 Hz through 0.39-0.45 s, and 1.80 and 2.08 s are fixed.
+The encoder is the only change: the frames and the decoder are v3.6's, so v3.6 and v3.7
+interoperate.
+
+Over 19 voices (PESQ from Python encoder and decoder; gross errors are voiced frames more
+than 1.6 times off librosa's pYIN where pYIN is fairly sure and the level is above
+-40 dBFS):
+
+| | v3.6 | v3.7 |
+|---|---:|---:|
+| Gross pitch errors (of 4,215 frames) | 51 | 26 |
+| Mean PESQ | 2.918 | 2.958 |
+| PESQ, EARS p020 (pair 2) | 2.77 | 3.12 |
+
+PESQ alone moves by up to ±0.15 on one clip when one frame changes, because the decoder's
+random phases fall out of step, so the gross-error count is the better measure here.
+Adding a quarter as well (1/3 and 1/4) gave the same gross errors but put a female voice
+(EARS p100) an octave low, so v3.7 uses only the third.
+
+**Pair 3 is a different, milder problem.** At voice onsets in LibriSpeech 8842, Codec 2's
+estimate sits at its 50 Hz floor for a few frames. The candidates are then near 100 Hz,
+and the tracker plays half the true pitch (about 100 Hz for a 170-230 Hz voice) for 30 to
+50 ms before it catches the real pitch. Offering three and four times the estimate when it
+is below 65 Hz fixed those onsets but added new errors on male voices (p020, LibriSpeech
+652), so that is left open.
+
+The C port builds v3.7 by default (`make VARIANT=v3.6` for the old tracker), and so does the
+fixed-point encoder. Over 19 voices the fixed-point encoder matches the float one on 97.8% of
+frames, as before. Before/after clips: `listening/pops/` in the project files.
 
 ## What limits the next step: speech data
 
