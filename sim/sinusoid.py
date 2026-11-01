@@ -242,7 +242,7 @@ def odd_even_db(S, w, fmax=1500.0, first=3):
 
 def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=WO_MAX_HI,
                         uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias", tilt=0.0,
-                        sub=0.0, sub_db=10.0, lag=None):
+                        sub=0.0, sub_db=10.0, lag=None, third=False):
     """Joint pitch and voicing track over the whole utterance (Viterbi).
 
     States per frame: unvoiced, or voiced at one of the candidates refine(wo0[t+d] * mu)
@@ -255,6 +255,10 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
       sub-octave      sub per 10 dB that odd_even_db(w) falls below -sub_db
     With `lag` set, frame t is decided from the best path at frame t + lag (fixed-lag
     Viterbi, as a real-time encoder would run) instead of from the whole utterance.
+    With `third` set (v3.7), this frame's own estimate also gives the candidate
+    refine(wo0[t] / 3), when wo0[t] / 3 is at or above fmin: Codec 2 sometimes says three
+    times the true pitch for several frames running (EARS p020 at 0.4 s: 400 Hz for a
+    120 Hz voice), and none of the other candidates is then near the true pitch.
     Returns (wo, voiced)."""
     n = len(wo0)
     v0 = np.asarray(voiced0) > 0
@@ -263,7 +267,9 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
         ws = []
         for d in (0, -1, 1):
             if 0 <= t + d < n:
-                for mu in (1.0, 2.0, 0.5):
+                for mu in (1.0, 2.0, 0.5) + ((1 / 3,) if third and d == 0 else ()):
+                    if mu < 0.5 and wo0[t] * mu * FS / (2 * np.pi) < fmin:
+                        continue
                     w = refine(Sw[t], float(np.clip(wo0[t + d] * mu, WO_MIN, wo_max)), wo_max)
                     if w * FS / (2 * np.pi) >= fmin or (d == 0 and mu == 1.0):
                         if all(abs(np.log(w / u)) > 0.01 for u in ws):

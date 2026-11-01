@@ -29,7 +29,12 @@
 #define K FX_K
 #define NC FX_NC
 #define LAG 8
-#define NCAND 9
+#ifdef SOTTO_PITCH_THIRD
+#define N_MU 4                /* v3.7: also a third of frame t's own estimate */
+#else
+#define N_MU 3
+#endif
+#define NCAND 10
 #define NST (NCAND + 1)
 #define RING 16
 #define TAIL_HOLD 30
@@ -392,8 +397,9 @@ static void frame_costs(struct sotto_enc *e, int32_t t, int has_next) {
     int32_t u = t + dd[i];
     if (u < 0 || (dd[i] == 1 && !has_next)) continue;
     uint32_t base = R(e, u)->wo0;
-    for (int j = 0; j < 3; j++) {
-      uint64_t w0 = j == 0 ? base : j == 1 ? (uint64_t)base * 2 : (base + 1) >> 1;
+    for (int j = 0; j < (dd[i] == 0 ? N_MU : 3); j++) {
+      if (j == 3 && base < 112742892u) continue;              /* base / 3 below 70 Hz */
+      uint64_t w0 = j == 0 ? base : j == 1 ? (uint64_t)base * 2 : j == 2 ? (base + 1) >> 1 : ((uint64_t)base + 1) / 3;
       uint32_t w0c = w0 < WO_MIN ? WO_MIN : w0 > WO_HI ? WO_HI : (uint32_t)w0;
       uint32_t w = refine(sp, w0c, WO_HI);
       if (w >= 37580964u || (dd[i] == 0 && j == 0)) {        /* 70 Hz */

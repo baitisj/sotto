@@ -38,15 +38,17 @@ the API and the input level the codec expects (speech near −26 dBFS).
   `make install PREFIX=/opt/sotto`, and set `PKG_CONFIG_PATH=/opt/sotto/lib/pkgconfig` and
   `LD_LIBRARY_PATH=/opt/sotto/lib`.
 - If `python3` has no numpy, point the build at a Python that does: `make PYTHON=.venv/bin/python`.
-- The library speaks one bitstream, v3.6 by default (`sotto_format()` says which).
-  `make clean all VARIANT=v3.5` builds the older one.
+- The library speaks one bitstream, v3.6 by default (`sotto_format()` says which). Its
+  encoder is v3.7, which only tracks pitch better, so v3.6 and v3.7 frames are the same
+  format. `make clean all VARIANT=v3.6` builds v3.6's encoder, `VARIANT=v3.5` the older
+  bitstream.
 - `make distclean` also removes the Codec 2 build. More detail is in `c/README.md`.
 
 ## Contents
 
 - `modem/`: the **softmodem**. It sends and receives YSF frames carrying sotto voice through a radio's 9600 data port and a sound card, or through an SDR (IQ). `python -m modem tx voice.bit tx.flac`, then `python -m modem rx rx.flac voice.bit`. See `docs/softmodem.md`.
 - `tests/`: `python -m pytest tests`.
-- `c/`: the **C port** of the sotto v3.6 encoder and decoder (float, links Codec 2), built as `libsotto` by `make` (see Build libsotto above). See `c/README.md` and `docs/c-port.md` for the plan to run it on the radio's DSP.
+- `c/`: the **C port** of the sotto v3.7 encoder and v3.6 decoder (float, links Codec 2), built as `libsotto` by `make` (see Build libsotto above). See `c/README.md` and `docs/c-port.md` for the plan to run it on the radio's DSP.
 - `tools/listening/` and `docs/listening-tests.md`: the blind A/B listening-test pages used to check each codec change by ear.
 - `tools/build_codec2.sh`: builds libcodec2, c2enc, c2dec and c2sim into `build/codec2/src` (the top-level `make` runs it).
 - `sim/`: a C4FM (4-level FSK over FM) link simulator with Rayleigh and two-path
