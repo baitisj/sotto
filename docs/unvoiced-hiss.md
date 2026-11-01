@@ -170,3 +170,31 @@ decision for the tracker. Snippets (2.5-4.0 s): `/mnt/project-files/vocoder/list
 
 Jeff (2026-11-01) preferred act_3 (gate + onset recoding) as least distracting, so the
 current candidate is hiss7 + burst rule + mixed-frame guess + gated boost + onset recoding.
+
+## v3.8 in the model, and vowel brightness (round 13)
+
+`sim/hiss_band.py` SottoV38 is the round 12 winner as a codec class (16 kHz `encode`,
+`decode_audio16`), trained by `tools/train_hiss_band.py` into `sim/data/hiss_band.npz`
+(LibriSpeech only). Jeff chose one more round before building it into C.
+
+Bright studio voices (p047) also carry 4-8 kHz in vowels, which v3.8 doesn't add. On the
+12 test voices (`tools/hiss_proto/vowel_eval.py`), rms band error on EARS / LibriSpeech:
+
+| Frames | Guess only | Per-speaker offset, causal, 1 s refresh | Side channel as built | Ceiling (exact speaker mean) |
+|---|---|---|---|---|
+| Voiced | 10.6 / 9.8 | 8.0 / 7.3 | 8.6 / 8.3 | 7.2 / 6.8 dB |
+| Mixed | 15.6 / 13.8 | 10.6 / 9.3 | 11.1 / 9.8 | 8.5 / 8.2 |
+| UU index 7 → 6 bits | 3.9 → 4.2 / 3.8 → 4.0 | | | |
+
+This is Jeff's original "default, refined in pauses" idea, and it fits vowels much better
+than fricatives. The side channel takes one bit from each UU frame's index (6 bits left):
+each 2 s window (100 frames, frame numbers known to both ends) carries a 16-bit message in
+its first 16 UU frames, made of level (4 bits, 2 dB steps) and tilt (2 bits) for voiced and
+for mixed frames, plus CRC-4. The message describes all earlier windows, so the encoder
+needs no look-ahead, and it applies from the next window. A window with a lost frame, or
+fewer than 16 UU frames (47% of EARS windows, 15% of LibriSpeech), keeps the old offsets.
+Offsets start at the default (the guess), so the first ~4 s use it.
+
+Round 13 (https://claude.ai/artifact/WffNrXkvcz13cgGkKNWwLr, `ab-13-key.json`,
+`tools/listening/render_ab13.py`): C (no vowel high band) vs G (guess - 3 dB in voiced
+frames, no bits) vs A (adaptive offsets), null pair 1.
