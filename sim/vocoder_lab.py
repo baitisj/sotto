@@ -385,8 +385,11 @@ class SottoV0:
             en[2 * f] = -60.0 if ei == 0 and self.SILENT0 else self.E_LO + ei * (self.E_HI - self.E_LO) / 31
             shape = self._shape_val([take(bb) for bb in self.fields])
             shape = self._frame_hook(f, vcode, wi, shape)
-            if self.pf:
-                shape = postfilter_rk(shape[None], self.pf)[0]
+            pf = self.pf
+            if vcode == 0 and getattr(self, "uv_pf", None) is not None:
+                pf = self.uv_pf                 # v3.8: weaker formant postfilter on UU frames
+            if pf and pf != 1.0:
+                shape = postfilter_rk(shape[None], pf)[0]
             rk[2 * f] = shape
         rk = decimate_interp(rk)
         en = decimate_interp(en)

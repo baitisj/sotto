@@ -237,3 +237,69 @@ shape. Per-speaker peaks in the test voices: 4.55-7.1 kHz, 4-14 dB high. Option
 layer. Comparison page (his recording, pairs 2 and 3; v3.7, consonants only, flat layer,
 whistle): https://claude.ai/artifact/2grQXFJWZTR6v4SfwhiUQ4. The peak is measured from the
 original here; in a link it would go over the side channel (4 bits frequency, 2 bits height).
+
+## Whispers, blending and the v3.8 candidate
+
+Two more bench recordings (Jeff on his phone, his wife on hers) settled the vowel layer.
+The high band's loudness is mostly the microphone (Jeff's vowels are 10-15 dB brighter
+above 4 kHz on the phone than on the desk mic); the resonance's position is the voice, but
+it moves with the vowel (Jeff ~5.1 kHz in front vowels, ~6.0 kHz in back vowels; his wife
+4.3-6.6 kHz). One fixed peak per speaker is too simple, so `vowel_shape="fine"`: a ridge
+regression from the decoded 0-4 kHz shape (250 Hz bands re 3.0-3.5 kHz) to sixteen 250 Hz
+bands at 4-8 kHz, trained on LibriSpeech vowels (`vfine.py`, `sim/data/hiss_vowel_fine.npz`),
+plus a per-speaker correction compressed to 3 PCA coefficients of the speaker's mean miss
+(`vfine2.py`: 3 coefficients explain 92% of the between-speaker variance; held-out error
+8.4 dB vs 11.9 for the vowel-only predictor and 13.0 for a flat template). The 3 numbers
+ride the slow side channel (`vowel="speaker"`: 4 bits each in 4 dB steps + CRC-4, one
+16-bit message per 2 s window in the UU frames' spare bit, the UU index drops to 6 bits).
+The encoder estimates them causally over vowel frames above the running 60th percentile of
+frame energy (1 s warm-up; a 1 dB histogram in C), which lands within 0.6 dB rms of the
+whole-clip estimate the layer was tuned with. A message applies from the next window, so the
+first 2-4 s of a transmission use the average speaker.
+
+Jeff's notes on the whistle page, and the fixes, in order:
+
+- **Low warble under whispered vowels.** v3.7 codes a whisper as mixed: the tracker finds a
+  pitch in noise and the decoder plays wandering harmonics below 1 kHz. In his desk-mic
+  whisper 93% of frames were mixed. `whisper=True` (encoder, `_whisper`): a run of >= 10
+  mixed/edge frames whose median harmonic SNR below 1 kHz is < 6 dB and whose median
+  pitch jitter is > 0.025 (log, per 10 ms) is sent as UU. Whispers go 85-93% UU; real speech
+  changes 0-12% of frames (mostly background between words); PESQ-NB over the 12 test clips
+  2.854 -> 2.867.
+- **Hiss popping on and off in her whispered "ah"/"ooh".** The whisper flickered between UU
+  (consonant layer) and mixed (vowel layer). Besides the whisper rule, `blend=True`: one hiss
+  layer per bin = the louder of the consonant hiss and the vowel layer, and flickers <= 40 ms
+  inside a vowel keep the vowel layer on. A 20 ms release on the consonant part sounded like
+  "a hard plate reverb"; `release_ms=0` was "clearly better every time".
+- **Stutter on the "zh" of "division".** v3.7 flutters V/M/edge every 20 ms through a voiced
+  fricative; with hiss above 4 kHz switching with it the stutter is easier to hear.
+  `vsmooth=True` (encoder, `_vsmooth`): edge blips <= 2 frames inside a voiced run become M,
+  and frames whose 7-frame neighbourhood switches V<->M >= 3 times become M. PESQ 2.869 ->
+  2.876 (per clip -0.08..+0.08). Jeff: no problems introduced.
+- **Weak "s" in "prism"; warble at the start of her "S".** The no-tail blend had dropped the
+  mixed frames' guessed hiss (`keep_mixed=True` restores it), and an "s" that starts inside
+  a mixed run kept the vowel's pitch for a few frames. `sib_db=3` (encoder): a mixed/edge
+  frame whose 4-8 kHz band is more than 3 dB above 0-1 kHz is sent as UU. Changes 0-3.5% of
+  frames; PESQ up where it changes anything (p095 2.92 -> 2.97) except 251 (-0.03). Jeff:
+  clear improvement on p095, less clear on p051; the fading LibriSpeech female "really
+  really good".
+
+Page: https://claude.ai/artifact/BBK2dLqgTY7zSmFHgDKjba (versions 1-7; version 7 is the
+v3.8 candidate with the speaker shape measured from the original; version 8 the same with
+the shape over the side channel).
+
+Still open from his notes, worked on before the C port:
+
+- **The lost "t" in "sunlight strikes" (p095 1.06-1.22 s).** The closure and the burst are
+  timed right in the decoded output, but the unvoiced frames of the burst and the "s" are
+  10-15 dB short at 200-1200 Hz (rate-K envelope vs the encoder's), with the 2-4 kHz
+  bands matching: the formant postfilter (1.35) deepens the low-band "valley" of a
+  fricative and leaves a thin hiss where the original has a broadband burst. (The original's
+  strong 0-100 Hz content through the closure is rumble below the envelope's 200 Hz start
+  and is not the problem.) Decoder option `uv_pf`: postfilter strength on UU frames.
+- **Vocal fry** ("rainbow" on p095 4.28-4.45 s, "light" on p051 6.1-6.45 s): the tracker's
+  pitch wanders 72-119 Hz frame to frame through creak (harmonic SNR 2-7 dB) and the
+  harmonic synthesis makes a warble. Re-pitching flagged stretches on a line and sending
+  them mixed (`fry=True`) cost PESQ 0.05-0.18 on three voices and was dropped. `fry="slew"`:
+  inside a voiced run the log pitch may move at most 0.08 per frame unless the frame's
+  harmonic SNR is >= 8 dB (one state variable, decoder unchanged).
