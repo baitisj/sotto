@@ -228,7 +228,7 @@ class SottoV38(vl.SottoV37):
     UU_WO_GUARD = True      # UU frames' pitch field is a hiss index: never interpolate from it
 
 
-    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, keep_mixed=False, sib_db=None, fry=False, uv_pf=None, onset_pf=None, attack_db=None, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, keep_mixed=False, sib_db=None, sib_voiced=False, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
@@ -239,12 +239,8 @@ class SottoV38(vl.SottoV37):
         self.spk_pc = spk_pc                  # vowel_shape="fine": 3 speaker-shape coefficients (side channel)
         self.whisper = whisper                # encoder: send whispered vowels (mixed runs with no
                                               # real harmonics and a wandering pitch) as unvoiced
-        self.onset_pf = onset_pf              # decoder: postfilter on the first UU frame after V/M
-        self.uv_pf = uv_pf                    # decoder: postfilter strength on UU frames (None = pf)
-        self.attack_db = attack_db            # decoder: UU frame this far above the one before gets
-                                              # a sharp attack (no 10 ms level ramp into it)
-        self.fry = fry                        # encoder: steady pitch through jumpy (creaky) voiced stretches
         self.sib_db = sib_db                  # encoder: M/edge frames with 4-8 kHz > 0-1 kHz + sib_db -> UU
+        self.sib_voiced = sib_voiced          # encoder: the sibilant rule also recodes VV frames (z, zh)
         self.keep_mixed = keep_mixed          # blend: mixed frames keep the -3 dB guessed hiss
         self.release_ms = release_ms          # blend: consonant hiss hold (0 = none)
         self.vsmooth = vsmooth                # encoder: no V/M flutter or U blips inside voiced runs
@@ -258,13 +254,6 @@ class SottoV38(vl.SottoV37):
 
     # ---------------------------------------------------------------- decoder hooks
     def _model_hook(self, m, rk, en):
-        if self.attack_db is not None:
-            # a stop burst or a fricative after a pause: the interpolated 10 ms subframe
-            # before it stays at the quiet level instead of ramping half-way up
-            for k in range(2, len(m), 2):
-                if m[k]["voiced"] == 0 and en[k] - en[k - 2] >= self.attack_db:
-                    en[k - 1] = en[k - 2]
-                    m[k - 1:k] = vl.set_energy(m[k - 1:k], en[k - 1:k])
         u = np.where(m["voiced"] == 0)[0]
         if len(u):
             mu = vl.set_wo(m[u], np.full(len(u), W50), np.zeros(len(u), int))
@@ -373,10 +362,6 @@ class SottoV38(vl.SottoV37):
             self._whisper(x8, bits)
         if self.vsmooth:
             self._vsmooth(bits)
-        if self.fry == "slew":
-            self._slew(x8, bits)
-        elif self.fry:
-            self._fry(bits)
         P = np.abs(stft(x16)) ** 2
         hb = bands_db(P, HB)
         m = self.decode(bits)
@@ -390,54 +375,12 @@ class SottoV38(vl.SottoV37):
             # band is louder than 0-1 kHz by sib_db in either 10 ms half, send it as UU.
             one = bands_db(P, [(0, 1000)])[:, 0]
             code = bits[:, 0] * 2 + bits[:, 1]
-            codes = (1, 2, 3) if getattr(self, "sib_voiced", False) else (2, 3)
+            codes = (1, 2, 3) if self.sib_voiced else (2, 3)
             for t in np.where(top - one > self.sib_db)[0]:
                 g = f[t]
                 if g < len(bits) and code[g] in codes:
                     bits[g, 0] = bits[g, 1] = 0
         return bits, hb, self.decode(bits)
-
-    def _fry(self, bits, jump=0.15, need=2, win=2):
-        """Vocal fry (creak) has irregular, often alternating glottal periods; the tracker
-        jumps between the pitch, half and a third of it from frame to frame, and the
-        harmonic synthesis turns that into a warble. In a voiced/mixed run, frames with
-        >= `need` pitch jumps (> `jump` in log) within +-`win` frames are re-pitched along
-        a log-linear line between the steady frames on either side and sent as mixed."""
-        code = bits[:, 0] * 2 + bits[:, 1]
-        n = len(bits)
-        wi = np.array([int("".join(map(str, b[2:9])), 2) for b in bits])
-        lw = np.log(vl.WO_MIN) + wi * (np.log(self.WO_HI) - np.log(vl.WO_MIN)) / 127
-        vo = code > 0
-        j = np.zeros(n, bool)
-        j[1:] = vo[1:] & vo[:-1] & (np.abs(np.diff(lw)) > jump)
-        bad = np.zeros(n, bool)
-        for g in range(n):
-            if vo[g] and j[max(0, g - win):g + win + 1].sum() >= need:
-                bad[g] = True
-        g = 0
-        while g < n:
-            if not bad[g]:
-                g += 1
-                continue
-            h = g
-            while h < n and bad[h]:
-                h += 1
-            a = g - 1 if g > 0 and vo[g - 1] else None
-            b = h if h < n and vo[h] else None
-            if a is None and b is None:
-                new = np.full(h - g, np.median(lw[g:h]))
-            elif a is None:
-                new = np.full(h - g, lw[b])
-            elif b is None:
-                new = np.full(h - g, lw[a])
-            else:
-                new = lw[a] + (lw[b] - lw[a]) * (np.arange(g, h) - a) / (b - a)
-            q = np.clip(np.round((new - np.log(vl.WO_MIN)) / (np.log(self.WO_HI) - np.log(vl.WO_MIN)) * 127), 0, 127).astype(int)
-            for k, gg in enumerate(range(g, h)):
-                bits[gg, 2:9] = [(q[k] >> (6 - i)) & 1 for i in range(7)]
-                if code[gg] == 1:
-                    bits[gg, 0], bits[gg, 1] = 1, 0             # mixed
-            g = h
 
     @staticmethod
     def _vsmooth(bits, max_blip=2, win=7, switches=3):
@@ -488,31 +431,6 @@ class SottoV38(vl.SottoV37):
         jt = np.r_[0.0, np.abs(np.diff(np.log(m["Wo"][:n])))]
         self._feat_key, self._feat = key, (snr, jt)
         return self._feat
-
-    def _slew(self, x8, bits, step=0.08, good_db=8.0):
-        """Pitch slew limiter for creaky voice. The tracker's pitch wanders by 20-40% from
-        frame to frame in vocal fry (irregular glottal periods, harmonic SNR 2-7 dB), and the
-        harmonic synthesis turns that into a warble. Inside a voiced/mixed run, a frame's
-        log pitch may move at most `step` from the previous frame unless the frame's
-        harmonic SNR (best 10 ms half) is >= `good_db`, in which case the tracker is
-        trusted. One state variable; the decoder is unchanged."""
-        snr, _ = self._features(x8)
-        code = bits[:, 0] * 2 + bits[:, 1]
-        k = np.log(self.WO_HI / vl.WO_MIN) / 127
-        prev = None
-        for g in range(len(bits)):
-            if code[g] == 0:
-                prev = None
-                continue
-            wi = int("".join(map(str, bits[g, 2:9])), 2)
-            lw = np.log(vl.WO_MIN) + wi * k
-            conf = np.nanmax(np.r_[snr[2 * g:2 * g + 2], -np.inf]) if 2 * g < len(snr) else -np.inf
-            if prev is not None and conf < good_db and abs(lw - prev) > step:
-                lw = prev + np.sign(lw - prev) * step
-                q = int(np.clip(np.round((lw - np.log(vl.WO_MIN)) / k), 0, 127))
-                bits[g, 2:9] = [(q >> (6 - i)) & 1 for i in range(7)]
-                lw = np.log(vl.WO_MIN) + q * k
-            prev = lw
 
     def _whisper(self, x8, bits, min_frames=10, snr_db=6.0, jit=0.025):
         """A whispered vowel has no glottal pulses, but the tracker still finds a 'pitch' and

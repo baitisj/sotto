@@ -1,6 +1,5 @@
 """v3.8 page: original / v3.7 / v3.8 with the speaker shape measured from the original /
-v3.8 with the shape over the side channel, plus two optional extras (fry slew limiter,
-broadband stop burst) on the groups where Jeff flagged them."""
+v3.8 with the shape over the side channel."""
 import sys, os; sys.path.insert(0,'/home/claude/sotto/sim'); sys.path.insert(0,'/home/claude/sotto'); sys.path.insert(0,'/home/claude/sotto/tools/hiss_proto')
 import numpy as np, soundfile as sf, vocoder_lab as vl, hiss_band as hb, audio_race as ar, waveforms as wf, c4fm_sim as cs, vowseg as vs
 from scipy.signal import resample_poly
@@ -8,7 +7,7 @@ from modem.link import Transmitter, Receiver
 vl.TRACK2['lag']=8
 S='/tmp/claude-0/-home-claude/929ea970-7bb5-552e-b050-589efb5f7fa7/scratchpad/v38/audio'; os.makedirs(S, exist_ok=True)
 ONLY=os.environ.get('ONLY')
-V7=dict(whisper=True,vsmooth=True,sib_db=3.0)
+V7=dict(whisper=True,vsmooth=True,sib_db=-10.0,sib_voiced=True)   # v3.8 encoder as proposed
 DEC=dict(vowel_shape='fine',voiced_trim=-5,blend=True,release_ms=0,keep_mixed=True)
 def channel(bits, cn0, fd, seed):
     mute=np.zeros(48,np.int8); n=len(bits)
@@ -26,7 +25,7 @@ SRC={'wifewhisper':('wife',wx,None,(9.4,15.0)),'jeffwhisper':('jeff',jx,None,(2.
      'pair3':('p051',sf.read(C+'ears_p051_f.wav')[0],None,(4,10)),
      'p095':('p095',sf.read(C+'ears_p095_m.wav')[0],None,(0,6)),
      'p047':('p047',sf.read(C+'ears_p047_f.wav')[0],None,(0,6))}
-EXTRA={'p095':('zfix',),'pair3':('zfix',),'p047':('zfix',),'pair2':('zfix',)}
+EXTRA={}
 cache={}
 for name,(key,x,ch,(a,e)) in SRC.items():
     if ONLY and name not in ONLY.split(','): continue
@@ -41,25 +40,6 @@ for name,(key,x,ch,(a,e)) in SRC.items():
         b=hb.SottoV38(vowel='speaker',**V7).encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
         r['v38']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
         win=hb.SottoV38(vowel='speaker')._read_pc(fr,gd); ch1=np.where((np.abs(win)>0).any(1))[0]; print(name,'measured pc',sp,'side channel first lands at',f'{ch1[0]*0.02:.2f}s' if len(ch1) else 'never','final',win[-1].tolist(),flush=True)
-        if 'burst' in EXTRA.get(name,()):
-            r['burst']=hb.SottoV38(vowel='speaker',onset_pf=1.0,**DEC).decode_audio16(fr,gd,n16=len(x))
-        if 'flatburst' in EXTRA.get(name,()):
-            dd=hb.SottoV38(vowel='speaker',**DEC); dd.flat_pf_db=5; dd.flat_onset=True; dd.flat_pf=1.15
-            r['flatburst']=dd.decode_audio16(fr,gd,n16=len(x))
-        if 'attack' in EXTRA.get(name,()):
-            r['attack']=hb.SottoV38(vowel='speaker',attack_db=12,**DEC).decode_audio16(fr,gd,n16=len(x))
-        if 'contrast' in EXTRA.get(name,()):
-            ee=hb.SottoV38(vowel='speaker',**V7); ee.contrast_db=15; b=ee.encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
-            r['contrast']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
-        if 'zfix' in EXTRA.get(name,()):
-            ee=hb.SottoV38(vowel='speaker',**{**V7,'sib_db':-10.0}); ee.sib_voiced=True; b=ee.encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
-            r['zfix']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
-        if 'zhiss' in EXTRA.get(name,()):
-            b=hb.SottoV38(vowel='speaker',**{**V7,'sib_db':-6.0}).encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
-            r['zhiss']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
-        if 'fry' in EXTRA.get(name,()):
-            b=hb.SottoV38(vowel='speaker',fry='slew',**V7).encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
-            r['fry']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
         cache[key]=r
     r=cache[key]; A,E=int(a*16000),min(int(e*16000),len(x))
     def snip(y):
@@ -67,11 +47,4 @@ for name,(key,x,ch,(a,e)) in SRC.items():
         return y*np.sqrt(np.mean(x[A:E]**2)/np.mean(y**2))
     w=lambda n,y: sf.write(f'{S}/{name}_{n}.wav',np.round(np.clip(snip(y),-1,1)*32767).astype(np.int16),16000,subtype='PCM_16')
     w('0_original',x); w('1_v37',r['v37']); w('2_v38_measured',r['v38m']); w('3_v38',r['v38'])
-    if 'fry' in r: w('4_v38_fry',r['fry'])
-    if 'burst' in r: w('5_v38_burst',r['burst'])
-    if 'attack' in r: w('6_v38_attack',r['attack'])
-    if 'flatburst' in r: w('7_v38_flatburst',r['flatburst'])
-    if 'contrast' in r: w('8_v38_contrast',r['contrast'])
-    if 'zhiss' in r: w('9_v38_zhiss',r['zhiss'])
-    if 'zfix' in r: w('a_v38_zfix',r['zfix'])
     print(name,'done',flush=True)

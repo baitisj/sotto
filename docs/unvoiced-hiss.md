@@ -354,12 +354,13 @@ and two voiced bench clips, the fading LibriSpeech female, p051, p095, p047; ori
 v3.7 / v3.8 with the speaker shape measured / v3.8 with the shape over the side channel,
 plus the fry and burst A/Bs on p051 and p095). Render: `snip17.py`.
 
-v3.8 as proposed: encoder `SottoV38(vowel="speaker", whisper=True, vsmooth=True,
-sib_db=3.0)` (plus the onset recode and burst rule that are always on), decoder
-`SottoV38(vowel="speaker", vowel_shape="fine", voiced_trim=-5, blend=True,
-release_ms=0, keep_mixed=True)`. Same 48-bit frame; UU frames carry a 6-bit hiss index
-and one side-channel bit in the pitch field. Off by default and on the page for ears:
-`fry="slew"`, `onset_pf=1.0`.
+v3.8 as proposed (updated 2 Nov 05:30 UTC): encoder `SottoV38(vowel="speaker",
+whisper=True, vsmooth=True, sib_db=-10.0, sib_voiced=True)` (plus the onset recode and
+burst rule that are always on), decoder `SottoV38(vowel="speaker", vowel_shape="fine",
+voiced_trim=-5, blend=True, release_ms=0, keep_mixed=True)` with `UU_WO_GUARD` (always
+on). Same 48-bit frame; UU frames carry a 6-bit hiss index and one side-channel bit in
+the pitch field. The side channel warms up for 0.5 s and a message applies from the frame
+that completes it.
 
 ## Decoder-only experiments on the v3.8 bits (2026-11-02)
 
@@ -536,3 +537,16 @@ same threshold on M/edge frames only costs the same, so the cost is the lower th
 not the voiced frames. Jeff: prism fixed ("YAY"); p095 at 0.28-0.52 s on the page as
 "v3.8 + z fix" for his ears. Lesson recorded: get the time index from the listener before
 analysing, and quote it back.
+
+
+## Cleanup (2 Nov 05:30 UTC)
+
+With the time indices in hand, the hooks that were aimed at the wrong frame came out:
+`uv_pf`, `onset_pf`, `burst_pf`, `flat_pf_db`/`flat_onset`/`flat_pf`, `contrast_db` from
+`vocoder_lab`, and `attack_db`, `fry` (`_fry`, `_slew`) from `SottoV38`, with their
+study scripts. `vocoder_lab.py` is now main plus the one-line pitch guard in `interp_wo`;
+v3.7 decode is bit-identical. The z fix is in the candidate: `sib_voiced=True` with
+`sib_db=-10`. Jeff: "all of the clips with 'z fix' sound great"; the t of "sunlight" is
+unchanged by it and is parked as a frame-size limit (the hiss there now matches the
+original within 2-3 dB per 5 ms, so whatever cue is missing sits in the 0-4 kHz vowel
+offset). The sections above keep the dead ends as a record.

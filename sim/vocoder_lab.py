@@ -32,7 +32,6 @@ def _mel(f):
 
 
 KFREQ = 700 * (10 ** (np.linspace(_mel(200), _mel(3700), K) / 2595) - 1)   # Hz
-KLOMID, KHIGH = (KFREQ >= 200) & (KFREQ < 1200), KFREQ >= 2000
 _n = np.arange(K)
 DCT = np.sqrt(2 / K) * np.cos(np.pi * (_n[None, :] + 0.5) * _n[:, None] / K)
 DCT[0] /= np.sqrt(2)                                     # orthonormal DCT-II
@@ -356,27 +355,11 @@ class SottoV0:
         # v3.6: code the energy the decoder can rebuild (the envelope starts at 200 Hz), so a
         # strong component below it isn't spread over the whole band
         en = frame_energy_db(from_rate_k(m, rk) if self.ENERGY_RK else m)
-        ecode = en[0::2].copy()
-        ct = getattr(self, "contrast_db", None)
-        if ct is not None:
-            # v3.8 study: a stop. A frame with an unvoiced half whose quieter half sits ct dB
-            # under the two frames before (the closure), followed by a frame with an unvoiced
-            # half that rises 8 dB above it (the burst): the closure is coded at its quieter
-            # half and the burst at its louder half, instead of both at the frame centre, so
-            # the 20 ms frames keep the contrast the 10 ms analysis saw.
-            for k in range(2, len(ecode) - 1):
-                i = 2 * k
-                lo, nxt = min(en[i], en[i + 1]), max(en[i + 2], en[i + 3])
-                if (lo <= en[i - 4:i].max() - ct and nxt >= lo + 8
-                        and min(m[i]["voiced"], m[i + 1]["voiced"]) == 0
-                        and min(m[i + 2]["voiced"], m[i + 3]["voiced"]) == 0):
-                    ecode[k] = lo
-                    ecode[k + 1] = max(ecode[k + 1], nxt)
         frames = []
         for i in range(0, len(m), 2):
             v = [int(m[i]["voiced"] > 0), int(m[i + 1]["voiced"] > 0)]
             wi, _ = q_wo(np.array([m[i]["Wo"]]), hi=self.WO_HI)
-            ei, _ = q_uniform(np.array([ecode[i // 2]]), self.E_LO, self.E_HI, 5)
+            ei, _ = q_uniform(np.array([en[i]]), self.E_LO, self.E_HI, 5)
             si = self._shape_idx(rk[i] - rk[i].mean())
             frames.append(self._pack([(v[0], 1), (v[1], 1), (wi[0], 7), (ei[0], 5)]
                                      + list(zip(si, self.fields))))
@@ -388,7 +371,6 @@ class SottoV0:
         wo = np.zeros(2 * n)
         rk = np.zeros((2 * n, K))
         en = np.zeros(2 * n)
-        since_vm = 99
         for f, b in enumerate(np.asarray(bits)):
             p = 0
 
@@ -397,37 +379,13 @@ class SottoV0:
                 v = int("".join(map(str, b[p:p + k])), 2)
                 p += k
                 return v
-            vcode = take(2)
-            voiced[2 * f], voiced[2 * f + 1] = self._read_voicing(vcode, voiced[2 * f - 1] if f else 0)
-            wi = take(7)
-            wo[2 * f] = np.exp(np.log(WO_MIN) + wi * (np.log(self.WO_HI) - np.log(WO_MIN)) / 127)
+            voiced[2 * f], voiced[2 * f + 1] = self._read_voicing(take(2), voiced[2 * f - 1] if f else 0)
+            wo[2 * f] = np.exp(np.log(WO_MIN) + take(7) * (np.log(self.WO_HI) - np.log(WO_MIN)) / 127)
             ei = take(5)
             en[2 * f] = -60.0 if ei == 0 and self.SILENT0 else self.E_LO + ei * (self.E_HI - self.E_LO) / 31
             shape = self._shape_val([take(bb) for bb in self.fields])
-            shape = self._frame_hook(f, vcode, wi, shape)
-            pf = self.pf
-            if vcode == 0 and getattr(self, "uv_pf", None) is not None:
-                pf = self.uv_pf                 # v3.8: weaker formant postfilter on UU frames
-            if vcode in (1, 2):
-                since_vm = 0
-            elif f:
-                since_vm += 1
-            if vcode in (0, 3) and since_vm <= 2 and getattr(self, "onset_pf", None) is not None:
-                pf = self.onset_pf              # v3.8: the first two unvoiced/edge frames after a
-                                                # voiced or mixed frame (a stop burst) keep their
-                                                # broadband shape
-            if vcode in (0, 3) and f and getattr(self, "burst_pf", None) is not None \
-                    and en[2 * f] - en[2 * f - 2] >= getattr(self, "burst_db", 8.0):
-                pf = self.burst_pf              # v3.8 study: an unvoiced frame that jumps up
-                                                # in level (a stop burst) keeps its broadband shape
-            fl = getattr(self, "flat_pf_db", None)
-            if vcode in (0, 3) and fl is not None and \
-                    (since_vm <= 2 or not getattr(self, "flat_onset", False)) and \
-                    shape[KLOMID].mean() - shape[KHIGH].mean() >= -fl:
-                pf = getattr(self, "flat_pf", 1.0)   # v3.8 study: a broadband unvoiced frame
-                                                     # (a stop burst, not an s) keeps its low-mid
-            if pf and pf != 1.0:
-                shape = postfilter_rk(shape[None], pf)[0]
+            if self.pf:
+                shape = postfilter_rk(shape[None], self.pf)[0]
             rk[2 * f] = shape
         rk = decimate_interp(rk)
         en = decimate_interp(en)
@@ -439,14 +397,6 @@ class SottoV0:
         m = set_energy(from_rate_k(m, rk), en)
         for k in np.where(voiced == MIXED)[0]:
             m[k]["voiced"] = mixed_cutoff(m[k]["Wo"])
-        return self._model_hook(m, rk, en)
-
-    def _frame_hook(self, f, vcode, wi, shape):
-        """Per 20 ms frame after the shape is decoded (before the postfilter). v3.7 uses
-        the pitch field of all-unvoiced frames here."""
-        return shape
-
-    def _model_hook(self, m, rk, en):
         return m
 
     @staticmethod
