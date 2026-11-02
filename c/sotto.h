@@ -43,7 +43,7 @@ extern "C" {
 #  else
 #    define SOTTO_API __declspec(dllimport)
 #  endif
-#elif defined(__GNUC__) && defined(SOTTO_BUILD)
+#elif defined(__GNUC__) && defined(SOTTO_BUILD) && !defined(__TI_COMPILER_VERSION__)
 #  define SOTTO_API __attribute__((visibility("default")))
 #else
 #  define SOTTO_API

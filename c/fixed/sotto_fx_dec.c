@@ -30,7 +30,7 @@
 #define MIXED 2
 #define WO_MIN 26843546u      /* 2 pi / 160 as Q32 turns (fx_wo_tab[0]) */
 #define WO_UV 53687091u       /* 2 pi / 80, rounded down so it has 40 harmonics as in float */
-#define DB(x) ((int32_t)((x) * 256))
+#define DB(x) ((int32_t)((x) * 256L))
 #define PF_GAIN_Q16 88474     /* 1.35 */
 #define C_HOLD 2
 #define C_SLOPE_DB 6
@@ -64,6 +64,7 @@ struct sotto_dec *sotto_dec_create(void) {
 }
 
 void sotto_dec_destroy(struct sotto_dec *d) { free(d); }
+unsigned sotto_fx_dec_bytes(void) { return (unsigned)sizeof(struct sotto_dec); }
 
 /* the C library's example rand(), as Codec 2 uses: 15 bits */
 static uint32_t rnd15(struct sotto_dec *d) {
@@ -74,22 +75,25 @@ static uint32_t rnd15(struct sotto_dec *d) {
 static uint32_t rnd_phase(struct sotto_dec *d) { return rnd15(d) * 131076u; }
 
 static int get_bits(const unsigned char *in, int *pos, int nb) {
+  int i;
   int v = 0;
-  for (int i = 0; i < nb; i++, (*pos)++) v = (v << 1) | ((in[*pos >> 3] >> (7 - (*pos & 7))) & 1);
+  for (i = 0; i < nb; i++, (*pos)++) v = (v << 1) | ((in[*pos >> 3] >> (7 - (*pos & 7))) & 1);
   return v;
 }
 
 /* vocoder_lab.postfilter_rk: raise the envelope's contrast, keep its power */
 static void postfilter_rk(int32_t *v) {
+  int k;
   int32_t e0, e1;
-  for (int k = 0; k < K; k++) v[k] += fx_pre[k];
+  for (k = 0; k < K; k++) v[k] += fx_pre[k];
   e0 = fx_db_power_sum(v, K);
-  for (int k = 0; k < K; k++) v[k] = fx_rshr((fx_acc)v[k] * PF_GAIN_Q16, 16);
+  for (k = 0; k < K; k++) v[k] = fx_rshr((fx_acc)v[k] * PF_GAIN_Q16, 16);
   e1 = fx_db_power_sum(v, K);
-  for (int k = 0; k < K; k++) v[k] -= e1 - e0 + fx_pre[k];
+  for (k = 0; k < K; k++) v[k] -= e1 - e0 + fx_pre[k];
 }
 
 static void unpack(struct sotto_dec *d, const unsigned char *b, dframe_t *f) {
+  int s, k, n;
   int pos = 0, code = get_bits(b, &pos, 2), wi = get_bits(b, &pos, 7), ei = get_bits(b, &pos, 5);
   if (code < 3) f->v[0] = f->v[1] = (int16_t)code;
   else if (d->prev_v == 0) f->v[0] = 0, f->v[1] = MIXED;
@@ -99,14 +103,14 @@ static void unpack(struct sotto_dec *d, const unsigned char *b, dframe_t *f) {
   /* 10 + ei * 70 / 31 dB */
   f->en = ei == 0 ? DB(-60) : DB(10) + (int32_t)((ei * (int32_t)17920 + 15) / 31);
   int32_t c[K] = {0};                       /* DCT coefficients, dB Q16 */
-  for (int s = 0; s < fx_cb_stages; s++) {
-    const int8_t *y = fx_cb[s] + (int32_t)get_bits(b, &pos, fx_cb_bits[s]) * NC;
-    for (int k = 0; k < NC; k++) c[k + 1] += (int32_t)y[k] * fx_cb_step[s];
+  for (s = 0; s < fx_cb_stages; s++) {
+    const int16_t *y = fx_cb[s] + get_bits(b, &pos, fx_cb_bits[s]) * FX_CBW;
+    for (k = 0; k < NC; k++) c[k + 1] += (int32_t)FX_CB_VAL(y, k) * fx_cb_step[s];
   }
-  for (int k = 1; k < K; k++) c[k] = fx_rshr(c[k], 8);          /* Q8 */
-  for (int n = 0; n < K; n++) {
+  for (k = 1; k < K; k++) c[k] = fx_rshr(c[k], 8);          /* Q8 */
+  for (n = 0; n < K; n++) {
     fx_acc a = 0;
-    for (int k = 1; k < K; k++) a += (fx_acc)c[k] * fx_dct[k * K + n];
+    for (k = 1; k < K; k++) a += (fx_acc)c[k] * fx_dct[k * K + n];
     FX_ACC_CHECK(a);
     f->rk[n] = fx_rshr(a, 15);
   }
@@ -125,13 +129,14 @@ static int32_t env_at(const int32_t *rk, int32_t f) {
 
 /* minimum phase at the 65 bins (Q32 turns) from the harmonic levels A[1..L] (dB Q8) */
 static void min_phase(const int32_t *A, int L, uint32_t wo, uint32_t *ph) {
+  int i, n, j;
   int32_t G[NBIN], cc[NBIN];
   /* parabolic interpolation through 3 neighbouring harmonics (Codec 2's interp_para). With
      equal spacing, in units of harmonics: y = y2 + t (y3 - y1) / 2 + t^2 (y3 - 2 y2 + y1) / 2 */
-  uint32_t rw = (uint32_t)(((uint64_t)1 << 56) / wo);   /* bins -> harmonics, Q31 */
+  uint32_t rw = (uint32_t)fx_udiv_shl(1, 56, wo, NULL);   /* 2^56 / wo: bins -> harmonics, Q31 */
   int k = 0;
-  for (int i = 0; i < NBIN; i++) {
-    int32_t u = (int32_t)(((uint64_t)i * rw) >> 15);  /* bin i in harmonics, Q16 */
+  for (i = 0; i < NBIN; i++) {
+    int32_t u = (int32_t)(((fx_uacc)i * rw) >> 15);  /* bin i in harmonics, Q16 */
     while (((int32_t)(k + 2) << 16) < u && k < L - 3) k++;
     int32_t y1 = A[k + 1], y2 = A[k + 2], y3 = A[k + 3];
     int32_t t = u - ((int32_t)(k + 2) << 16);
@@ -139,43 +144,57 @@ static void min_phase(const int32_t *A, int L, uint32_t wo, uint32_t *ph) {
     G[i] = y2 + (int32_t)(((fx_acc)t * (y3 - y1)) >> 17) + (int32_t)(((fx_acc)tt * (y3 - 2 * y2 + y1)) >> 17);
   }
   /* real cepstrum (x 128): c[n] = G0 + (-1)^n G64 + 2 sum_j G_j cos(2 pi j n / 128), Q4 */
-  for (int n = 1; n < 64; n++) {
-    fx_acc a = (fx_acc)(G[0] + ((n & 1) ? -G[64] : G[64])) * 32768;
-    for (int j = 1; j < 64; j++) a += (fx_acc)(2 * G[j]) * fx_cos512[((j * n) & 127) * 4];
+  for (n = 1; n < 64; n++) {
+    fx_acc a = (fx_acc)(G[0] + ((n & 1) ? -G[64] : G[64])) * 32768, ah = 0, al = 0;
+    for (j = 1; j < 64; j++) {                 /* 2 G[j] cos(...), as two 16 x 16 products */
+      int16_t c = fx_cos512[((j * n) & 127) * 4];
+      ah += (fx_acc)FX_HI(G[j]) * c;
+      al += (fx_acc)FX_LO(G[j]) * c;
+    }
+    a += FX_JOIN(ah, al) * 2;
     FX_ACC_CHECK(a);
     cc[n] = fx_rshr(a, 19);
   }
   /* folded cepstrum back to phase: phi_k = -2 / (128 * 20 / ln 10) sum_n c[n] sin(2 pi k n / 128)
      radians; in Q32 turns from Q19 sums that is x -2.34542 (153709 in Q16) */
-  for (int i = 0; i < NBIN; i++) {
-    fx_acc a = 0;
-    for (int n = 1; n < 64; n++) a += (fx_acc)cc[n] * fx_cos512[(((i * n) & 127) * 4 - 128) & 511];
+  for (i = 0; i < NBIN; i++) {
+    fx_acc a, ah = 0, al = 0;
+    for (n = 1; n < 64; n++) {
+      int16_t c = fx_cos512[(((i * n) & 127) * 4 - 128) & 511];
+      ah += (fx_acc)FX_HI(cc[n]) * c;
+      al += (fx_acc)FX_LO(cc[n]) * c;
+    }
+    a = FX_JOIN(ah, al);
     FX_ACC_CHECK(a);
-    ph[i] = (uint32_t)(-((a * 153709) >> 16));
+    /* -((a x 153709) >> 16) mod 2^32: split a so no product needs more than 40 bits */
+    ph[i] = (uint32_t)0 - ((uint32_t)(a >> 16) * 153709u + (uint32_t)(((a & 0xFFFF) * 153709) >> 16));
   }
 }
 
 /* one 10 ms half */
 static void synth(struct sotto_dec *d, uint32_t wo, int v, const int32_t *rk, int32_t en, int32_t g,
                   short *out) {
+  int h, i, j;
   int32_t A[MAXL + 1] = {0};                 /* harmonic levels, dB Q8 */
   uint32_t phi[MAXL + 1], ph[NBIN];
   if (!v && wo < WO_MIN) wo = WO_MIN;
   int L = (int)(0x80000000u / wo);          /* 8 (500 Hz) .. 80 */
   if (L > MAXL) L = MAXL;
-  for (int h = 1; h <= L; h++)
-    A[h] = env_at(rk, (int32_t)(((uint64_t)h * wo * 128000u) >> 32));
+  for (h = 1; h <= L; h++)
+    A[h] = env_at(rk, (int32_t)(((fx_uacc)h * wo * 125) >> 22));   /* h f0, Hz Q4 */
   int32_t gain = en - fx_db_power_sum(A + 1, L) + g;
-  for (int h = 1; h <= L; h++) A[h] += gain;
+  for (h = 1; h <= L; h++) A[h] += gain;
   int vc = v > 0;                            /* voiced harmonics: all (1), none (0), m < vc */
   if (v == MIXED) {
     vc = (int)(0x20000000u / wo) + 1;        /* 1 kHz / f0 + 1 */
     if (vc < 2) vc = 2;
   }
+  FX_PROF(11, 1);
   min_phase(A, L, wo, ph);
+  FX_PROF(11, 0);
   d->ex_phase += wo * NSAMP;
-  for (int h = 1; h <= L; h++) {
-    uint32_t b = (h * wo + (1u << 24)) >> 25;
+  for (h = 1; h <= L; h++) {
+    uint32_t b = ((uint32_t)h * wo + ((uint32_t)1 << 24)) >> 25;
     uint32_t ex = (vc && (vc == 1 || h < vc)) ? (uint32_t)h * d->ex_phase : rnd_phase(d);
     phi[h] = ex + ph[b];
   }
@@ -183,58 +202,61 @@ static void synth(struct sotto_dec *d, uint32_t wo, int v, const int32_t *rk, in
   int32_t e = fx_db_power_sum(A + 1, L) - fx_log2_to_db_pow(fx_log2((uint32_t)L));
   if (e < BG_THRESH && !vc) d->bg_est = fx_rshr((fx_acc)d->bg_est * 58982 + (fx_acc)e * 6554, 16);
   if (vc)
-    for (int h = 1; h <= L; h++)
+    for (h = 1; h <= L; h++)
       if (A[h] < d->bg_est + BG_MARGIN) phi[h] = rnd_phase(d);
   /* harmonics on 512-point bins, amplitudes 2 A in a common Q(qa) so the largest is <= 2^14 */
   int32_t amax = L > 0 ? A[1] : 0;
-  for (int h = 2; h <= L; h++)
+  for (h = 2; h <= L; h++)
     if (A[h] > amax) amax = A[h];
   int32_t l2 = fx_db_to_log2_amp(amax);
   int qa = 13 - (int)((l2 + 65535) >> 16);
   if (qa > 30) qa = 30;
   int16_t bin[MAXL], re[MAXL], im[MAXL];
   int nb = 0;
-  for (int h = 1; h <= L; h++) {
-    int16_t b = (int16_t)((h * wo + (1u << 22)) >> 23);
+  for (h = 1; h <= L; h++) {
+    int16_t b = (int16_t)(((uint32_t)h * wo + ((uint32_t)1 << 22)) >> 23);
     if (b > 255) b = 255;
     int32_t a = fx_exp2(fx_db_to_log2_amp(A[h]) + 65536, qa);
     if (nb && bin[nb - 1] == b) nb--;        /* a later harmonic on the same bin replaces it */
     bin[nb] = b;
-    re[nb] = (int16_t)fx_rshr((fx_acc)a * fx_cos(phi[h]), 15);
-    im[nb] = (int16_t)fx_rshr((fx_acc)a * fx_sin(phi[h]), 15);
+    re[nb] = (int16_t)fx_rshr(fx_mul32x16(a, fx_cos(phi[h])), 15);
+    im[nb] = (int16_t)fx_rshr(fx_mul32x16(a, fx_sin(phi[h])), 15);
     nb++;
   }
   /* overlap-add (Codec 2's synthesise with shift): samples 433..511 of this frame's
      inverse DFT finish the previous half, samples 0..80 start the next */
-  for (int i = 0; i < NSAMP - 1; i++) d->sn[i] = d->sn[i + NSAMP];
+  FX_PROF(12, 1);
+  for (i = 0; i < NSAMP - 1; i++) d->sn[i] = d->sn[i + NSAMP];
   d->sn[NSAMP - 1] = 0;
-  for (int i = 0; i < 2 * NSAMP; i++) {
+  for (i = 0; i < 2 * NSAMP; i++) {
     int n = i < NSAMP - 1 ? 512 - NSAMP + 1 + i : i - (NSAMP - 1);
     fx_acc a = 0;
-    for (int j = 0; j < nb; j++) {
-      int x = (bin[j] * n) & 511;
+    for (j = 0; j < nb; j++) {
+      int x = (int)(((unsigned)bin[j] * (unsigned)n) & 511u);   /* wraps at 16 bits on the C55x */
       a += (fx_acc)re[j] * fx_cos512[x] - (fx_acc)im[j] * fx_cos512[(x - 128) & 511];
     }
     FX_ACC_CHECK(a);
     int32_t s4 = fx_rshr(a, qa + 11);        /* Q(qa + 15) -> samples Q4 */
-    int32_t w = (int32_t)(((fx_acc)s4 * fx_pn[i]) >> 14);
+    int32_t w = (int32_t)(fx_mul32x16(s4, fx_pn[i]) >> 14);
     if (i < NSAMP - 1) d->sn[i] += w;
     else d->sn[i] = w;
   }
-  for (int i = 0; i < NSAMP; i++) {
+  FX_PROF(12, 0);
+  for (i = 0; i < NSAMP; i++) {
     int32_t x = d->sn[i] >= 0 ? d->sn[i] >> 4 : -((-d->sn[i]) >> 4);   /* truncate, as (short) */
     out[i] = (short)(x > 32767 ? 32767 : x < -32767 ? -32767 : x);
   }
 }
 
 static void synth_pair(struct sotto_dec *d, const dframe_t *p, const dframe_t *n, short *out) {
+  int k;
   synth(d, p->wo, p->v[0], p->rk, p->en, p->g[0], out);
   /* odd half: interpolated with the next frame */
   const dframe_t *q = n ? n : p;
   int32_t rk[K];
   uint32_t wo;
   int va = p->v[0], vi = p->v[1], vb = n ? n->v[0] : p->v[1];
-  for (int k = 0; k < K; k++) rk[k] = (p->rk[k] + q->rk[k]) >> 1;
+  for (k = 0; k < K; k++) rk[k] = (p->rk[k] + q->rk[k]) >> 1;
   if (vi && va && vb) wo = (p->wo >> 1) + (q->wo >> 1) + (p->wo & q->wo & 1);
   else if (vi) wo = va ? p->wo : q->wo;
   else wo = WO_UV;
@@ -251,6 +273,7 @@ static int32_t conceal_gain(int run, int half) {
 
 void sotto_decode(struct sotto_dec *d, const unsigned char in[SOTTO_BYTES_PER_FRAME], int good,
                   short speech[SOTTO_SAMPLES_PER_FRAME]) {
+  int h;
   const unsigned char *b = in;
   if (good) {
     memcpy(d->last, in, SOTTO_BYTES_PER_FRAME);
@@ -261,8 +284,10 @@ void sotto_decode(struct sotto_dec *d, const unsigned char in[SOTTO_BYTES_PER_FR
     if (d->have_last) b = d->last;
   }
   dframe_t f;
+  FX_PROF(10, 1);
   unpack(d, b, &f);
-  for (int h = 0; h < 2; h++) f.g[h] = conceal_gain(d->run, h);
+  FX_PROF(10, 0);
+  for (h = 0; h < 2; h++) f.g[h] = conceal_gain(d->run, h);
   if (d->n == 0) memset(speech, 0, SOTTO_SAMPLES_PER_FRAME * sizeof(short));
   else synth_pair(d, &d->prev, &f, speech);
   d->prev = f;
