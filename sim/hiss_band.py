@@ -194,7 +194,7 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
-    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
@@ -205,6 +205,8 @@ class SottoV38(vl.SottoV37):
         self.spk_pc = spk_pc                  # vowel_shape="fine": 3 speaker-shape coefficients (side channel)
         self.whisper = whisper                # encoder: send whispered vowels (mixed runs with no
                                               # real harmonics and a wandering pitch) as unvoiced
+        self.release_ms = release_ms          # blend: consonant hiss hold (0 = none)
+        self.vsmooth = vsmooth                # encoder: no V/M flutter or U blips inside voiced runs
         self.blend = blend                    # one layer: max(vowel, consonant) power, flickers bridged
         if model:                                       # None while training the guess
             z = np.load(model, allow_pickle=True)
@@ -262,6 +264,8 @@ class SottoV38(vl.SottoV37):
         self._onsets(x8, bits)
         if self.whisper:
             self._whisper(x8, bits)
+        if self.vsmooth:
+            self._vsmooth(bits)
         P = np.abs(stft(x16)) ** 2
         hb = bands_db(P, HB)
         m = self.decode(bits)
@@ -270,6 +274,35 @@ class SottoV38(vl.SottoV37):
         for t in np.where((top[1:] - top[:-1] > BURST_DB) & (top[1:] > low[1:] - 15))[0] + 1:
             bits[f[t], 0] = bits[f[t], 1] = 0            # burst: send as UU
         return bits, hb, self.decode(bits)
+
+    @staticmethod
+    def _vsmooth(bits, max_blip=2, win=7, switches=3):
+        """Voiced fricatives ('zh' in 'division') make v3.7 flutter V M V M and drop in
+        U-edge blips (M e e M), heard as a stutter. Inside a voiced run: edge runs of
+        <= `max_blip` frames between voiced/mixed frames become M, and frames whose
+        `win`-frame neighbourhood switches V<->M >= `switches` times become M."""
+        code = bits[:, 0] * 2 + bits[:, 1]
+        n = len(code)
+        g = 0
+        while g < n:
+            if code[g] != 3:
+                g += 1
+                continue
+            h = g
+            while h < n and code[h] == 3:
+                h += 1
+            if g > 0 and h < n and h - g <= max_blip and code[g - 1] in (1, 2) and code[h] in (1, 2):
+                code[g:h] = 2
+            g = h
+        c0 = code.copy()
+        for g in range(n):
+            if c0[g] not in (1, 2):
+                continue
+            w = c0[max(0, g - win // 2):g + win // 2 + 1]
+            w = w[w > 0]
+            if np.sum((w[1:] != w[:-1]) & (w[1:] < 3) & (w[:-1] < 3)) >= switches:
+                code[g] = 2
+        bits[:, 0], bits[:, 1] = code >> 1, code & 1
 
     def _whisper(self, x8, bits, min_frames=10, snr_db=6.0, jit=0.025):
         """A whispered vowel has no glottal pulses, but the tracker still finds a 'pitch' and
@@ -443,9 +476,10 @@ class SottoV38(vl.SottoV37):
                 # one hiss layer: per bin, the louder of the vowel layer and the consonant hiss,
                 # the consonant part held with a 20 ms release so it never drops in one frame
                 pc = np.abs(X) ** 2
-                ar = np.exp(-10.0 / 20.0)
-                for t in range(1, nfr):
-                    pc[t] = np.maximum(pc[t], ar * pc[t - 1])
+                if self.release_ms > 0:
+                    ar = np.exp(-10.0 / self.release_ms)
+                    for t in range(1, nfr):
+                        pc[t] = np.maximum(pc[t], ar * pc[t - 1])
                 X = np.sqrt(np.maximum(pc, mag2 ** 2)) * ph2
             else:
                 X = X + mag2 * ph2
