@@ -390,9 +390,10 @@ class SottoV38(vl.SottoV37):
             # band is louder than 0-1 kHz by sib_db in either 10 ms half, send it as UU.
             one = bands_db(P, [(0, 1000)])[:, 0]
             code = bits[:, 0] * 2 + bits[:, 1]
+            codes = (1, 2, 3) if getattr(self, "sib_voiced", False) else (2, 3)
             for t in np.where(top - one > self.sib_db)[0]:
                 g = f[t]
-                if g < len(bits) and code[g] in (2, 3):
+                if g < len(bits) and code[g] in codes:
                     bits[g, 0] = bits[g, 1] = 0
         return bits, hb, self.decode(bits)
 

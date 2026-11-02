@@ -504,3 +504,17 @@ The real answer is item 4 of the list above: a hiss level for mixed frames.
 at its quieter 10 ms half and the burst after it at its louder half. Fires 17-21 times a
 clip, p095 1.12/1.14 s 43.9 -> 39.4 / 48.4 dB. PESQ -0.043 (1 win / 9 losses); p095 row 8
 for ears.
+
+**Correction on "prism" (05:05 UTC).** The z analysed above (8.12-8.19 s) is the z of
+"rainbow IS a division"; Jeff caught the diagnosis clip saying the wrong words. "Act as a
+prism" is at 4.3-4.9 s of p051 and its z (4.76-4.82 s) is coded VV by both codecs: her
+voice bar stays at 18-23 dB (5 dB under the vowel) while the 6-8 kHz hiss sits at +14 to
++18 dB, nearly as loud. A voiced frame has no hiss index and the vowel layer predicts a
+dark vowel, so v3.7 and v3.8 put that hiss 30-50 dB low: the soft "th". Diagnosis group on
+the page: original / v3.7 / v3.8 / codec 0-4 kHz + original 4-8 kHz (the ceiling for a
+voiced-frame hiss level) / original 0-4 kHz + codec 4-8 kHz / original without its high
+band / v3.8 with those z frames sent as UU (`sib_voiced=True`, `sib_db=-10`: 16 frames
+recoded in 12 s, three of them the prism z). The encoder's 10 ms measure puts the z at
+-10 to -6 dB (4-8 kHz against 0-1 kHz), the 20 ms STFT bands at about 0 dB; the rule's
+threshold is calibrated to the former. This is item 4 of the list (a hiss level for
+voiced/mixed frames) made concrete.
