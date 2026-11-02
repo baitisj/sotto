@@ -28,8 +28,8 @@ head -c 16000 ../../../../codec/codec2/raw/ve9qrp_10s.raw > in.raw    # 1 s
 
 The simulator runs about 1 s of audio in 1.5 minutes. `C55X_OUT=dir` builds into another
 folder; `-DFX_CB_UNPACKED` stores the codebook one value per word (29 KB more, faster
-search). The x86 decoder's output (`c/fixed/sotto_dec_fx`) starts 160 samples later than
-`out.raw` (the command-line tool's alignment), and is otherwise identical.
+search). `out.raw` is the x86 decoder's output (`c/fixed/sotto_dec_fx out.bit`) delayed by 160
+samples (the command-line tool drops the first 20 ms), and otherwise identical.
 
 ## Getting the tools (Linux x86-64, 2026-11)
 

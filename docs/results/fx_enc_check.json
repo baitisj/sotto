@@ -3,162 +3,177 @@
   "clip": "ears_p020_m.flac",
   "frames": 573,
   "frames_fx": 573,
-  "bit_exact": 0.9529,
+  "bit_exact": 0.9442,
   "field_mismatch": {
    "voicing": 5,
-   "Wo": 17,
-   "energy": 6,
-   "vq": 23
+   "Wo": 16,
+   "energy": 5,
+   "vq": 29
   },
   "pesq_float": 2.953,
-  "pesq_fixed": 3.023,
-  "pesq_fxenc_floatdec": 3.023
+  "pesq_fixed": 3.066,
+  "pesq_fxenc_floatdec": 3.064
  },
  {
   "clip": "ears_p025_m.flac",
   "frames": 530,
   "frames_fx": 530,
-  "bit_exact": 0.9717,
+  "bit_exact": 0.9604,
   "field_mismatch": {
    "voicing": 1,
-   "Wo": 4,
+   "Wo": 5,
    "energy": 0,
-   "vq": 14
+   "vq": 19
   },
   "pesq_float": 3.26,
-  "pesq_fixed": 3.254,
-  "pesq_fxenc_floatdec": 3.252
+  "pesq_fixed": 3.247,
+  "pesq_fxenc_floatdec": 3.243
  },
  {
   "clip": "ears_p047_f.flac",
   "frames": 445,
   "frames_fx": 445,
-  "bit_exact": 0.991,
+  "bit_exact": 0.9775,
   "field_mismatch": {
    "voicing": 1,
-   "Wo": 2,
+   "Wo": 3,
    "energy": 1,
-   "vq": 3
+   "vq": 8
   },
   "pesq_float": 2.811,
-  "pesq_fixed": 2.923,
-  "pesq_fxenc_floatdec": 2.932
+  "pesq_fixed": 2.925,
+  "pesq_fxenc_floatdec": 2.934
  },
  {
   "clip": "ears_p051_f.flac",
   "frames": 594,
   "frames_fx": 594,
-  "bit_exact": 0.9798,
+  "bit_exact": 0.9764,
   "field_mismatch": {
    "voicing": 0,
    "Wo": 8,
    "energy": 0,
-   "vq": 11
+   "vq": 13
   },
   "pesq_float": 2.781,
-  "pesq_fixed": 2.676,
-  "pesq_fxenc_floatdec": 2.732
+  "pesq_fixed": 2.692,
+  "pesq_fxenc_floatdec": 2.736
  },
  {
   "clip": "ears_p070_f.flac",
   "frames": 579,
   "frames_fx": 579,
-  "bit_exact": 0.9689,
+  "bit_exact": 0.962,
   "field_mismatch": {
    "voicing": 6,
-   "Wo": 11,
-   "energy": 4,
-   "vq": 14
+   "Wo": 12,
+   "energy": 5,
+   "vq": 18
   },
   "pesq_float": 2.682,
-  "pesq_fixed": 2.669,
-  "pesq_fxenc_floatdec": 2.669
+  "pesq_fixed": 2.671,
+  "pesq_fxenc_floatdec": 2.673
  },
  {
   "clip": "ears_p095_m.flac",
   "frames": 441,
   "frames_fx": 441,
-  "bit_exact": 0.9864,
+  "bit_exact": 0.9705,
   "field_mismatch": {
    "voicing": 0,
    "Wo": 3,
    "energy": 0,
-   "vq": 4
+   "vq": 11
   },
   "pesq_float": 2.869,
   "pesq_fixed": 2.84,
-  "pesq_fxenc_floatdec": 2.702
+  "pesq_fxenc_floatdec": 2.832
  },
  {
   "clip": "ears_p100_f.flac",
   "frames": 468,
   "frames_fx": 468,
-  "bit_exact": 0.9722,
+  "bit_exact": 0.9679,
   "field_mismatch": {
    "voicing": 0,
-   "Wo": 7,
+   "Wo": 6,
    "energy": 1,
-   "vq": 13
+   "vq": 14
   },
   "pesq_float": 2.661,
-  "pesq_fixed": 2.619,
-  "pesq_fxenc_floatdec": 2.624
+  "pesq_fixed": 2.607,
+  "pesq_fxenc_floatdec": 2.632
  },
  {
   "clip": "ears_p107_m.flac",
   "frames": 548,
   "frames_fx": 548,
-  "bit_exact": 0.9799,
+  "bit_exact": 0.9653,
   "field_mismatch": {
    "voicing": 0,
    "Wo": 4,
    "energy": 2,
-   "vq": 9
+   "vq": 17
   },
   "pesq_float": 3.151,
-  "pesq_fixed": 3.122,
-  "pesq_fxenc_floatdec": 3.119
+  "pesq_fixed": 3.11,
+  "pesq_fxenc_floatdec": 3.107
+ },
+ {
+  "clip": "female_libri198_14s.flac",
+  "frames": 695,
+  "frames_fx": 695,
+  "bit_exact": 0.9856,
+  "field_mismatch": {
+   "voicing": 2,
+   "Wo": 4,
+   "energy": 0,
+   "vq": 9
+  },
+  "pesq_float": 2.901,
+  "pesq_fixed": 2.966,
+  "pesq_fxenc_floatdec": 2.945
  },
  {
   "clip": "librispeech_2428_m.flac",
   "frames": 600,
   "frames_fx": 600,
-  "bit_exact": 0.9883,
+  "bit_exact": 0.9867,
   "field_mismatch": {
    "voicing": 2,
    "Wo": 3,
    "energy": 1,
-   "vq": 6
+   "vq": 7
   },
   "pesq_float": 3.286,
-  "pesq_fixed": 3.285,
-  "pesq_fxenc_floatdec": 3.285
+  "pesq_fixed": 3.287,
+  "pesq_fxenc_floatdec": 3.287
  },
  {
   "clip": "librispeech_251_m.flac",
   "frames": 600,
   "frames_fx": 600,
-  "bit_exact": 0.985,
+  "bit_exact": 0.9833,
   "field_mismatch": {
    "voicing": 1,
    "Wo": 5,
    "energy": 0,
-   "vq": 8
+   "vq": 9
   },
   "pesq_float": 3.026,
-  "pesq_fixed": 2.974,
-  "pesq_fxenc_floatdec": 2.97
+  "pesq_fixed": 2.982,
+  "pesq_fxenc_floatdec": 2.977
  },
  {
   "clip": "librispeech_3081_f.flac",
   "frames": 600,
   "frames_fx": 600,
-  "bit_exact": 0.96,
+  "bit_exact": 0.9583,
   "field_mismatch": {
    "voicing": 13,
    "Wo": 8,
    "energy": 2,
-   "vq": 15
+   "vq": 16
   },
   "pesq_float": 2.507,
   "pesq_fixed": 2.465,
@@ -191,23 +206,23 @@
    "vq": 8
   },
   "pesq_float": 2.935,
-  "pesq_fixed": 2.904,
-  "pesq_fxenc_floatdec": 2.904
+  "pesq_fixed": 2.922,
+  "pesq_fxenc_floatdec": 2.922
  },
  {
   "clip": "librispeech_652_m.flac",
   "frames": 600,
   "frames_fx": 600,
-  "bit_exact": 0.9817,
+  "bit_exact": 0.98,
   "field_mismatch": {
    "voicing": 1,
    "Wo": 4,
    "energy": 3,
-   "vq": 9
+   "vq": 10
   },
   "pesq_float": 2.757,
-  "pesq_fixed": 2.778,
-  "pesq_fxenc_floatdec": 2.794
+  "pesq_fixed": 2.707,
+  "pesq_fxenc_floatdec": 2.77
  },
  {
   "clip": "librispeech_777_m.flac",
@@ -218,67 +233,52 @@
    "voicing": 0,
    "Wo": 3,
    "energy": 0,
-   "vq": 8
+   "vq": 7
   },
   "pesq_float": 3.192,
-  "pesq_fixed": 3.155,
-  "pesq_fxenc_floatdec": 3.147
+  "pesq_fixed": 3.148,
+  "pesq_fxenc_floatdec": 3.15
  },
  {
   "clip": "librispeech_8842_f.flac",
   "frames": 600,
   "frames_fx": 600,
-  "bit_exact": 0.9567,
+  "bit_exact": 0.96,
   "field_mismatch": {
    "voicing": 1,
    "Wo": 10,
    "energy": 6,
-   "vq": 23
+   "vq": 21
   },
   "pesq_float": 2.815,
-  "pesq_fixed": 2.802,
-  "pesq_fxenc_floatdec": 2.801
- },
- {
-  "clip": "female_libri198_14s.flac",
-  "frames": 695,
-  "frames_fx": 695,
-  "bit_exact": 0.9871,
-  "field_mismatch": {
-   "voicing": 2,
-   "Wo": 4,
-   "energy": 0,
-   "vq": 8
-  },
-  "pesq_float": 2.901,
-  "pesq_fixed": 2.951,
-  "pesq_fxenc_floatdec": 2.937
+  "pesq_fixed": 2.831,
+  "pesq_fxenc_floatdec": 2.833
  },
  {
   "clip": "male_libri3436_15s.flac",
   "frames": 750,
   "frames_fx": 750,
-  "bit_exact": 0.9827,
+  "bit_exact": 0.9813,
   "field_mismatch": {
    "voicing": 0,
    "Wo": 1,
    "energy": 1,
-   "vq": 11
+   "vq": 12
   },
   "pesq_float": 3.355,
-  "pesq_fixed": 3.348,
-  "pesq_fxenc_floatdec": 3.348
+  "pesq_fixed": 3.339,
+  "pesq_fxenc_floatdec": 3.339
  },
  {
   "clip": "male_ve9qrp_15s.flac",
   "frames": 750,
   "frames_fx": 750,
-  "bit_exact": 0.992,
+  "bit_exact": 0.9933,
   "field_mismatch": {
    "voicing": 0,
    "Wo": 2,
    "energy": 0,
-   "vq": 6
+   "vq": 5
   },
   "pesq_float": 3.071,
   "pesq_fixed": 3.167,
