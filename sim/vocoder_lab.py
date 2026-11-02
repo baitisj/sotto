@@ -397,6 +397,10 @@ class SottoV0:
                 pf = self.onset_pf              # v3.8: the first two unvoiced/edge frames after a
                                                 # voiced or mixed frame (a stop burst) keep their
                                                 # broadband shape
+            if vcode in (0, 3) and f and getattr(self, "burst_pf", None) is not None \
+                    and en[2 * f] - en[2 * f - 2] >= getattr(self, "burst_db", 8.0):
+                pf = self.burst_pf              # v3.8 study: an unvoiced frame that jumps up
+                                                # in level (a stop burst) keeps its broadband shape
             if pf and pf != 1.0:
                 shape = postfilter_rk(shape[None], pf)[0]
             rk[2 * f] = shape

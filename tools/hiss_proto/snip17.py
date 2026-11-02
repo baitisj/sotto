@@ -26,7 +26,7 @@ SRC={'wifewhisper':('wife',wx,None,(9.4,15.0)),'jeffwhisper':('jeff',jx,None,(2.
      'pair3':('p051',sf.read(C+'ears_p051_f.wav')[0],None,(4,10)),
      'p095':('p095',sf.read(C+'ears_p095_m.wav')[0],None,(0,6)),
      'p047':('p047',sf.read(C+'ears_p047_f.wav')[0],None,(0,6))}
-EXTRA={'p095':('fry','burst'),'pair3':('fry',)}
+EXTRA={'p095':('fry','burst','attack'),'pair3':('fry','attack'),'p047':('attack',),'wife':('attack',)}
 cache={}
 for name,(key,x,ch,(a,e)) in SRC.items():
     if ONLY and name not in ONLY.split(','): continue
@@ -43,6 +43,8 @@ for name,(key,x,ch,(a,e)) in SRC.items():
         win=hb.SottoV38(vowel='speaker')._read_pc(fr,gd); print(name,'measured pc',sp,'side channel',np.array(win)[[len(win)//3,-1]].tolist(),flush=True)
         if 'burst' in EXTRA.get(name,()):
             r['burst']=hb.SottoV38(vowel='speaker',onset_pf=1.0,**DEC).decode_audio16(fr,gd,n16=len(x))
+        if 'attack' in EXTRA.get(name,()):
+            r['attack']=hb.SottoV38(vowel='speaker',attack_db=12,**DEC).decode_audio16(fr,gd,n16=len(x))
         if 'fry' in EXTRA.get(name,()):
             b=hb.SottoV38(vowel='speaker',fry='slew',**V7).encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
             r['fry']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
@@ -55,4 +57,5 @@ for name,(key,x,ch,(a,e)) in SRC.items():
     w('0_original',x); w('1_v37',r['v37']); w('2_v38_measured',r['v38m']); w('3_v38',r['v38'])
     if 'fry' in r: w('4_v38_fry',r['fry'])
     if 'burst' in r: w('5_v38_burst',r['burst'])
+    if 'attack' in r: w('6_v38_attack',r['attack'])
     print(name,'done',flush=True)

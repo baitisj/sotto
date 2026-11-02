@@ -360,3 +360,65 @@ sib_db=3.0)` (plus the onset recode and burst rule that are always on), decoder
 release_ms=0, keep_mixed=True)`. Same 48-bit frame; UU frames carry a 6-bit hiss index
 and one side-channel bit in the pitch field. Off by default and on the page for ears:
 `fry="slew"`, `onset_pf=1.0`.
+
+## Decoder-only experiments on the v3.8 bits (2026-11-02)
+
+Same bitstream, PESQ-NB over the 12 clips, v3.8 decoder as above = 2.886
+(`tools/hiss_proto/play1.py`, `play2.py`).
+
+- **Low-frequency roll-off under the 50 Hz noise spacing.** The rate-K grid starts at
+  200 Hz, so the 50/100/150 Hz noise components take the 200 Hz level. Rolling them off
+  (12 dB/oct below 150 or 250 Hz: -0.005, -0.012) or dropping them (-60 dB: +0.002,
+  6313 +0.02) changes nothing. They are not why 6313 and 8842 dislike 50 Hz spacing;
+  that cause is still open.
+- **Decoder-side pitch smoother for creaky stretches.** Median-5 over log Wo inside voiced
+  runs, replacing frames that are off by more than 0.12 or 0.2, optionally only on frames
+  6 dB under the run's peak: -0.011, -0.010, 0.000 (gated). p051, the clip with the
+  creaky "light", loses 0.04-0.06 every time. The decoder cannot tell creak from a real
+  pitch move; only the encoder sees the harmonic SNR. Dropped.
+- **Stop-burst shape** (`burst_pf`, hook in `vocoder_lab.SottoV0.decode`): an unvoiced
+  frame 8 or 12 dB above the frame before keeps its broadband shape instead of the
+  postfiltered one: -0.025, -0.023, -0.014 (pf 1.15). Dropped. It also does not reach the
+  "t" of "strikes": that closure sits in M/edge frames at 44-47 dB and the jump into the
+  fricative is 3 dB, so no level rule finds it. (The input RMS there is <100 Hz rumble,
+  -17 to -36 dB, which hides the burst in any frame-energy view.)
+- **Sharp attack** (`attack_db`, decoder option on `SottoV38`): an unvoiced frame 12 dB
+  or more above the frame before keeps the interpolated 10 ms subframe at the quiet level,
+  a step instead of a half-way ramp: **+0.009 mean, 7 wins / 3 losses**, p095 +0.06,
+  6313 +0.05, 652 +0.02, p020 -0.045, 2428 -0.04. Threshold 10 dB +0.003, 14 dB -0.008,
+  16 dB -0.016; putting the subframe at the loud level instead ("early") -0.054. It fires
+  6-20 times per clip, at fricatives and bursts after pauses (on p095 at 1.82, 2.04, 2.72,
+  3.0, 4.56, 6.96, 8.32 s), never inside a word. On the v3.8 page as row 6 for p095, p051,
+  p047 and the wife's voiced clip (her opening S). Off by default until heard.
+
+## Where the next real gains might be
+
+Ranked by expected audible gain per hour, with what each would cost.
+
+1. **Stops (the lost "t").** 20 ms frames with 10 ms interpolation cannot place a 10 ms
+   burst, and the closure before it is coded as the vowel's tail. Routes: a decoder rule
+   (`attack_db`, above, does not reach this case); an encoder rule that codes a detected
+   closure as energy code 0 (silence) and pushes the burst's level into the next frame,
+   encoder-only and bitstream-compatible but the closure detector must not fire on quiet
+   vowel tails; or a 1-bit hold/ramp flag, which needs a bit the UU frame no longer has
+   (6 index + 1 side). Ears only; PESQ does not see bursts.
+2. **The 50 Hz spacing cost on 6313 and 8842** (-0.2 each, the whole v3.7 -> v3.8 mean
+   loss). Not LF content. Next suspects: the overlap-add of independent random phases per
+   10 ms subframe at 50 Hz spacing (slower amplitude modulation than at 100 Hz) and PESQ's
+   time alignment. A per-frame disturbance trace from PESQ would localise it in an hour.
+3. **Vocal fry.** Only the encoder sees the creak (harmonic SNR 2-7 dB, pitch wandering
+   72-119 Hz). The slew limiter (`fry="slew"`, on the page) is the bitstream-compatible
+   fix; PESQ -0.015..-0.03. Anything better needs a creak-aware tracker.
+4. **Mixed frames have no hiss index** (z, v, zh, breathy vowels keep the -3 dB guess).
+   Their 7 pitch bits are real pitch. A 2-bit tilt could come from the energy field
+   (5 -> 4 bits, 2 dB steps) or the shape (34 -> 33) in MM frames only. Bitstream change,
+   v3.9 material; worth a PESQ + ears study.
+5. **Spare side-channel capacity.** About 24 UU frames per 2 s window carry 16 bits.
+   The other ~8 could hold a station hiss-level offset (if PC1 does not already carry
+   it), a whisper-mode flag, or a second message per window so the speaker shape locks in
+   twice as fast after a fade.
+6. **Perceptual weighting in the shape VQ search** (formant peaks over valleys).
+   Encoder-only, PESQ-blind, ears.
+7. **Voiced phase model.** c2sim `--phase0` is zero-phase per harmonic; a dispersion
+   filter or Codec 2's newer phase synthesis would change the voiced texture. Independent
+   of the hiss work, large, ears.
