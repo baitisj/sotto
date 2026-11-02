@@ -518,3 +518,21 @@ recoded in 12 s, three of them the prism z). The encoder's 10 ms measure puts th
 -10 to -6 dB (4-8 kHz against 0-1 kHz), the 20 ms STFT bands at about 0 dB; the rule's
 threshold is calibrated to the former. This is item 4 of the list (a hiss level for
 voiced/mixed frames) made concrete.
+
+**Correction on the "t" of "sunlight strikes" (05:10 UTC).** Jeff gave the time index:
+0.281-0.521 s of the p095 snippet (= of the clip), not 1.1 s. There the t of "sunlight" runs
+into the s of "strikes": 0.36-0.44 s is one 80 ms hiss cluster at +16 to +22 dB in 4-8 kHz
+with the voice bar still at 10-20 dB. Four of its five frames are coded M (voice bar
+present), one UU, so only one frame gets a hiss index and the rest the -3 dB guess: v3.8's
+4-8 kHz there is +23/+19 on one frame and -3..-9, +3/-4 on the others, 20 dB low; v3.7 has
+nothing. That single frame of hiss is the "k" in "sunlike". Everything in the two sections
+above that was aimed at 1.1 s (`uv_pf`, `onset_pf`, `burst_pf`, `flat_pf_db`,
+`contrast_db`, `attack_db`) was aimed at a frame that was fine; those hooks are off by
+default and are to be removed. The fix is the same as for prism: frames whose 4-8 kHz
+comes within 10 dB of their 0-1 kHz are sent UU with an index whatever their voicing
+(`sib_voiced=True, sib_db=-10`). PESQ over 12 clips (`play8.py`, fresh encodes): 2.868 ->
+2.844 (3 wins / 6 losses; p051 -0.07 for its three z frames, 251 -0.08, 777 -0.10); the
+same threshold on M/edge frames only costs the same, so the cost is the lower threshold,
+not the voiced frames. Jeff: prism fixed ("YAY"); p095 at 0.28-0.52 s on the page as
+"v3.8 + z fix" for his ears. Lesson recorded: get the time index from the listener before
+analysing, and quote it back.

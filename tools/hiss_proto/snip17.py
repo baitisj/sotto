@@ -26,7 +26,7 @@ SRC={'wifewhisper':('wife',wx,None,(9.4,15.0)),'jeffwhisper':('jeff',jx,None,(2.
      'pair3':('p051',sf.read(C+'ears_p051_f.wav')[0],None,(4,10)),
      'p095':('p095',sf.read(C+'ears_p095_m.wav')[0],None,(0,6)),
      'p047':('p047',sf.read(C+'ears_p047_f.wav')[0],None,(0,6))}
-EXTRA={'p095':('fry','burst','attack','flatburst','contrast'),'pair3':('fry','attack','zhiss'),'p047':('attack',),'wife':('attack',)}
+EXTRA={'p095':('zfix',),'pair3':('zfix',),'p047':('zfix',),'pair2':('zfix',)}
 cache={}
 for name,(key,x,ch,(a,e)) in SRC.items():
     if ONLY and name not in ONLY.split(','): continue
@@ -51,6 +51,9 @@ for name,(key,x,ch,(a,e)) in SRC.items():
         if 'contrast' in EXTRA.get(name,()):
             ee=hb.SottoV38(vowel='speaker',**V7); ee.contrast_db=15; b=ee.encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
             r['contrast']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
+        if 'zfix' in EXTRA.get(name,()):
+            ee=hb.SottoV38(vowel='speaker',**{**V7,'sib_db':-10.0}); ee.sib_voiced=True; b=ee.encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
+            r['zfix']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
         if 'zhiss' in EXTRA.get(name,()):
             b=hb.SottoV38(vowel='speaker',**{**V7,'sib_db':-6.0}).encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
             r['zhiss']=hb.SottoV38(vowel='speaker',**DEC).decode_audio16(fr,gd,n16=len(x))
@@ -70,4 +73,5 @@ for name,(key,x,ch,(a,e)) in SRC.items():
     if 'flatburst' in r: w('7_v38_flatburst',r['flatburst'])
     if 'contrast' in r: w('8_v38_contrast',r['contrast'])
     if 'zhiss' in r: w('9_v38_zhiss',r['zhiss'])
+    if 'zfix' in r: w('a_v38_zfix',r['zfix'])
     print(name,'done',flush=True)
