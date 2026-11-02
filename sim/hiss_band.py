@@ -225,7 +225,7 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
-    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, keep_mixed=False, sib_db=None, fry=False, uv_pf=None, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, keep_mixed=False, sib_db=None, fry=False, uv_pf=None, onset_pf=None, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
@@ -236,6 +236,7 @@ class SottoV38(vl.SottoV37):
         self.spk_pc = spk_pc                  # vowel_shape="fine": 3 speaker-shape coefficients (side channel)
         self.whisper = whisper                # encoder: send whispered vowels (mixed runs with no
                                               # real harmonics and a wandering pitch) as unvoiced
+        self.onset_pf = onset_pf              # decoder: postfilter on the first UU frame after V/M
         self.uv_pf = uv_pf                    # decoder: postfilter strength on UU frames (None = pf)
         self.fry = fry                        # encoder: steady pitch through jumpy (creaky) voiced stretches
         self.sib_db = sib_db                  # encoder: M/edge frames with 4-8 kHz > 0-1 kHz + sib_db -> UU

@@ -369,6 +369,7 @@ class SottoV0:
         wo = np.zeros(2 * n)
         rk = np.zeros((2 * n, K))
         en = np.zeros(2 * n)
+        since_vm = 99
         for f, b in enumerate(np.asarray(bits)):
             p = 0
 
@@ -388,6 +389,14 @@ class SottoV0:
             pf = self.pf
             if vcode == 0 and getattr(self, "uv_pf", None) is not None:
                 pf = self.uv_pf                 # v3.8: weaker formant postfilter on UU frames
+            if vcode in (1, 2):
+                since_vm = 0
+            elif f:
+                since_vm += 1
+            if vcode in (0, 3) and since_vm <= 2 and getattr(self, "onset_pf", None) is not None:
+                pf = self.onset_pf              # v3.8: the first two unvoiced/edge frames after a
+                                                # voiced or mixed frame (a stop burst) keep their
+                                                # broadband shape
             if pf and pf != 1.0:
                 shape = postfilter_rk(shape[None], pf)[0]
             rk[2 * f] = shape

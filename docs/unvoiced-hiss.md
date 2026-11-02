@@ -296,10 +296,21 @@ Still open from his notes, worked on before the C port:
   bands matching: the formant postfilter (1.35) deepens the low-band "valley" of a
   fricative and leaves a thin hiss where the original has a broadband burst. (The original's
   strong 0-100 Hz content through the closure is rumble below the envelope's 200 Hz start
-  and is not the problem.) Decoder option `uv_pf`: postfilter strength on UU frames.
+  and is not the problem.) Decoder options `uv_pf` (postfilter strength on UU frames) and
+  `onset_pf` (on the first two unvoiced/edge frames after a voiced or mixed frame). Neither
+  pays by the numbers: PESQ-NB over the 12 clips 2.887 with the postfilter everywhere,
+  2.873 / 2.852 / 2.795 with 1.2 / 1.1 / 1.0 on all UU frames, 2.869 / 2.849 with 1.15 /
+  1.0 on onset frames only, and the burst frame's 200-1200 Hz deficit only drops from 6-8
+  to 4-5 dB (the following "s" frames stay 13-14 dB short). Both off by default; the burst
+  variant is on the v3.8 page for ears. The "t" stays a 20 ms-frame limit.
 - **Vocal fry** ("rainbow" on p095 4.28-4.45 s, "light" on p051 6.1-6.45 s): the tracker's
   pitch wanders 72-119 Hz frame to frame through creak (harmonic SNR 2-7 dB) and the
   harmonic synthesis makes a warble. Re-pitching flagged stretches on a line and sending
   them mixed (`fry=True`) cost PESQ 0.05-0.18 on three voices and was dropped. `fry="slew"`:
   inside a voiced run the log pitch may move at most 0.08 per frame unless the frame's
-  harmonic SNR is >= 8 dB (one state variable, decoder unchanged).
+  harmonic SNR is >= 8 dB (one state variable, decoder unchanged). It smooths both spots
+  (p095: 82 105 117 103 105 -> 85 91 98 103 105) but costs PESQ 0.015-0.03 on average
+  whatever the thresholds (`fry_eval2.py`: step 0.08-0.15, trust 5-8 dB; 3-8% of frames
+  touched), with single clips moving +-0.1. Off by default; on the v3.8 page as an A/B for
+  the two spots. A proper fix is aperiodic (pulse-by-pulse) excitation in creak, which the
+  sinusoidal model can't do, or a tracker that penalises jumps when the harmonic fit is poor.
