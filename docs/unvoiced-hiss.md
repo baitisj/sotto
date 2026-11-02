@@ -314,3 +314,49 @@ Still open from his notes, worked on before the C port:
   touched), with single clips moving +-0.1. Off by default; on the v3.8 page as an A/B for
   the two spots. A proper fix is aperiodic (pulse-by-pulse) excitation in creak, which the
   sinusoidal model can't do, or a tracker that penalises jumps when the harmonic fit is poor.
+
+## Scores and the v3.8 page
+
+0-4 kHz core (PESQ-NB / ESTOI at 8 kHz, `pesq_v37_v38.py`), v3.7 vs the v3.8 candidate's
+bits decoded without the high band:
+
+| clip | v3.7 | v3.8 |
+|---|---|---|
+| ears p020 m | 3.011 / 0.807 | 3.059 / 0.797 |
+| ears p047 f | 2.884 / 0.846 | 2.861 / 0.841 |
+| ears p051 f | 2.773 / 0.843 | 2.663 / 0.833 |
+| ears p095 m | 2.932 / 0.817 | 2.926 / 0.814 |
+| libri 2428 m | 3.288 / 0.842 | 3.348 / 0.837 |
+| libri 251 m | 2.952 / 0.856 | 2.973 / 0.856 |
+| libri 3081 f | 2.493 / 0.700 | 2.511 / 0.702 |
+| libri 3536 f | 2.945 / 0.819 | 2.858 / 0.820 |
+| libri 6313 f | 2.929 / 0.796 | 2.662 / 0.782 |
+| libri 652 m | 2.730 / 0.810 | 2.870 / 0.809 |
+| libri 777 m | 3.152 / 0.811 | 3.140 / 0.801 |
+| libri 8842 f | 2.862 / 0.839 | 2.765 / 0.835 |
+| **mean** | **2.913 / 0.815** | **2.887 / 0.810** |
+
+Mean -0.026 PESQ, with 6313 -0.27, p051 -0.11, 8842 -0.10 and 652 +0.14. Ablations
+(`ablate_6313.py`, `hook_ablate.py`, `spacing_ablate.py`): the encoder rules account for
+little of it (6313: v3.7 bits through the v3.8 decoder 2.732, + onset recode / burst /
+whisper 2.721, + vsmooth 2.662, + sibilant 2.662); most is the decoder's unvoiced synthesis
+change, 50 Hz noise spacing in place of v3.7's coded-Wo / 100 Hz halves, which PESQ
+dislikes on 6313, 8842 and p095 (-0.1..-0.2) and likes on 652 and p047 (+0.1), mean -0.03
+before the gated +3 dB boost and -0.014 after. With 100 Hz spacing the mean is 2.911, level
+with v3.7. 50 Hz is kept: at 100 Hz the random-phase sum is periodic within the 20 ms frame
+(a 10 ms buzz under fricatives, the old Codec 2 unvoiced texture), and the hiss variants
+built on 50 Hz won rounds 11-13 and the whisper page by ear, including on p095 where PESQ
+says the opposite. PESQ-NB moves by +-0.1 per clip on changes to noise synthesis, so the
+per-voice numbers above are not to be read closely.
+
+Page: https://claude.ai/artifact/4znczJEufu9VwqX83JmQpb (9 groups: the three whispered
+and two voiced bench clips, the fading LibriSpeech female, p051, p095, p047; original /
+v3.7 / v3.8 with the speaker shape measured / v3.8 with the shape over the side channel,
+plus the fry and burst A/Bs on p051 and p095). Render: `snip17.py`.
+
+v3.8 as proposed: encoder `SottoV38(vowel="speaker", whisper=True, vsmooth=True,
+sib_db=3.0)` (plus the onset recode and burst rule that are always on), decoder
+`SottoV38(vowel="speaker", vowel_shape="fine", voiced_trim=-5, blend=True,
+release_ms=0, keep_mixed=True)`. Same 48-bit frame; UU frames carry a 6-bit hiss index
+and one side-channel bit in the pitch field. Off by default and on the page for ears:
+`fry="slew"`, `onset_pf=1.0`.
