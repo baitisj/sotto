@@ -485,7 +485,13 @@ carries the hiss index in that field, so the mixed half of an edge frame before 
 fricative was synthesised at a random pitch for 10 ms (p051: L 39 -> 78 at 7.38 s; three
 such subframes in 12 s). `SottoV38.UU_WO_GUARD` keeps the frame's own Wo in that case;
 v3.7 decode is bit-identical. It also explains why fresh v3.8 encodes scored up to 0.05
-away from the cached `encode_low` bits with identical voicing, energy and shape.
+away from the cached `encode_low` bits with identical voicing, energy and shape (those
+cached bits still carry the real Wo in UU frames, so they never leaked). Measured on
+fresh encodes (`play7.py`): the guard changes 0-9 subframes per clip, 40 in all, and
+moves PESQ by up to +-0.1 per clip either way (p020 -0.105, 777 +0.076), mean 2.875 ->
+2.868. Ten milliseconds of wrong pitch moves PESQ that much because the phase track of
+the voiced run after it shifts; it is also a reminder that per-clip PESQ differences
+under 0.1 are noise for this codec.
 
 **"prism" is a z.** Its frames (8.12-8.19 s) have the 4-8 kHz band 2-8 dB *under* 0-1 kHz,
 so the sibilant rule (+3 dB) never fires; they are coded M/edge, correctly, and the hiss
