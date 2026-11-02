@@ -44,7 +44,7 @@
 #define WO_MIN 26843546u      /* 2 pi / 160, Q32 turns */
 #define WO_HI 268435456u      /* 2 pi / 16 */
 #define WO_C2MAX 214748365u   /* 2 pi / 20, Codec 2's highest pitch */
-#define DB(x) ((int32_t)((x) * 256))
+#define DB(x) ((int32_t)((x) * 256L))
 #define NAT(x) ((int32_t)((x) * 65536))   /* costs: natural log units, Q16 */
 #define LN2_Q16 45426
 #define LN_RAD (-1333188)     /* (ln(2 pi) - 32 ln 2), Q16: ln(Wo in radians) from Q32 turns */
@@ -89,39 +89,74 @@ struct sotto_enc {
 
 #define R(e, t) (&(e)->ring[(t) % RING])
 
-static int32_t ln_q16(uint64_t x) { return (int32_t)(((fx_acc)fx_log2_64(x) * LN2_Q16 + 32768) >> 16); }
+static int32_t ln_q16(fx_uacc x) { return (int32_t)(((fx_acc)fx_log2_acc(x) * LN2_Q16 + 32768) >> 16); }
 static int32_t ln_wo(uint32_t wo) { return ln_q16(wo) + LN_RAD; }
-/* 2^48 / x: pitch period Q16 <-> Wo Q32 turns */
-static uint32_t recip48(uint32_t x) { return (uint32_t)((((uint64_t)1 << 48) + (x >> 1)) / x); }
+/* 2^48 / x, rounded: pitch period Q16 <-> Wo Q32 turns */
+static uint32_t recip48(uint32_t x) {
+  int n = 16;
+  uint32_t v = x >> 16, xn, y, r, q;
+  if (x < ((uint32_t)1 << 20) || x >= ((uint32_t)1 << 28)) {
+    fx_uacc r40, q40 = fx_udiv_shl(1, 48, x, &r40);
+    return (uint32_t)q40 + (r40 + (x >> 1) >= x);
+  }
+  /* one 32-bit division for a 17-bit reciprocal of the top 16 bits, a multiply for the
+     next 14 bits, then the exact remainder (mod 2^32, |r| < 2^31): at most one correction
+     step for every x in [2^20, 2^28) (checked exhaustively against the 64-bit division) */
+  while (v) n++, v >>= 1;                                   /* n = bit length of x, 21..28 */
+  xn = x >> (n - 16);
+  y = 0xFFFFFFFFu / (xn + 1);
+  r = 0u - y * x;                                           /* 2^(16+n) - y x, < 2^(n+2) */
+  q = (y << (32 - n)) + (((r >> (n - 13)) * y) >> (n - 3));
+  r = 0u - q * x;                                           /* 2^48 - q x */
+  while ((int32_t)r < 0) q--, r += x;
+  while (r >= x) q++, r -= x;
+  return q + (r + (x >> 1) >= x);
+}
 
 /* power of bin b (0..511) of frame f's 16-bit spectrum */
-static fx_acc pw(const spec_t *f, int b) {
+static inline fx_acc pw(const spec_t *f, int b) {
   if (b > 256) b = 512 - b;
   return (fx_acc)f->sw[2 * b] * f->sw[2 * b] + (fx_acc)f->sw[2 * b + 1] * f->sw[2 * b + 1];
 }
-/* the same at 31-bit precision (sums of up to 256 stay inside 40 bits), for harmonic sums */
-static fx_acc pwh(const spec_t *f, int b) { return f->p[b > 256 ? 512 - b : b]; }
 
 /* Codec 2's harmonic count: floor(pi / Wo), less one when the last harmonic is at 0.95 pi or above */
 static int n_harm(uint32_t wo) {
   int L = (int)(0x80000000u / wo);
-  if ((uint64_t)L * wo >= 2040109466u) L--;
+  if ((fx_uacc)L * wo >= 2040109466u) L--;
   return L;
 }
 
-/* ceil((2l - 1) Wo 256 / 2^32) style bin bounds: ceil(x / 2^sh) and floor(x / 2^sh + 1/2) */
-static int ceil_sh(uint64_t x, int sh) { return (int)((x + ((uint64_t)1 << sh) - 1) >> sh); }
-static int round_sh(uint64_t x, int sh) { return (int)((x + ((uint64_t)1 << (sh - 1))) >> sh); }
+/* ceil((2l - 1) Wo 256 / 2^32) style bin bounds: ceil(x / 2^sh) */
+static int ceil_sh(fx_uacc x, int sh) { return (int)((x + ((fx_uacc)1 << sh) - 1) >> sh); }
 
 /* ---------------------------------------------------------------- analysis */
+
+/* the right shift that brings the largest |re|, |im| of bins 0..256 below 2^bits */
+static int bins_shift(const int32_t *re, const int32_t *im, int bits) {
+  int b, t = 0;
+  uint32_t m = 0;
+  for (b = 0; b < NB; b++) {
+    uint32_t a = (uint32_t)(re[b] < 0 ? -re[b] : re[b]), c = (uint32_t)(im[b] < 0 ? -im[b] : im[b]);
+    if (a > m) m = a;
+    if (c > m) m = c;
+  }
+  while ((m >> t) >= ((uint32_t)1 << bits) - 1) t++;   /* rounding may add one */
+  return t;
+}
+/* power of a bin rounded right by t bits */
+static fx_acc sq2(int32_t re, int32_t im, int t) {
+  int32_t a = t ? fx_rshr32(re, t) : re, b = t ? fx_rshr32(im, t) : im;
+  return fx_sq32(a) + fx_sq32(b);
+}
 
 /* Codec 2's windowed 512-point spectrum of the 320 samples at buf: e->re, e->im (int32,
    float spectrum = re x 2^(return value + fx_sw_l2 / 2^16)), and its 16-bit copy in *f */
 static int spectrum(struct sotto_enc *e, const int16_t *buf, spec_t *f) {
+  int i, b;
   int32_t *re = e->re, *im = e->im;
   int32_t x[278];
   uint32_t mx = 0;
-  for (int i = 0; i < 278; i++) {
+  for (i = 0; i < 278; i++) {
     x[i] = (int32_t)buf[21 + i] * fx_hann[i];                /* Q15 */
     uint32_t a = (uint32_t)(x[i] < 0 ? -x[i] : x[i]);
     if (a > mx) mx = a;
@@ -130,18 +165,20 @@ static int spectrum(struct sotto_enc *e, const int16_t *buf, spec_t *f) {
   memset(im, 0, sizeof e->im);
   int s = 0;                                                  /* x * 2^-s, largest in [2^22, 2^23) */
   if (mx) {
-    while ((mx >> s) >= (1u << 23)) s++;
+    while ((mx >> s) >= ((uint32_t)1 << 23)) s++;
     if (s == 0)
-      while (((uint64_t)mx << (1 - s)) < (1u << 23)) s--;
+      while ((mx << (1 - s)) < ((uint32_t)1 << 23)) s--;
   }
   /* Codec 2 centres the window on the time origin: samples 160..298 at 0.., 21..159 at the end */
-  for (int i = 0; i < 278; i++) {
+  for (i = 0; i < 278; i++) {
     int n = 21 + i;                                           /* buffer index */
-    re[n >= 160 ? n - 160 : 512 - 160 + n] = s > 0 ? fx_rshr(x[i], s) : x[i] * (1 << -s);
+    re[n >= 160 ? n - 160 : 512 - 160 + n] = s > 0 ? fx_rshr32(x[i], s) : (int32_t)((uint32_t)x[i] << -s);
   }
+  FX_PROF(15, 1);
   fx_fft(re, im, 512);
+  FX_PROF(15, 0);
   int32_t m2 = 0;
-  for (int b = 0; b < NB; b++) {
+  for (b = 0; b < NB; b++) {
     int32_t a = re[b] < 0 ? -re[b] : re[b], c = im[b] < 0 ? -im[b] : im[b];
     if (a > m2) m2 = a;
     if (c > m2) m2 = c;
@@ -150,98 +187,116 @@ static int spectrum(struct sotto_enc *e, const int16_t *buf, spec_t *f) {
   if (m2) {
     while ((m2 >> s2) > 32767) s2++;
     if (s2 == 0)
-      while (s2 > -15 && ((int64_t)m2 << (1 - s2)) <= 32767) s2--;
+      while (s2 > -15 && (m2 << (1 - s2)) <= 32767) s2--;
   }
-  for (int b = 0; b < NB; b++) {
-    f->sw[2 * b] = (int16_t)(s2 > 0 ? fx_rshr(re[b], s2) : re[b] * (1 << -s2));
-    f->sw[2 * b + 1] = (int16_t)(s2 > 0 ? fx_rshr(im[b], s2) : im[b] * (1 << -s2));
+  for (b = 0; b < NB; b++) {
+    f->sw[2 * b] = (int16_t)(s2 > 0 ? fx_rshr32(re[b], s2) : (int32_t)((uint32_t)re[b] << -s2));
+    f->sw[2 * b + 1] = (int16_t)(s2 > 0 ? fx_rshr32(im[b], s2) : (int32_t)((uint32_t)im[b] << -s2));
   }
   f->e = (int16_t)(s + s2);
-  int64_t pm = 0;                                             /* 64-bit squares of 32-bit bins */
-  for (int b = 0; b < NB; b++) {
-    int64_t q = (int64_t)re[b] * re[b] + (int64_t)im[b] * im[b];
+  /* power per bin at 31 bits, from the bins rounded to 19 bits (so a power is < 2^39) */
+  int t = bins_shift(re, im, 19);
+  fx_acc pm = 0;
+  for (b = 0; b < NB; b++) {
+    fx_acc q = sq2(re[b], im[b], t);
     if (q > pm) pm = q;
   }
   int sp = 0;
-  while ((pm >> sp) >= ((int64_t)1 << 31)) sp++;
-  for (int b = 0; b < NB; b++)
-    f->p[b] = (uint32_t)((((int64_t)re[b] * re[b] + (int64_t)im[b] * im[b]) + (sp ? (int64_t)1 << (sp - 1) : 0)) >> sp);
+  while ((pm >> sp) >= ((fx_acc)1 << 31)) sp++;
+  for (b = 0; b < NB; b++) {
+    fx_acc q = sq2(re[b], im[b], t);
+    f->p[b] = (uint32_t)(sp ? fx_rshr(q, sp) : q);
+  }
   return s;
 }
 
 /* Codec 2's NLP: the pitch bin (3.125 Hz steps) of the 10 ms just added to the input */
 static int msb(uint32_t x) { int n = -1; while (x) { x >>= 1; n++; } return n; }
 static uint32_t uabs(int32_t x) { return (uint32_t)(x < 0 ? -x : x); }
-static int32_t shift(int64_t x, int s) { return s > 0 ? fx_rshr(x, s) : (int32_t)(x * ((int64_t)1 << -s)); }
+static int32_t shift(int32_t x, int s) { return s > 0 ? fx_rshr32(x, s) : (int32_t)((uint32_t)x << -s); }
 
 static int nlp_bin(struct sotto_enc *e) {
+  int i, j, b, k, n, mult;
   /* squared input; choose this block's exponent so it and the filter memories stay below
      2^22, and rescale the memories to it */
   uint32_t sq2[NSAMP], mx = 0, mm = uabs(e->mem_x) | uabs(e->mem_y);
-  for (int i = 0; i < NSAMP; i++) {
+  for (i = 0; i < NSAMP; i++) {
     int32_t v = e->hist[HIST - NSAMP + i];
     sq2[i] = (uint32_t)(v * v);
     mx |= sq2[i];
   }
-  for (int j = 0; j < 48; j++) mm |= uabs(e->fir[j]);
+  for (j = 0; j < 48; j++) mm |= uabs(e->fir[j]);
   int sh = msb(mx) - 21, shm = mm ? e->sh + msb(mm) - 21 : -99;
   if (shm > sh) sh = shm;
   if (sh < -8) sh = -8;
   int d = sh - e->sh;
   e->mem_x = shift(e->mem_x, d);
   e->mem_y = shift(e->mem_y, d);
-  for (int j = 0; j < 48; j++) e->fir[j] = shift(e->fir[j], d);
+  for (j = 0; j < 48; j++) e->fir[j] = shift(e->fir[j], d);
   e->sh = (int16_t)sh;
   e->blk[3] = (int16_t)sh;
   int32_t one = shift(1, sh);                                 /* Codec 2 adds 1.0 after the notch */
-  for (int i = 0; i < NSAMP; i++) {
+  for (i = 0; i < NSAMP; i++) {
     int32_t x = shift(sq2[i], sh);
-    int32_t y = x - e->mem_x + fx_rshr((fx_acc)e->mem_y * 31130, 15);   /* DC notch, pole 0.95 */
+    int32_t y = x - e->mem_x + fx_rshr(fx_mul32x16(e->mem_y, 31130), 15);   /* DC notch, pole 0.95 */
     e->mem_x = x;
     e->mem_y = y;
     memmove(e->fir, e->fir + 1, 47 * sizeof(int32_t));
     e->fir[47] = y + one;
-    fx_acc a = 0;
-    for (int j = 0; j < 48; j++) a += (fx_acc)e->fir[j] * fx_nlp_fir[j];
+    fx_acc a = 0, al = 0;
+    for (j = 0; j < 48; j++) {
+      a += (fx_acc)FX_HI(e->fir[j]) * fx_nlp_fir[j];
+      al += (fx_acc)FX_LO(e->fir[j]) * fx_nlp_fir[j];
+    }
+    a = FX_JOIN(a, al);
     FX_ACC_CHECK(a);
     e->sq[MPITCH - NSAMP + i] = fx_rshr(a, 15);
   }
   /* decimate by 5 (aligning the four blocks' exponents), window, normalise to 15 bits */
   int shx = e->blk[0];
-  for (int b = 1; b < 4; b++)
+  for (b = 1; b < 4; b++)
     if (e->blk[b] > shx) shx = e->blk[b];
   int32_t xd[64];
   mx = 0;
-  for (int i = 0; i < 64; i++) {
+  for (i = 0; i < 64; i++) {
     int32_t v = shift(e->sq[5 * i], shx - e->blk[(5 * i) / NSAMP]);
-    xd[i] = fx_rshr((fx_acc)v * fx_nlp_win[i], 15);
+    xd[i] = fx_rshr(fx_mul32x16(v, fx_nlp_win[i]), 15);
     mx |= uabs(xd[i]);
   }
   int s = 0;
-  while ((mx >> s) >= (1u << 14)) s++;
+  while ((mx >> s) >= ((uint32_t)1 << 14)) s++;
   int16_t x16[64];
-  for (int i = 0; i < 64; i++) x16[i] = (int16_t)(s ? fx_rshr(xd[i], s) : xd[i]);
+  for (i = 0; i < 64; i++) x16[i] = (int16_t)(s ? fx_rshr32(xd[i], s) : xd[i]);
   /* DFT magnitudes at bins 15..129 of 512 */
   fx_acc P[130];                                          /* entries 15..129 used */
-  for (int k = 15; k < 130; k++) {
+  int32_t rr[130], qq[130];
+  uint32_t pmx = 0;
+  for (k = 15; k < 130; k++) {
     fx_acc r = 0, q = 0;
-    for (int n = 0; n < 64; n++) {
+    for (n = 0; n < 64; n++) {
       int x = (k * n) & 511;
       r += (fx_acc)x16[n] * fx_cos512[x];
       q += (fx_acc)x16[n] * fx_cos512[(x - 128) & 511];
     }
     FX_ACC_CHECK(r); FX_ACC_CHECK(q);
-    int32_t rr = fx_rshr(r, 15), qq = fx_rshr(q, 15);
-    P[k] = (fx_acc)rr * rr + (fx_acc)qq * qq;              /* 64-bit scalar */
+    rr[k] = fx_rshr(r, 15), qq[k] = fx_rshr(q, 15);
+    pmx |= uabs(rr[k]) | uabs(qq[k]);
+  }
+  /* magnitudes below 2^16, so powers are < 2^33 and 20 x a power fits in 40 bits */
+  int tp = 0;
+  while ((pmx >> tp) >= 65535) tp++;
+  for (k = 15; k < 130; k++) {
+    int32_t a = tp ? fx_rshr32(rr[k], tp) : rr[k], c = tp ? fx_rshr32(qq[k], tp) : qq[k];
+    P[k] = fx_sq32(a) + fx_sq32(c);
   }
   fx_acc gmax = 0;
   int gbin = 16;
-  for (int k = 16; k <= 128; k++)
+  for (k = 16; k <= 128; k++)
     if (P[k] > gmax) gmax = P[k], gbin = k;
   /* sub-multiples: prefer a lower pitch peak that is a local maximum above a threshold,
      a lower threshold near the previous frame's estimate */
   int cbin = gbin;
-  for (int mult = 2; gbin / mult >= 16; mult++) {
+  for (mult = 2; gbin / mult >= 16; mult++) {
     int b = gbin / mult, bmin = fx_nlp_bmin[b], bmax = fx_nlp_bmax[b];
     if (bmin < 16) bmin = 16;
     int near = e->prev_bin > bmin && e->prev_bin < bmax;
@@ -261,70 +316,107 @@ static int nlp_bin(struct sotto_enc *e) {
 
 /* Codec 2's harmonic-sum refinement over pitch periods p0 - span .. p0 + span (Q16) */
 static uint32_t hs_refine(const spec_t *f, uint32_t p0, uint32_t span, uint32_t step, uint32_t wo) {
+  uint32_t p;
+  int m;
   int L = (int)(0x80000000u / wo);
   fx_acc em = 0;
   uint32_t wom = wo;
-  for (uint32_t p = p0 - span; p <= p0 + span; p += step) {
+  for (p = p0 - span; p <= p0 + span; p += step) {
     uint32_t w = recip48(p);
     fx_acc E = 0;
-    for (int m = 1; m <= L; m++) E += pwh(f, round_sh((uint64_t)m * w, 23));
+    uint32_t acc = w + ((uint32_t)1 << 22);                /* m w + 1/2 bin, < 2^32 for m <= L */
+    for (m = 1; m <= L; m++, acc += w) {
+      int b = (int)(acc >> 23);
+      E += f->p[b > 256 ? 512 - b : b];
+    }
     FX_ACC_CHECK(E);
     if (E > em) em = E, wom = w;
   }
   return wom;
 }
 
+/* n 2^15 / d for d > 0, truncated toward zero, with d rounded down to 16 bits: about 15
+   significant bits, plenty for a least-squares amplitude (the residual is flat around its
+   minimum), and one 32-bit division instead of several 40-bit ones */
+static int32_t div_q15(fx_acc n, fx_acc d) {
+  fx_uacc un = (fx_uacc)(n < 0 ? -n : n), num;
+  int sd = d >= ((fx_acc)1 << 32) ? 16 : 0, sh;
+  while ((d >> sd) >= 65536) sd++;                         /* d >> sd in [2^15, 2^16) */
+  sh = 15 - sd;
+  if (sh > 0 && (un >> (39 - sh)) != 0) num = 0xFFFFFFFFu;
+  else num = sh >= 0 ? un << sh : un >> -sh;
+  if (num > 0xFFFFFFFFu) num = 0xFFFFFFFFu;
+  uint32_t q = (uint32_t)num / (uint32_t)(d >> sd);
+  if (q > 0x7FFFFFFFu) q = 0x7FFFFFFFu;
+  return n < 0 ? -(int32_t)q : (int32_t)q;
+}
+
 /* least-squares fit of the window response to bins [al, bl) around harmonic l:
    returns the residual power, and the band power in *sig */
 static fx_acc harm_fit(const spec_t *f, uint32_t wo, int l, fx_acc *sig) {
-  int al = ceil_sh((uint64_t)(2 * l - 1) * wo, 24), bl = ceil_sh((uint64_t)(2 * l + 1) * wo, 24);
-  int off = (int)((((uint64_t)256 << 23) + (1u << 22) - (uint64_t)l * wo) >> 23);
+  int i;
+  uint32_t lw = (uint32_t)l * wo;                          /* < 2^31 for the harmonics fitted */
+  int al = ceil_sh((fx_uacc)lw * 2 - wo, 24), bl = ceil_sh((fx_uacc)lw * 2 + wo, 24);
+  int off = (int)((((fx_uacc)256 << 23) + ((fx_uacc)1 << 22) - lw) >> 23);
   fx_acc nr = 0, ni = 0, den = 0, s = 0, err = 0;
-  for (int i = al; i < bl; i++) {
-    int32_t w = fx_W[off + i];
+  for (i = al; i < bl; i++) {
+    int16_t w = fx_W[off + i];
     nr += (fx_acc)f->sw[2 * i] * w;
     ni += (fx_acc)f->sw[2 * i + 1] * w;
     den += (fx_acc)w * w;
   }
   FX_ACC_CHECK(nr); FX_ACC_CHECK(ni); FX_ACC_CHECK(den);
   if (den > 0) {
-    int32_t ar = (int32_t)(nr * 32768 / den), ai = (int32_t)(ni * 32768 / den);   /* Q15, 64-bit scalar */
-    for (int i = al; i < bl; i++) {
-      int32_t w = fx_W[off + i];
-      int32_t er = f->sw[2 * i] - fx_rshr((fx_acc)ar * w, 15), ei = f->sw[2 * i + 1] - fx_rshr((fx_acc)ai * w, 15);
-      err += (fx_acc)er * er + (fx_acc)ei * ei;
-      s += pw(f, i);
+    int32_t ar = div_q15(nr, den), ai = div_q15(ni, den);   /* Q15 */
+    for (i = al; i < bl; i++) {
+      int16_t w = fx_W[off + i];
+      int32_t er = f->sw[2 * i] - fx_rshr(fx_mul32x16(ar, w), 15), ei = f->sw[2 * i + 1] - fx_rshr(fx_mul32x16(ai, w), 15);
+      err += fx_sq32(er) + fx_sq32(ei);
     }
+    if (sig)
+      for (i = al; i < bl; i++) s += pw(f, i);
     FX_ACC_CHECK(err); FX_ACC_CHECK(s);
   }
   if (sig) *sig = s;
   return err;
 }
 
+/* a ka > b kb for a, b >= 0 and 0 < ka, kb < 2^18: both sides shifted to 21 bits first
+   when they are larger, so the products stay inside 40 bits */
+static int gt_mul(fx_acc a, int32_t ka, fx_acc b, int32_t kb) {
+  fx_acc m = a > b ? a : b;
+  int s = 0;
+  while ((m >> s) >= ((fx_acc)1 << 21)) s++;
+  return (a >> s) * ka > (b >> s) * kb;
+}
+
 /* Codec 2's MBE voicing decision at its refined Wo */
 static int c2_voicing(const spec_t *f, uint32_t wo) {
+  int m, i, l;
   int L = n_harm(wo);
   fx_acc A2[MAXH + 1];
-  for (int m = 1; m <= L; m++) {
-    int am = round_sh((uint64_t)(2 * m - 1) * wo, 24), bm = round_sh((uint64_t)(2 * m + 1) * wo, 24);
+  fx_uacc edge = (fx_uacc)wo + ((fx_uacc)1 << 23);          /* (2m - 1) wo + 1/2 bin */
+  for (m = 1; m <= L; m++) {
+    int am = (int)(edge >> 24), bm = (int)((edge + 2 * (fx_uacc)wo) >> 24);
     fx_acc p = 0;
-    for (int i = am; i < bm; i++) p += pw(f, i);
+    for (i = am; i < bm; i++) p += pw(f, i);
     A2[m] = p;
+    edge += 2 * (fx_uacc)wo;
   }
   int l1 = L / 4;
   fx_acc sig = 0, err = 0;
-  for (int l = 1; l <= l1; l++) {
+  for (l = 1; l <= l1; l++) {
     sig += A2[l];
     err += harm_fit(f, wo, l, NULL);
   }
-  int v = sig * 65536 > err * 260904;                       /* SNR > 6 dB */
+  int v = gt_mul(sig, 65536, err, 260904);                  /* SNR > 6 dB */
   fx_acc lo = 0, hi = 0;
-  for (int l = 1; l <= L / 2; l++) lo += A2[l];
-  for (int l = L / 2; l <= L; l++) hi += A2[l];
-  if (!v && lo > 10 * hi) v = 1;                            /* low/high ratio > 10 dB */
+  for (l = 1; l <= L / 2; l++) lo += A2[l];
+  for (l = L / 2; l <= L; l++) hi += A2[l];
+  if (!v && gt_mul(lo, 1, hi, 10)) v = 1;                   /* low/high ratio > 10 dB */
   if (v) {
-    if (10 * lo < hi) v = 0;                                /* < -10 dB */
-    if (lo * 164619 < hi * 65536 && wo <= 32212254u) v = 0; /* < -4 dB at a pitch of 60 Hz or less */
+    if (gt_mul(hi, 1, lo, 10)) v = 0;                       /* < -10 dB */
+    if (gt_mul(hi, 65536, lo, 164619) && wo <= 32212254u) v = 0;   /* < -4 dB at a pitch of 60 Hz or less */
   }
   return v;
 }
@@ -333,20 +425,24 @@ static int c2_voicing(const spec_t *f, uint32_t wo) {
 
 /* sotto's two-stage refinement (sinusoid.refine), clamped to [WO_MIN, wo_max] */
 static uint32_t refine(const spec_t *f, uint32_t wo, uint32_t wo_max) {
-  static const uint32_t span[2] = {5u << 16, 1u << 16}, step[2] = {1u << 16, 1u << 14};
+  int s, i, m;
+  static const uint32_t span[2] = {(uint32_t)5 << 16, (uint32_t)1 << 16}, step[2] = {(uint32_t)1 << 16, (uint32_t)1 << 14};
   static const int np[2] = {11, 9};
   uint32_t p0 = recip48(wo);
-  for (int s = 0; s < 2; s++) {
+  for (s = 0; s < 2; s++) {
     int L = (int)(p0 >> 17);                                /* floor(pi / Wo) */
     fx_acc best = -1;
     uint32_t pbest = p0;
-    for (int i = 0; i < np[s]; i++) {
-      uint32_t p = p0 - span[s] + (uint32_t)i * step[s], w = recip48(p);
+    for (i = 0; i < np[s]; i++) {
+      uint32_t p = p0 - span[s] + (uint32_t)i * step[s], w;
+      FX_PROF(14, 1);
+      w = recip48(p);
+      FX_PROF(14, 0);
       fx_acc E = 0;
-      for (int m = 1; m <= L; m++) {
-        int b = round_sh((uint64_t)m * w, 23);
-        if (b < 256) E += pwh(f, b);
-      }
+      uint32_t acc = w + ((uint32_t)1 << 22);              /* m w + 1/2 bin: round(m w / 2^23) */
+      int mx = L;                                           /* bins < 256 for m <= mx */
+      while (mx > 0 && (uint32_t)mx * w >= ((uint32_t)256 << 23) - ((uint32_t)1 << 22)) mx--;
+      for (m = 1; m <= mx; m++, acc += w) E += f->p[(int)(acc >> 23)];
       FX_ACC_CHECK(E);
       if (E > best) best = E, pbest = p;
     }
@@ -358,83 +454,95 @@ static uint32_t refine(const spec_t *f, uint32_t wo, uint32_t wo_max) {
 
 /* sinusoid.fit_error, as a natural log, Q16 */
 static int32_t ln_fit_error(const spec_t *f, uint32_t wo) {
+  int l, i;
   int L = (int)(1342177280u / wo);                          /* 2500 Hz / f0 */
   if (L < 1) L = 1;
-  int hi = ceil_sh((uint64_t)(2 * L + 1) * wo, 24);
+  int hi = ceil_sh((fx_uacc)(2 * L + 1) * wo, 24);
   fx_acc err = 0, en = 0;
-  for (int l = 1; l <= L; l++) err += harm_fit(f, wo, l, NULL);
-  for (int i = 1; i < hi; i++) en += pw(f, i);
+  for (l = 1; l <= L; l++) err += harm_fit(f, wo, l, NULL);
+  for (i = 1; i < hi; i++) en += pw(f, i);
   if (en == 0) return 0;
-  return ln_q16((uint64_t)(err > 0 ? err : 1)) - ln_q16((uint64_t)en);
+  return ln_q16((fx_uacc)(err > 0 ? err : 1)) - ln_q16((fx_uacc)en);
 }
 
 /* sinusoid.odd_even_db, dB Q8 */
 static int32_t odd_even_db(const spec_t *f, uint32_t wo) {
+  int j, i;
   int h = (int)(wo >> 25);
   if (h < 1) h = 1;
   int L = (int)(805306368u / wo);                           /* 1500 Hz / f0 */
   fx_acc odd = 0, even = 0;
-  for (int j = 3; j <= L; j++) {
-    int c = (int)(((uint64_t)j * wo) >> 23);
+  uint32_t acc = 3 * wo;                                    /* j wo < 2^31 for j <= L */
+  for (j = 3; j <= L; j++, acc += wo) {
+    int c = (int)(acc >> 23);
     fx_acc p = 0;
     if (c < 256)
-      for (int i = c - h > 1 ? c - h : 1; i <= c + h; i++) {
-        fx_acc q = pwh(f, i);
+      for (i = c - h > 1 ? c - h : 1; i <= c + h; i++) {
+        uint32_t q = f->p[i];                               /* c <= 1500 Hz, i < 105 */
         if (q > p) p = q;
       }
     if (j % 2) odd += p; else even += p;
   }
-  return fx_log2_to_db_pow(fx_log2_64((uint64_t)(odd > 0 ? odd : 1)) - fx_log2_64((uint64_t)(even > 0 ? even : 1)));
+  return fx_log2_to_db_pow(fx_log2_acc((fx_uacc)(odd > 0 ? odd : 1)) - fx_log2_acc((fx_uacc)(even > 0 ? even : 1)));
 }
 
 /* candidates and costs of frame t */
 static void frame_costs(struct sotto_enc *e, int32_t t, int has_next) {
+  int i, j, c;
   frame_t *f = R(e, t);
   const spec_t *sp = &e->spec[t & 1];
   static const int dd[3] = {0, -1, 1};
   f->nc = 0;
-  for (int i = 0; i < 3; i++) {
+  for (i = 0; i < 3; i++) {
     int32_t u = t + dd[i];
     if (u < 0 || (dd[i] == 1 && !has_next)) continue;
     uint32_t base = R(e, u)->wo0;
-    for (int j = 0; j < (dd[i] == 0 ? N_MU : 3); j++) {
+    for (j = 0; j < (dd[i] == 0 ? N_MU : 3); j++) {
       if (j == 3 && base < 112742892u) continue;              /* base / 3 below 70 Hz */
-      uint64_t w0 = j == 0 ? base : j == 1 ? (uint64_t)base * 2 : j == 2 ? (base + 1) >> 1 : ((uint64_t)base + 1) / 3;
+      uint32_t w0 = j == 0 ? base : j == 1 ? base * 2 : j == 2 ? (base + 1) >> 1 : (base + 1) / 3;   /* base < 2^28 */
       uint32_t w0c = w0 < WO_MIN ? WO_MIN : w0 > WO_HI ? WO_HI : (uint32_t)w0;
+      FX_PROF(8, 1);
       uint32_t w = refine(sp, w0c, WO_HI);
+      FX_PROF(8, 0);
       if (w >= 37580964u || (dd[i] == 0 && j == 0)) {        /* 70 Hz */
         int dup = 0;
-        for (int c = 0; c < f->nc; c++) {                    /* |ln(w / cand)| <= 0.01 */
-          uint64_t a = f->cand[c];
-          if ((uint64_t)w * 1000000 <= a * 1010050 && a * 1000000 <= (uint64_t)w * 1010050) dup = 1;
+        for (c = 0; c < f->nc; c++) {                    /* |ln(w / cand)| <= 0.01: */
+          uint32_t a = f->cand[c], lo = a < w ? a : w, dw = a < w ? w - a : a - w;
+          /* w 10^6 <= a 1010050 and a 10^6 <= w 1010050, exactly, inside 40 bits */
+          if (dw <= lo >> 6 && (fx_uacc)dw * 20000 <= (fx_uacc)lo * 201) dup = 1;
         }
         if (!dup) f->cand[f->nc++] = w;
       }
     }
   }
   f->cost[0] = NAT(-0.5) + NAT(1.0) * (f->v0 > 0);
-  for (int c = 0; c < f->nc; c++) {
+  for (c = 0; c < f->nc; c++) {
     uint32_t w = f->cand[c];
     f->lnc[c] = ln_wo(w);
+    FX_PROF(9, 1);
     int32_t cst = ln_fit_error(sp, w) - f->lnc[c] / 2 + NAT(1.0) * (f->v0 == 0);
+    FX_PROF(9, 0);
+    FX_PROF(13, 1);
     int32_t oe = odd_even_db(sp, w);
+    FX_PROF(13, 0);
     if (-oe - DB(10) > 0) cst += (int32_t)(((fx_acc)(-oe - DB(10)) * 512) / 10);   /* 2 (-oe - 10) / 10 */
     f->cost[1 + c] = cst;
   }
 }
 
 static void viterbi_step(struct sotto_enc *e, int32_t t) {
+  int j, i;
   frame_t *f = R(e, t);
   int n = f->nc + 1;
   if (t == 0) {
-    for (int j = 0; j < n; j++) f->D[j] = f->cost[j], f->back[j] = 0;
+    for (j = 0; j < n; j++) f->D[j] = f->cost[j], f->back[j] = 0;
   } else {
     frame_t *p = R(e, t - 1);
     int np = p->nc + 1;
-    for (int j = 0; j < n; j++) {
+    for (j = 0; j < n; j++) {
       int32_t best = 0;
       int bi = 0;
-      for (int i = 0; i < np; i++) {
+      for (i = 0; i < np; i++) {
         int32_t tr;
         if (i == 0 && j == 0) tr = 0;
         else if (i == 0 || j == 0) tr = NAT(1.5);
@@ -452,62 +560,89 @@ static void viterbi_step(struct sotto_enc *e, int32_t t) {
     }
   }
   int32_t mn = f->D[0];                                      /* keep D small: argmins don't change */
-  for (int j = 1; j < n; j++)
+  for (j = 1; j < n; j++)
     if (f->D[j] < mn) mn = f->D[j];
-  for (int j = 0; j < n; j++) f->D[j] -= mn;
+  for (j = 0; j < n; j++) f->D[j] -= mn;
 }
 
 /* ---------------------------------------------------------------- frame decision */
 
 static void put_bits(unsigned char *out, int *pos, int v, int nb) {
-  for (int i = nb - 1; i >= 0; i--, (*pos)++)
+  int i;
+  for (i = nb - 1; i >= 0; i--, (*pos)++)
     if ((v >> i) & 1) out[*pos >> 3] |= 0x80 >> (*pos & 7);
+}
+
+/* the largest h with rr + 128 h < worst, clamped to 32 bits */
+static int32_t h_limit(fx_acc worst, fx_acc rr) {
+  fx_acc t = (worst - rr - 1) >> 7;                          /* floor */
+  return t > INT32_MAX ? INT32_MAX : t < INT32_MIN ? INT32_MIN : (int32_t)t;
 }
 
 /* M-best multistage search; c in dB Q16 */
 static void msvq_search(const int32_t *c, int16_t *idx) {
+  int s, p, k, v, i;
   int np = 1;
   int16_t path[MBEST][5];
   int32_t recon[MBEST][NC];                                  /* dB Q16 */
   memset(recon, 0, sizeof recon);
   memset(path, 0, sizeof path);
-  for (int s = 0; s < fx_cb_stages; s++) {
+  for (s = 0; s < fx_cb_stages; s++) {
     int n = 1 << fx_cb_bits[s], nk = 0;
-    const int8_t *cb = fx_cb[s];
+    const int16_t *cb = fx_cb[s];
     const int32_t *e2 = fx_cb_e2[s];
     fx_acc kd[MBEST];
     int kp[MBEST], kc[MBEST];
-    for (int p = 0; p < np; p++) {
-      int16_t r[NC];                                         /* residual in codebook steps, Q6 */
+    for (p = 0; p < np; p++) {
+      int16_t r[NC + 1];                                     /* residual in codebook steps, Q6 */
       fx_acc rr = 0;
-      for (int k = 0; k < NC; k++) {
+      int32_t hthr;
+      for (k = 0; k < NC; k++) {
         fx_acc t = ((fx_acc)(c[k] - recon[p][k]) * fx_cb_istep[s]) >> 24;
+        FX_ACC_CHECK((fx_acc)(c[k] - recon[p][k]) * fx_cb_istep[s]);
         r[k] = (int16_t)(t > 32767 ? 32767 : t < -32767 ? -32767 : t);
         rr += (fx_acc)r[k] * r[k];
       }
+      r[NC] = 0;                                             /* the padding value */
       FX_ACC_CHECK(rr);
-      /* d = sum (r - 64 y)^2 = rr - 128 r.y + 4096 |y|^2, exactly, so the inner loop is one
-         16 x 16 multiply-accumulate per value */
-      for (int v = 0; v < n; v++) {
-        const int8_t *y = cb + v * NC;
-        fx_acc ry = 0;
-        for (int k = 0; k < NC; k++) ry += (fx_acc)r[k] * y[k];
-        FX_ACC_CHECK(ry);
-        fx_acc d = rr - 128 * ry + 4096 * (fx_acc)e2[v];   /* < 2^36 */
+      /* d = sum (r - 64 y)^2 = rr - 128 r.y + 4096 |y|^2 = rr + 128 h, h = 32 |y|^2 - r.y,
+         exactly. The inner loop is one 16 x 16 multiply-accumulate per value, and h fits in
+         32 bits (r.y < 2^27, 32 |y|^2 < 2^24), so most vectors are rejected with a 32-bit
+         compare against hthr, the largest h that could still enter the list */
+      hthr = nk < MBEST ? INT32_MAX : h_limit(kd[nk - 1], rr);
+      for (v = 0; v < n; v++) {
+        const int16_t *y = cb + v * FX_CBW;
+        int32_t ry = 0, h;
+#ifdef FX_CB_UNPACKED
+        for (k = 0; k < NC; k++) ry += (int32_t)r[k] * y[k];
+#else
+        /* 256 x each value, as a 16-bit word, without unpacking: the high byte with the
+           low one cleared, the low byte shifted up (two operations a word, not five) */
+        fx_acc a = 0;
+        for (k = 0; k < FX_CBW; k++)
+          a += (fx_acc)r[2 * k] * (int16_t)(y[k] & -256) + (fx_acc)r[2 * k + 1] * (int16_t)((uint16_t)y[k] << 8);
+        ry = (int32_t)(a >> 8);                              /* exact: a is a multiple of 256 */
+#endif
+        h = e2[v] * 32 - ry;
+        if (h > hthr) continue;
+        fx_acc d = rr + (fx_acc)h * 128;                     /* < 2^36 */
         FX_ACC_CHECK(d);
         if (nk < MBEST || d < kd[nk - 1]) {
           int i = nk < MBEST ? nk++ : MBEST - 1;
           while (i > 0 && kd[i - 1] > d) kd[i] = kd[i - 1], kp[i] = kp[i - 1], kc[i] = kc[i - 1], i--;
           kd[i] = d, kp[i] = p, kc[i] = v;
+          if (nk == MBEST) hthr = h_limit(kd[nk - 1], rr);
         }
       }
     }
     int16_t npath[MBEST][5];
     int32_t nrec[MBEST][NC];
-    for (int i = 0; i < nk; i++) {
+    for (i = 0; i < nk; i++) {
       memcpy(npath[i], path[kp[i]], sizeof path[0]);
       npath[i][s] = (int16_t)kc[i];
-      for (int k = 0; k < NC; k++) nrec[i][k] = recon[kp[i]][k] + (int32_t)cb[kc[i] * NC + k] * fx_cb_step[s];
+      for (k = 0; k < NC; k++) {
+        nrec[i][k] = recon[kp[i]][k] + (int32_t)FX_CB_VAL(cb + kc[i] * FX_CBW, k) * fx_cb_step[s];
+      }
     }
     memcpy(path, npath, sizeof path);
     memcpy(recon, nrec, sizeof recon);
@@ -515,9 +650,9 @@ static void msvq_search(const int32_t *c, int16_t *idx) {
   }
   int best = 0;
   fx_acc bd = 0;
-  for (int p = 0; p < np; p++) {
+  for (p = 0; p < np; p++) {
     fx_acc d = 0;
-    for (int k = 0; k < NC; k++) {
+    for (k = 0; k < NC; k++) {
       int32_t q = fx_rshr(c[k] - recon[p][k], 8);
       d += (fx_acc)q * q;
     }
@@ -536,47 +671,57 @@ static int32_t env_at(const int32_t *rk, int32_t f) {
   return rk[j] + (int32_t)(((fx_acc)(rk[j + 1] - rk[j]) * fr + 32768) >> 16);
 }
 
-/* 10 log10 of a power in units of a spectrum with exponent ex, as absolute dB Q8 */
-static int32_t power_db(int ex, int64_t p) {
+/* 10 log10 of a power p 2^xb in units of a spectrum with exponent ex, as absolute dB Q8 */
+static int32_t power_db(int ex, fx_acc p, int xb) {
   if (p <= 0) return DB(-90);
-  return fx_log2_to_db_pow(fx_log2_64((uint64_t)p) + 2 * ((int32_t)ex * 65536 + fx_sw_l2));
+  return fx_log2_to_db_pow(fx_log2_acc((fx_uacc)p) + 2 * ((int32_t)ex * 65536 + fx_sw_l2) + (int32_t)xb * 65536);
 }
 
 static void emit(struct sotto_enc *e, int cls);
 
 static void decide(struct sotto_enc *e, int32_t t, int k) {
+  int h, i, l, j;
+  int32_t u;
   frame_t *f = R(e, t);
   uint32_t wo = k ? f->cand[k - 1] : f->wo0;
   int L = n_harm(wo);
   /* redo frame t's spectrum from the kept input, at 32 bits for the harmonic levels */
   spec_t spx, *sp = &spx;
-  int ex = spectrum(e, e->hist + HIST - MPITCH - (e->n_an - 1 - t) * NSAMP, sp);
-  int64_t A2[MAXH + 1], tot = 0;                              /* 64-bit sums of 32 x 32-bit squares */
-  for (int h = 1; h <= L; h++) {
-    int am = round_sh((uint64_t)(2 * h - 1) * wo, 24), bm = round_sh((uint64_t)(2 * h + 1) * wo, 24);
-    int64_t p = 0;
-    for (int i = am; i < bm; i++) {
+  FX_PROF(7, 1);
+  int ex = spectrum(e, e->hist + (HIST - MPITCH - (int)(e->n_an - 1 - t) * NSAMP), sp);
+  /* band powers from the bins rounded to 16 bits: a bin's power is < 2^33, a band (at most
+     33 bins) < 2^39, and the total is summed at 1/8 */
+  FX_PROF(7, 0);
+  int t16 = bins_shift(e->re, e->im, 16);
+  fx_acc A2[MAXH + 1], tot = 0;
+  fx_uacc edge = (fx_uacc)wo + ((fx_uacc)1 << 23);          /* (2h - 1) wo + 1/2 bin */
+  for (h = 1; h <= L; h++, edge += 2 * (fx_uacc)wo) {
+    int am = (int)(edge >> 24), bm = (int)((edge + 2 * (fx_uacc)wo) >> 24);
+    fx_acc p = 0;
+    for (i = am; i < bm; i++) {
       int b = i > 256 ? 512 - i : i;
-      p += (int64_t)e->re[b] * e->re[b] + (int64_t)e->im[b] * e->im[b];
+      p += sq2(e->re[b], e->im[b], t16);
     }
+    FX_ACC_CHECK(p);
     A2[h] = p;
-    tot += p;
+    tot += p >> 3;
   }
-  int32_t en = power_db(ex, tot);
+  ex += t16;
+  int32_t en = power_db(ex, tot, 3);
 
   /* unvoice_tails, then voicing_classes */
   e->ehist[t % (TAIL_HOLD + 1)] = en;
   int cls = k > 0;
   if (cls) {
     int32_t emax = INT32_MIN;
-    for (int32_t u = t - TAIL_HOLD < 0 ? 0 : t - TAIL_HOLD; u <= t; u++)
+    for (u = t - TAIL_HOLD < 0 ? 0 : t - TAIL_HOLD; u <= t; u++)
       if (e->ehist[u % (TAIL_HOLD + 1)] > emax) emax = e->ehist[u % (TAIL_HOLD + 1)];
     /* mean harmonic SNR below 1 kHz, dB Q8 */
     int32_t snr = INT32_MAX, sum = 0, n = 0;
-    for (int l = 1; l <= L; l++) {
-      if ((uint64_t)l * wo * 8000 >= (uint64_t)1000 << 32) break;
+    for (l = 1; l <= L; l++) {
+      if ((fx_uacc)l * wo >= ((fx_uacc)1 << 29)) break;          /* 1 kHz */
       fx_acc sig, err = harm_fit(sp, wo, l, &sig);
-      sum += sig > 0 ? fx_log2_to_db_pow(fx_log2_64((uint64_t)sig) - fx_log2_64((uint64_t)(err > 0 ? err : 1))) : 0;
+      sum += sig > 0 ? fx_log2_to_db_pow(fx_log2_acc((fx_uacc)sig) - fx_log2_acc((fx_uacc)(err > 0 ? err : 1))) : 0;
       n++;
     }
     if (n) snr = sum / n;
@@ -586,33 +731,35 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
 
   if (t % 2 == 0) {
     int32_t a[MAXH], amax = INT32_MIN, rk[K];
-    for (int h = 1; h <= L; h++) {
-      a[h - 1] = A2[h] > 0 ? power_db(ex, A2[h]) : DB(-320);
+    for (h = 1; h <= L; h++) {
+      a[h - 1] = A2[h] > 0 ? power_db(ex, A2[h], 0) : DB(-320);
       if (a[h - 1] > amax) amax = a[h - 1];
     }
-    for (int h = 0; h < L; h++)
+    for (h = 0; h < L; h++)
       if (a[h] < amax - DB(50)) a[h] = amax - DB(50);
     /* np.interp of the harmonic levels at the rate-K frequencies (harmonic h at h f0) */
-    for (int j = 0; j < K; j++) {
-      int64_t u = ((int64_t)fx_kfreq[j] << 41) / ((int64_t)wo * 1000);   /* in harmonics, Q16 */
+    for (j = 0; j < K; j++) {
+      fx_uacc u = fx_udiv_shl((fx_uacc)fx_kfreq[j], 38, (fx_uacc)wo * 125, NULL);   /* kfreq 2^41 / (1000 wo): harmonics, Q16 */
       int32_t ui = (int32_t)(u >> 16), fr = (int32_t)(u & 0xFFFF);
       if (ui < 1) rk[j] = a[0];
       else if (ui >= L) rk[j] = a[L - 1];
       else rk[j] = a[ui - 1] + (int32_t)(((fx_acc)(a[ui] - a[ui - 1]) * fr + 32768) >> 16);
     }
     int32_t sum = 0, c[NC];
-    for (int i = 0; i < K; i++) sum += rk[i];
-    for (int j = 1; j < K; j++) {                            /* DCT of rk - mean, dB Q16 */
+    for (i = 0; i < K; i++) sum += rk[i];
+    for (j = 1; j < K; j++) {                            /* DCT of rk - mean, dB Q16 */
       fx_acc v = 0;
-      for (int i = 0; i < K; i++) v += (fx_acc)fx_dct[j * K + i] * (rk[i] * 20 - sum);
+      for (i = 0; i < K; i++) v += fx_mul32x16(rk[i] * 20 - sum, fx_dct[j * K + i]);
       FX_ACC_CHECK(v);
       c[j - 1] = fx_rshr(v / 20, 7);                         /* Q8 x Q15 x 20 -> dB Q16 */
     }
+    FX_PROF(6, 1);
     msvq_search(c, e->idx_e);
+    FX_PROF(6, 0);
     e->wo_e = wo;
     /* v3.6: energy of the envelope at the harmonics */
     int32_t lv[MAXH];
-    for (int h = 1; h <= L; h++) lv[h - 1] = env_at(rk, (int32_t)(((uint64_t)h * wo * 128000u) >> 32));
+    for (h = 1; h <= L; h++) lv[h - 1] = env_at(rk, (int32_t)(((fx_uacc)h * wo * 125) >> 22));   /* h f0, Hz Q4 */
     e->en_e = fx_db_power_sum(lv, L);
     e->cls_e = (int16_t)cls;
   } else {
@@ -621,6 +768,7 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
 }
 
 static void emit(struct sotto_enc *e, int cls) {
+  int s;
   int a = e->cls_e, b = cls, code = a == b ? a : (a == 0 || b == 0) ? 3 : 1;
   unsigned char *out = e->q[(e->q_head + e->q_n++) % 8];
   int pos = 0, wi = 0, ei;
@@ -632,51 +780,68 @@ static void emit(struct sotto_enc *e, int cls) {
   put_bits(out, &pos, code, 2);
   put_bits(out, &pos, wi, 7);
   put_bits(out, &pos, ei, 5);
-  for (int s = 0; s < fx_cb_stages; s++) put_bits(out, &pos, e->idx_e[s], fx_cb_bits[s]);
+  for (s = 0; s < fx_cb_stages; s++) put_bits(out, &pos, e->idx_e[s], fx_cb_bits[s]);
 }
 
 static void decide_from(struct sotto_enc *e, int32_t t, int32_t last) {
+  int j;
+  int32_t u;
   frame_t *f = R(e, last);
   int k = 0;
-  for (int j = 1; j <= f->nc; j++)
+  for (j = 1; j <= f->nc; j++)
     if (f->D[j] < f->D[k]) k = j;
-  for (int32_t u = last; u > t; u--) k = R(e, u)->back[k];
+  for (u = last; u > t; u--) k = R(e, u)->back[k];
   decide(e, t, k);
 }
 
 /* ---------------------------------------------------------------- API */
 
 struct sotto_enc *sotto_enc_create(void) {
+  int i;
   struct sotto_enc *e = calloc(1, sizeof *e);
   if (!e) return NULL;
-  for (int i = 0; i < HIST; i++) e->hist[i] = 1;
+  for (i = 0; i < HIST; i++) e->hist[i] = 1;
   e->prev_bin = 16;                                          /* 50 Hz */
   return e;
 }
 
 void sotto_enc_destroy(struct sotto_enc *e) { free(e); }
+unsigned sotto_fx_enc_bytes(void) { return (unsigned)sizeof(struct sotto_enc); }
 
 static void analyse_10ms(struct sotto_enc *e, const short *x) {
+  int i;
   memmove(e->hist, e->hist + NSAMP, (HIST - NSAMP) * sizeof(int16_t));
-  for (int i = 0; i < NSAMP; i++) e->hist[HIST - NSAMP + i] = x[i];
+  for (i = 0; i < NSAMP; i++) e->hist[HIST - NSAMP + i] = x[i];
   int32_t a = e->n_an++;
   frame_t *f = R(e, a);
   spec_t *sp = &e->spec[a & 1];
+  FX_PROF(0, 1);
   int bin = nlp_bin(e);
+  FX_PROF(0, 0);
+  FX_PROF(1, 1);
   spectrum(e, e->hist + HIST - MPITCH, sp);
+  FX_PROF(1, 0);
   /* Codec 2: Wo = 2 pi / pitch, pitch = 2560 / bin samples; two-stage refinement */
-  uint32_t p0 = (uint32_t)((((uint64_t)2560 << 16) + bin / 2) / bin);
+  uint32_t p0 = (((uint32_t)2560 << 16) + (uint32_t)(bin / 2)) / (uint32_t)bin;
   uint32_t wo = recip48(p0);
-  wo = hs_refine(sp, p0, 5u << 16, 1u << 16, wo);
-  wo = hs_refine(sp, recip48(wo), 1u << 16, 1u << 14, wo);
+  FX_PROF(2, 1);
+  wo = hs_refine(sp, p0, (uint32_t)5 << 16, (uint32_t)1 << 16, wo);
+  wo = hs_refine(sp, recip48(wo), (uint32_t)1 << 16, (uint32_t)1 << 14, wo);
+  FX_PROF(2, 0);
   if (wo < WO_MIN) wo = WO_MIN;
   if (wo > WO_C2MAX) wo = WO_C2MAX;
   f->wo0 = wo;
+  FX_PROF(3, 1);
   f->v0 = (int16_t)c2_voicing(sp, wo);
+  FX_PROF(3, 0);
   if (a >= 1) {
+    FX_PROF(4, 1);
     frame_costs(e, a - 1, 1);
+    FX_PROF(4, 0);
     viterbi_step(e, a - 1);
+    FX_PROF(5, 1);
     if (a - 1 - LAG >= 0) decide_from(e, e->n_dec++, a - 1);
+    FX_PROF(5, 0);
   }
 }
 

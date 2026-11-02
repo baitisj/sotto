@@ -19,7 +19,7 @@ Speech scientists think of the voice as two parts:
 
 Try singing one note and changing between "ee", "ah" and "oo". The pitch (the source) stays the same, but the sound changes. You're changing the filter.
 
-The loud bumps the filter makes are called **formants**. In the harmonics picture from chapter 2, you can see bumps near 750 Hz, 1,300 Hz and 2,200 Hz. Those are formants.
+The loud bumps the filter makes are called **formants** (say *FOR-munts*). In the harmonics picture from chapter 2, you can see bumps near 750 Hz, 1,300 Hz and 2,200 Hz. Those are formants.
 
 ## The envelope is the outline of the harmonics
 

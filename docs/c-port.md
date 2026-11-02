@@ -1,6 +1,6 @@
 # sotto on the C5517: C port and budget
 
-*2026-10-31. The float C port is in `c/`, and `c/README.md` explains how to build and run it.
+*2026-10-31, C55x measurements 2026-11-02. The float C port is in `c/`, and `c/README.md` explains how to build and run it.
 This page covers what the radio's DSP needs that the float port doesn't have yet.*
 
 ## What exists
@@ -129,15 +129,18 @@ top of `c/fixed/fx.h`.
   value: |r − y|² = |r|² − 2 r·y + |y|², with |y|² from a table. That gives exactly the same
   distances as the direct form.
 - Over 19 voices, 11,173 frames (`tools/check_fx.py --enc`, `docs/results/fx_enc_check.json`),
-  with v3.7's pitch tracker (v3.6 gave the same 97.8%):
+  with v3.7's pitch tracker. The C55x version (2026-11-02, below) rounds two steps more
+  coarsely so they fit 40-bit arithmetic: the least-squares amplitudes in the voicing fit
+  (one 32-bit division, about 15 significant bits) and the bin powers for the pitch searches
+  (from bins rounded to 19 bits). That moved a few near-ties:
 
-  | | Result |
-  |---|---:|
-  | Frames whose 48 bits match the float encoder | 97.8% |
-  | Frames differing in voicing / pitch / energy / shape | 34 / 103 / 30 / 203 |
-  | PESQ, float encoder + float decoder | 2.947 |
-  | PESQ, fixed encoder + fixed decoder | 2.944 |
-  | PESQ, fixed encoder + float decoder | 2.934 |
+  | | Before (PR #8) | Now |
+  |---|---:|---:|
+  | Frames whose 48 bits match the float encoder | 97.8% | 97.5% |
+  | Frames differing in voicing / pitch / energy / shape | 34 / 103 / 30 / 203 | 34 / 104 / 30 / 243 |
+  | PESQ, float encoder + float decoder | 2.947 | 2.947 |
+  | PESQ, fixed encoder + fixed decoder | 2.944 | 2.945 |
+  | PESQ, fixed encoder + float decoder | 2.934 | 2.944 |
 
   The frames that differ are near-ties: a pitch or band edge exactly on a grid point, or two
   codebook paths at almost the same distance, where float rounding decides. Integer code
@@ -149,40 +152,97 @@ top of `c/fixed/fx.h`.
   4 KB of FFT scratch). The tables are shared with the decoder, 43 KB in all with the 6 KB
   of codebook lengths.
 
-**Cycle estimate (not measured).** TI's C55x compiler can't be downloaded from the
-environment this was built in, so these numbers come from counting how often each inner
-loop runs on x86 (`sh tools/fx_profile.sh`, gcov on 10 s of ve9qrp) and assuming a cost per
-iteration on the C55x. The low end assumes hand-tuned loops (the dual multiply-accumulate
-for the codebook search); the high end assumes plain compiled C.
+## Fixed point on the C55x: measured
 
-| Block | Inner iterations per second | C55x cycles each | MHz |
-|---|---:|---:|---:|
-| Codebook search | 8.3 M multiply-adds, 0.44 M vectors | 0.5–1.5, plus 4–10 per vector | 6–17 |
-| Harmonic sums (pitch refinement, tracker) | 0.92 M | 5–10 | 5–9 |
-| 512-point FFT, 32-bit data | 0.46 M butterflies | 10–16 | 5–7 |
-| nlp DFT (64 points × 115 bins) | 0.74 M | 2–4 | 1.5–3 |
-| nlp 48-tap filter | 0.39 M | 1–2 | 0.4–0.8 |
-| Everything else | about 15 M x86 instructions | about 0.5–1 per instruction | 8–15 |
-| **Encoder** | | | **25–50** |
-| Decoder synthesis sums | 0.67 M (2 multiply-adds each) | 3–5 | 2–3.5 |
-| Decoder minimum phase (cepstrum) | 0.82 M | 1.5–3 | 1.2–2.5 |
-| Decoder, everything else | | | 1–2 |
-| **Decoder** | | | **4–8** |
+*2026-11-02.* Built with TI's C5500 compiler 4.4.1 (`-O3`, large memory model, the C5517's
+CPU revision 3.3) and run on TI's cycle-accurate C55x Rev 3.0 CPU simulator. The program is
+`c/fixed/c55x/bench.c`. It counts the cycles of every `sotto_encode` and `sotto_decode` call,
+and `c/fixed/c55x/README.md` explains how to set up the tools and run it. The input is 10 s
+of ve9qrp (500 frames). The DSP's bits and audio are identical to the x86 build's.
 
-The radio is half duplex, so only one of the two runs at a time. 25 to 50 MHz is an eighth
-to a quarter of the C5517's 200 MHz, which leaves room for the modem and FEC. The real
-number needs TI's compiler and a C55x board, for example the C5517 EVM.
+**Cycles.** These are MHz of the C5517's 200 MHz. "Mean" is the average over the 500 frames,
+and "worst frame" is the most expensive single frame, which is what has to fit in real time.
 
-**Before a C55x build.**
+| | Estimate (2026-11-01) | First C55x build | Now: mean | Now: worst frame |
+|---|---:|---:|---:|---:|
+| Encoder | 25–50 | 802 | **188** | **212** |
+| Decoder | 4–8 | 106 | **36.7** | **43.9** |
+| Encoder, codebook unpacked (`-DFX_CB_UNPACKED`, 1 s) | | | 169 | 192 |
 
-- The TI compiler's `long long` is 40 bits. The sums of products already fit (that is what
-  `FX_CHECK` checks), and most of the scalar steps that use 64-bit types here fit too, but
-  a few do not: the 2^48 reciprocal in the pitch refinement and the 32 × 32-bit band powers
-  in the encoder's decide step. Those need a two-word helper.
-- `char` is 16 bits, so the int8 codebook takes 58 KB unless it is packed two values to a
-  word.
-- The FFT could move to the C5517's hardware FFT accelerator, which works on 16-bit data.
-  That would change the low bits of the spectra, so it needs its own check against float.
+The radio is half duplex, so only one of the two runs at a time. The encoder doesn't fit
+yet: at its worst frame it needs more than the whole DSP, before the modem and FEC.
+
+**Memory.** These are bytes; one C55x word is 2 bytes.
+
+| | Estimate (x86 sizes) | C55x |
+|---|---:|---:|
+| Encoder state | 15.7 KB | 16.2 KB |
+| Decoder state | 0.8 KB | 0.8 KB |
+| Tables | 43 KB | 45.7 KB (76.4 KB with the codebook unpacked) |
+| Code | 18 KB | 17.4 KB (encoder 11.9, decoder 3.6, arithmetic 1.9), plus a few KB of TI's run-time library |
+| Stack | not estimated | 14.4 KB at most |
+| **Total** | **about 78 KB** | **about 98 KB of the C5517's 320 KB** |
+
+The RAM estimate held. The tables grew because the C55x has no 8-bit type: the codebook is
+stored two values to a 16-bit word, padded to 20 values a vector, and the other small tables
+take a word a value. The stack is large because the encoder keeps a whole spectrum (2 KB)
+and the codebook search's 8 paths (2.4 KB) on it.
+
+**Where the encoder's time goes** (1 s, MHz averaged over frames, from the profiling build,
+whose timer calls add about 7% to the total):
+
+| Block | MHz | What it does |
+|---|---:|---|
+| Codebook search | 48 | 8,704 vectors a frame (8 paths), 10 packed words each |
+| 512-point FFT | 35 | 4 a frame: one per 10 ms analysis, and one redone for each frame the tracker decides |
+| Pitch refinement (`refine`) | 36 | harmonic sums at 20 trial pitches for each pitch candidate |
+| Fit error (`ln_fit_error`) | 32 | the voicing fit for each candidate: 2 divisions per harmonic |
+| nlp pitch estimator | 18 | 64-point DFT at 115 bins, and the 48-tap filter |
+| Everything else in the spectra (window, scaling, bin powers) | 15 | |
+| Everything else | about 17 | |
+| **Decoder:** minimum phase / overlap-add sums / the rest | 16 / 10 / 10 | |
+
+**Why the estimate was 4 to 5 times too low.** It assumed one or two cycles per inner-loop
+step, which is what hand-written C55x assembly gets. Compiled C gets much less:
+
+- A 32 × 16-bit product needs two 16 × 16 multiplies, and any sum wider than 32 bits makes
+  the compiler switch the accumulator mode inside the loop. One FFT butterfly takes about
+  77 cycles (estimate 10 to 16), so one FFT takes 177,000 cycles.
+- The FFT runs 4 times a frame, not 2.
+- Division is a bit-serial library call of 100 cycles or more. The voicing fit does two per
+  harmonic, for every candidate.
+- Every `long long` product of two 32-bit values is a library call. The first build was full
+  of them, which is why it needed 802 MHz.
+
+**What changed for the C55x** (all in `c/fixed/`, the x86 build gives the same bits):
+
+- 40-bit `long long`: `fx_acc` is the accumulator type, the 2^48 reciprocal and the other
+  wide divisions use `fx_udiv_shl` (exact, in 40-bit steps), and `fx_log2_acc` takes a 40-bit
+  value.
+- 16-bit `int` and `char`, C89 declarations, and the packed codebook (`tools/gen_fx_tables.py`).
+- Speed, keeping the bits: 32 × 32 products split into 16 × 16 ones; the reciprocal of a
+  pitch period with one division and a correction step (checked against 64-bit division for
+  every input from 2^20 to 2^28); bin positions stepped instead of multiplied; the codebook
+  search on packed words without unpacking; the FFT butterfly in 32-bit arithmetic only; and
+  the codebook search skipping a vector as soon as a 32-bit test shows it can't make the list.
+
+**Next, to fit with room for the modem.** In order of MHz saved for the work:
+
+1. **FFT in assembly**, or on the C5517's FFT accelerator (16-bit data, which changes the low
+   bits and needs a check against float): 35 MHz to under 10.
+2. **Codebook search:** unpack the codebook (29 KB more, saves about 20 MHz at the worst
+   frame), or write the search with the C55x's dual multiply-accumulate (2 vectors at once).
+3. **Voicing fit:** one reciprocal per harmonic instead of two divisions, and the fit error
+   from the sums instead of a second pass. That changes rounding, so it needs the 19-voice
+   check again. About 15 to 20 MHz.
+4. **Keep the decided frame's spectrum** instead of redoing its FFT: saves a quarter of the
+   FFT time for 18 KB more state.
+5. **Decoder:** the overlap-add as one 256-point inverse FFT, and the minimum phase with
+   FFTs, as Codec 2 does. About 15 MHz.
+
+With 1 to 3, the encoder should land near 100 MHz at its worst frame, and the decoder near
+25 MHz. A C5517 board is still needed to confirm the simulator against real memory wait
+states.
 
 ## Fixed point: the plan
 
