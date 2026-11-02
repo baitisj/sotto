@@ -194,7 +194,7 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
-    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, keep_mixed=False, sib_db=None, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
@@ -205,6 +205,8 @@ class SottoV38(vl.SottoV37):
         self.spk_pc = spk_pc                  # vowel_shape="fine": 3 speaker-shape coefficients (side channel)
         self.whisper = whisper                # encoder: send whispered vowels (mixed runs with no
                                               # real harmonics and a wandering pitch) as unvoiced
+        self.sib_db = sib_db                  # encoder: M/edge frames with 4-8 kHz > 0-1 kHz + sib_db -> UU
+        self.keep_mixed = keep_mixed          # blend: mixed frames keep the -3 dB guessed hiss
         self.release_ms = release_ms          # blend: consonant hiss hold (0 = none)
         self.vsmooth = vsmooth                # encoder: no V/M flutter or U blips inside voiced runs
         self.blend = blend                    # one layer: max(vowel, consonant) power, flickers bridged
@@ -273,6 +275,16 @@ class SottoV38(vl.SottoV37):
         top, low = bands_db(P, [(4000, 8000)])[:, 0], bands_db(P, [(0, 3900)])[:, 0]
         for t in np.where((top[1:] - top[:-1] > BURST_DB) & (top[1:] > low[1:] - 15))[0] + 1:
             bits[f[t], 0] = bits[f[t], 1] = 0            # burst: send as UU
+        if self.sib_db is not None:
+            # sibilant: an s/sh that starts inside a mixed run keeps the vowel's pitch for
+            # a few frames (a warble under the hiss, and no high-band index). If the 4-8 kHz
+            # band is louder than 0-1 kHz by sib_db in either 10 ms half, send it as UU.
+            one = bands_db(P, [(0, 1000)])[:, 0]
+            code = bits[:, 0] * 2 + bits[:, 1]
+            for t in np.where(top - one > self.sib_db)[0]:
+                g = f[t]
+                if g < len(bits) and code[g] in (2, 3):
+                    bits[g, 0] = bits[g, 1] = 0
         return bits, hb, self.decode(bits)
 
     @staticmethod
@@ -443,7 +455,9 @@ class SottoV38(vl.SottoV37):
             # one continuous vowel layer under the consonant hiss: the template level for
             # every frame, smoothed in time (one pole, ~30 ms) and faded in and out by a
             # smoothed voiced/mixed weight, so it never switches on or off in one frame
-            X[mask >= 2] = 0                            # drop the per-frame vowel/mixed hiss
+            # drop the per-frame vowel hiss; with blend, mixed frames (z, zh, v: voiced
+            # fricatives) keep their guessed hiss in the consonant layer
+            X[(mask == 2) if self.blend and self.keep_mixed else (mask >= 2)] = 0
             a = np.exp(-10.0 / self.smooth_ms)
             lv, wv = vt.copy(), np.zeros(nfr)
             want = ((v == 1) | (v == 2)) & (mask != 1)

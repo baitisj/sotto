@@ -26,7 +26,7 @@ for name,(key,x,ch,(a,e)) in SRC.items():
     x=x[:len(x)//320*320]; nfr=(len(x)-hb.N)//hb.H+1
     if key not in cache:
         r={}
-        for tag,enc in (('old',hb.SottoV38()),('new',hb.SottoV38(whisper=True)),('vs',hb.SottoV38(whisper=True,vsmooth=True))):
+        for tag,enc in (('old',hb.SottoV38()),('new',hb.SottoV38(whisper=True)),('vs',hb.SottoV38(whisper=True,vsmooth=True)),('sib',hb.SottoV38(whisper=True,vsmooth=True,sib_db=3.0))):
             b=enc.encode(x); fr,gd=channel(b,*ch) if ch else (b,np.ones(len(b),bool))
             sp=hb.fine_speaker(x, hb.SottoV38().decode_audio16(fr,gd,n16=len(x)), nfr); sp=np.round(np.clip(sp,-30,30)/4)*4
             r[tag]=(fr,gd,sp)
@@ -44,5 +44,6 @@ for name,(key,x,ch,(a,e)) in SRC.items():
     w('4_whisper_fix_blend',hb.SottoV38(vowel_shape='fine',voiced_trim=-5,spk_pc=sp,blend=True).decode_audio16(fr,gd,n16=len(x)))
     w('5_blend_no_tail',hb.SottoV38(vowel_shape='fine',voiced_trim=-5,spk_pc=sp,blend=True,release_ms=0).decode_audio16(fr,gd,n16=len(x)))
     fv,gv,sv=r['vs']; w('6_voicing_smooth',hb.SottoV38(vowel_shape='fine',voiced_trim=-5,spk_pc=sv,blend=True,release_ms=0).decode_audio16(fv,gv,n16=len(x)))
+    fs_,gs_,ss_=r['sib']; w('7_sibilant',hb.SottoV38(vowel_shape='fine',voiced_trim=-5,spk_pc=ss_,blend=True,release_ms=0,keep_mixed=True).decode_audio16(fs_,gs_,n16=len(x)))
     c0=r['old'][0][:,0]*2+r['old'][0][:,1]; c1=fr[:,0]*2+fr[:,1]
     print(name,'UU frames in snippet: before %.0f%% after %.0f%%'%(np.mean(c0[A//320:E//320]==0)*100,np.mean(c1[A//320:E//320]==0)*100),flush=True)
