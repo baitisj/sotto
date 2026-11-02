@@ -16,11 +16,23 @@ extern const int16_t fx_dct[FX_K * FX_K];
 extern const int16_t fx_pn[160];
 extern const int32_t fx_log2_tab[257];
 extern const uint32_t fx_exp2_tab[257];   /* the last entry, 2^31, needs 32 unsigned bits */
-/* shape codebook: fx_cb_stages stages of 2^fx_cb_bits[s] vectors of FX_NC 8-bit values.
- * On the C55x (16-bit char) these would be packed two to a word. */
+/* shape codebook: fx_cb_stages stages of 2^fx_cb_bits[s] vectors of FX_NC 8-bit values,
+ * padded with a zero to FX_NC + 1, packed two to a 16-bit word (the C55x has no 8-bit
+ * type), high byte first: FX_CBW words a vector. With FX_CB_UNPACKED, one value per word:
+ * twice the memory (58 KB instead of 29 KB on the C55x), but a faster search.
+ * FX_CB_VAL(y, k) is value k of the vector at y. */
+#define FX_CB_HI(w) ((int16_t)(w) >> 8)
+#define FX_CB_LO(w) ((int16_t)((((w) & 0xFF) ^ 0x80) - 0x80))
+#ifdef FX_CB_UNPACKED
+#define FX_CBW (FX_NC + 1)
+#define FX_CB_VAL(y, k) ((y)[k])
+#else
+#define FX_CBW ((FX_NC + 1) / 2)
+#define FX_CB_VAL(y, k) ((k) & 1 ? FX_CB_LO((y)[(k) >> 1]) : FX_CB_HI((y)[(k) >> 1]))
+#endif
 extern const int16_t fx_cb_stages;
 extern const int16_t fx_cb_bits[];
-extern const int8_t *const fx_cb[];
+extern const int16_t *const fx_cb[];
 extern const int32_t *const fx_cb_e2[];  /* sum of squares of each vector, for the search */
 extern const int32_t fx_cb_step[];
 extern const int32_t fx_cb_istep[];

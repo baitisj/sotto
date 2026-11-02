@@ -111,10 +111,22 @@ def main(cb_path, out):
             q = np.round(c / step)
             assert np.abs(q).max() <= 127
             scales.append(step)
-            arr(f, "int8_t", "fx_cb%d" % s, q, per_line=19)
+            # two 8-bit values per 16-bit word (the C55x has no 8-bit type), high byte
+            # first, each vector padded with a zero to 20 values = FX_CBW words
+            # (FX_CB_UNPACKED: one value per word, twice the memory, a faster search)
+            qp = np.concatenate([q, np.zeros((len(q), 1))], 1).astype(np.int64)
+            words = (qp[:, 0::2] << 8) | (qp[:, 1::2] & 0xFF)
+            words = np.where(words >= 32768, words - 65536, words)
+            f.write("#ifdef FX_CB_UNPACKED\n")
+            arr(f, "int16_t", "fx_cb%d" % s, qp, per_line=20,
+                comment="stage %d: 2^%d vectors of %d values" % (s, nb, K))
+            f.write("#else\n")
+            arr(f, "int16_t", "fx_cb%d" % s, words, per_line=10,
+                comment="stage %d: 2^%d vectors of %d words, two 8-bit values each" % (s, nb, K // 2))
+            f.write("#endif\n")
             arr(f, "int32_t", "fx_cb%d_e2" % s, (q ** 2).sum(1), per_line=12,
                 comment="squared length of each vector of stage %d, in steps^2" % s)
-        f.write("const int8_t *const fx_cb[] = {%s};\n" % ", ".join("fx_cb%d" % s for s in range(len(bits))))
+        f.write("const int16_t *const fx_cb[] = {%s};\n" % ", ".join("fx_cb%d" % s for s in range(len(bits))))
         f.write("const int32_t *const fx_cb_e2[] = {%s};\n" % ", ".join("fx_cb%d_e2" % s for s in range(len(bits))))
         f.write("/* value of one codebook step, dB x 2^16, and its inverse, x 2^22 / dB Q8 */\n")
         f.write("const int32_t fx_cb_step[] = {%s};\n" % ", ".join(str(int(rnd(s * 65536))) for s in scales))

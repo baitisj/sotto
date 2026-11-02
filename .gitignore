@@ -9,3 +9,5 @@ build/
 *.flac
 !docs/samples/**/*.flac
 !docs/course/audio/*.flac
+c/fixed/c55x/build*/
+c/fixed/c55x/run*/
