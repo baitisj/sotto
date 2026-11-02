@@ -458,3 +458,43 @@ row 5 (`onset_pf=1.0`, every onset frame, -0.038) is the same idea without the t
 gate. PESQ likes the postfilter on unvoiced frames in general, so this is as far as a
 decoder rule goes; the next step for stops, if the ear wants more, is to spend bits
 (a per-frame postfilter-off flag) rather than infer.
+
+## Jeff's first listen to the v3.8 page, and what it turned up (2026-11-02)
+
+Jeff: p047 rows 2/3/4 indistinguishable (expected: her over-the-air shape lands within
+4 dB of the measured one; the attack rule touches nine onsets by 10 ms). p095 rows 2-7
+indistinguishable and "sunlight" still "sunlike". p051 "prism" still "prithm" in rows 2-5.
+On the fading LibriSpeech pair, row 2 (measured shape) clearly beats row 3 (shape over
+the air) at "poems", 1 s into the snippet, and row 2 is "the most clear of all the
+clips". Three findings came out of chasing those.
+
+**The side channel locked in late.** The message in window w carries the estimate from
+windows 0..w-1, and the estimate needs 20 vowel frames after a 1 s warm-up, so the first
+real shape reached the decoder at 6 s (8842: windows 0-2 sent the mean speaker); the
+snippet starts at 4 s. Two bitstream-compatible changes: warm-up 0.5 s (every test clip
+now sends a real estimate in window 1), and the decoder applies a message from the frame
+that completes it (its 16th unvoiced frame) instead of the next window boundary; a lost
+frame before that drops the message, lost frames after it no longer do. First shape now
+at 2.9 s (8842), 3.2 s (p051), but 8.6 s on p095: his windows have 9-11 UU frames, fewer
+than the 16 bits a message needs, so windows 1-3 carry nothing. Next step there: 8-bit
+messages (2-bit coefficient id, 4-bit value, CRC-2) sent round-robin, PC1 twice as often.
+
+**The pitch field leak (a real bug, fixed).** `interp_wo` gives a voiced odd subframe
+whose own first half is unvoiced the *next* frame's Wo. In v3.8 the next frame, when UU,
+carries the hiss index in that field, so the mixed half of an edge frame before a
+fricative was synthesised at a random pitch for 10 ms (p051: L 39 -> 78 at 7.38 s; three
+such subframes in 12 s). `SottoV38.UU_WO_GUARD` keeps the frame's own Wo in that case;
+v3.7 decode is bit-identical. It also explains why fresh v3.8 encodes scored up to 0.05
+away from the cached `encode_low` bits with identical voicing, energy and shape.
+
+**"prism" is a z.** Its frames (8.12-8.19 s) have the 4-8 kHz band 2-8 dB *under* 0-1 kHz,
+so the sibilant rule (+3 dB) never fires; they are coded M/edge, correctly, and the hiss
+they get is the mixed-frame guess. Lowering the threshold (`sib_db` 0 / -3 / -6, fresh
+encodes, `play6.py`): -6 recodes 1-11 M/edge frames per clip and costs 0.03 PESQ against
+0 (p095 -0.11, 8842 -0.08, p047 +0.09); it is on the page as p051 row 6 ("z as hiss").
+The real answer is item 4 of the list above: a hiss level for mixed frames.
+
+**Encoder burst contrast** (`contrast_db`, `vocoder_lab.SottoV0.encode`): code a closure
+at its quieter 10 ms half and the burst after it at its louder half. Fires 17-21 times a
+clip, p095 1.12/1.14 s 43.9 -> 39.4 / 48.4 dB. PESQ -0.043 (1 win / 9 losses); p095 row 8
+for ears.

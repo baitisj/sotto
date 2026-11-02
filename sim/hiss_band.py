@@ -225,6 +225,9 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
+    UU_WO_GUARD = True      # UU frames' pitch field is a hiss index: never interpolate from it
+
+
     def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, keep_mixed=False, sib_db=None, fry=False, uv_pf=None, onset_pf=None, attack_db=None, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
@@ -308,8 +311,8 @@ class SottoV38(vl.SottoV37):
         tot = 10 * np.log10(P.sum(1) + 1e-12)
         # loud vowel frames only (within 10 dB of the running peak), like the training set
         # frames above the running 60th percentile of frame energy (a 1 dB histogram in C),
-        # after a 1 s warm-up: matches the whole-clip selection the layer was tuned with
-        vow = (lo - bands_db(P, [(2500, 3000)])[:, 0] > 10) & running_pct(tot, 60, warm=100)
+        # after a 0.5 s warm-up (1 s cost every clip a whole window of lock-in time)
+        vow = (lo - bands_db(P, [(2500, 3000)])[:, 0] > 10) & running_pct(tot, 60, warm=50)
         fr = np.clip(np.arange(nfr) + HB_LAG, 0, 2 * len(bits) - 1) // 2
         code = bits[:, 0] * 2 + bits[:, 1]
         acc, cnt = np.zeros(len(FHI)), 0
@@ -323,18 +326,26 @@ class SottoV38(vl.SottoV37):
             cnt += len(ts)
 
     def _read_pc(self, bits, good):
-        """-> per window the speaker shape in force (a message applies from the next
-        window; any lost frame in a window drops its message; starts at the mean speaker)."""
-        nw = (len(bits) + WIN_FRAMES - 1) // WIN_FRAMES
-        cur, out = np.zeros(3), []
-        for w in range(nw + 1):
-            out.append(cur.copy())
-            g0, g1 = w * WIN_FRAMES, min(len(bits), (w + 1) * WIN_FRAMES)
-            if g0 >= len(bits) or not np.all(good[g0:g1]):
-                continue
-            msg = unpack_pc([int(r[8]) for r in bits[g0:g1] if r[0] == 0 and r[1] == 0][:MSG_BITS])
-            if msg is not None:
-                cur = msg
+        """-> per codec frame the speaker shape in force. A window's message applies from
+        the frame that completes it (its 16th unvoiced frame), not from the next window; a
+        lost frame before that drops the window's message (a lost frame may have carried a
+        bit); lost frames after it do no harm. Starts at the mean speaker."""
+        cur, out = np.zeros(3), np.zeros((len(bits), 3))
+        for g0 in range(0, len(bits), WIN_FRAMES):
+            got, ok = [], True
+            for g in range(g0, min(len(bits), g0 + WIN_FRAMES)):
+                out[g] = cur
+                if not ok or len(got) == MSG_BITS:
+                    continue
+                if not good[g]:
+                    ok = False
+                elif bits[g, 0] == 0 and bits[g, 1] == 0:
+                    got.append(int(bits[g, 8]))
+                    if len(got) == MSG_BITS:
+                        msg = unpack_pc(got)
+                        if msg is not None:
+                            cur = msg
+                            out[g] = cur
         return out
 
     def _side_channel(self, bits, hb, p, E, v, f):
@@ -596,7 +607,7 @@ class SottoV38(vl.SottoV37):
             pcs = self.spk_pc
             if self.vowel == "speaker":                 # from the side channel, per frame
                 win = self._read_pc(bits, good)
-                pcs = np.array([win[min(g // WIN_FRAMES, len(win) - 1)] for g in f])
+                pcs = win[np.minimum(f, len(win) - 1)]
             vt = fine_levels(y16, nfr, pcs)             # 16 bands of 250 Hz, not 4
         mask = np.zeros(nfr)
         for t in range(nfr):

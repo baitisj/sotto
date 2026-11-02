@@ -129,15 +129,17 @@ def decimate_interp(v, axis_vals=None):
     return out
 
 
-def interp_wo(wo, voiced):
-    """Codec 2 style: odd 10 ms subframes take Wo from the 20 ms frames either side."""
+def interp_wo(wo, voiced, guard=False):
+    """Codec 2 style: odd 10 ms subframes take Wo from the 20 ms frames either side.
+    guard (v3.8): a voiced second half whose neighbours are both unvoiced keeps its own
+    frame's Wo instead of the next frame's, whose pitch field is a hiss index."""
     out = wo.copy()
     for i in range(1, len(wo), 2):
         a, b = i - 1, min(i + 1, len(wo) - 1)
         if voiced[i] and voiced[a] and voiced[b]:
             out[i] = 0.5 * (wo[a] + wo[b])
         elif voiced[i]:
-            out[i] = wo[a] if voiced[a] else wo[b]
+            out[i] = wo[a] if (voiced[a] or (guard and not voiced[b])) else wo[b]
         else:
             out[i] = WO_MIN * 2 if not voiced[i] else out[i]
     return out
@@ -354,11 +356,27 @@ class SottoV0:
         # v3.6: code the energy the decoder can rebuild (the envelope starts at 200 Hz), so a
         # strong component below it isn't spread over the whole band
         en = frame_energy_db(from_rate_k(m, rk) if self.ENERGY_RK else m)
+        ecode = en[0::2].copy()
+        ct = getattr(self, "contrast_db", None)
+        if ct is not None:
+            # v3.8 study: a stop. A frame with an unvoiced half whose quieter half sits ct dB
+            # under the two frames before (the closure), followed by a frame with an unvoiced
+            # half that rises 8 dB above it (the burst): the closure is coded at its quieter
+            # half and the burst at its louder half, instead of both at the frame centre, so
+            # the 20 ms frames keep the contrast the 10 ms analysis saw.
+            for k in range(2, len(ecode) - 1):
+                i = 2 * k
+                lo, nxt = min(en[i], en[i + 1]), max(en[i + 2], en[i + 3])
+                if (lo <= en[i - 4:i].max() - ct and nxt >= lo + 8
+                        and min(m[i]["voiced"], m[i + 1]["voiced"]) == 0
+                        and min(m[i + 2]["voiced"], m[i + 3]["voiced"]) == 0):
+                    ecode[k] = lo
+                    ecode[k + 1] = max(ecode[k + 1], nxt)
         frames = []
         for i in range(0, len(m), 2):
             v = [int(m[i]["voiced"] > 0), int(m[i + 1]["voiced"] > 0)]
             wi, _ = q_wo(np.array([m[i]["Wo"]]), hi=self.WO_HI)
-            ei, _ = q_uniform(np.array([en[i]]), self.E_LO, self.E_HI, 5)
+            ei, _ = q_uniform(np.array([ecode[i // 2]]), self.E_LO, self.E_HI, 5)
             si = self._shape_idx(rk[i] - rk[i].mean())
             frames.append(self._pack([(v[0], 1), (v[1], 1), (wi[0], 7), (ei[0], 5)]
                                      + list(zip(si, self.fields))))
@@ -414,7 +432,7 @@ class SottoV0:
         rk = decimate_interp(rk)
         en = decimate_interp(en)
         wo[1::2] = wo[0::2]
-        wo = interp_wo(wo, voiced)
+        wo = interp_wo(wo, voiced, getattr(self, "UU_WO_GUARD", False))
         wo = np.where(voiced > 0, wo, np.maximum(wo, WO_MIN))
         m = np.zeros(2 * n, MODEL)
         m = set_wo(m, wo, np.minimum(voiced, 1))
