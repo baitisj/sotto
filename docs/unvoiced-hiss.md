@@ -404,8 +404,12 @@ Ranked by expected audible gain per hour, with what each would cost.
    (6 index + 1 side). Ears only; PESQ does not see bursts.
 2. **The 50 Hz spacing cost on 6313 and 8842** (-0.2 each, the whole v3.7 -> v3.8 mean
    loss). Not LF content. Next suspects: the overlap-add of independent random phases per
-   10 ms subframe at 50 Hz spacing (slower amplitude modulation than at 100 Hz) and PESQ's
-   time alignment. A per-frame disturbance trace from PESQ would localise it in an hour.
+   10 ms subframe at 50 Hz spacing and PESQ's time alignment. Measured on 6313 and 652:
+   the UU frames' band levels (0-1, 1-2, 2-3, 3-4 kHz, against the original) and their
+   2.5 ms envelope spread are the same at 50 and 100 Hz to 0.1 dB, so it is not level or
+   modulation depth; what PESQ reacts to is the texture itself (the 10 ms periodicity at
+   100 Hz spacing scores as "more speech-like"). A per-frame disturbance trace from PESQ
+   would confirm it; if so the 0.2 is a metric artefact and nothing to fix.
 3. **Vocal fry.** Only the encoder sees the creak (harmonic SNR 2-7 dB, pitch wandering
    72-119 Hz). The slew limiter (`fry="slew"`, on the page) is the bitstream-compatible
    fix; PESQ -0.015..-0.03. Anything better needs a creak-aware tracker.
