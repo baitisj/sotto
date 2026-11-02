@@ -194,7 +194,7 @@ class SottoV38(vl.SottoV37):
     """See the module docstring. encode() and decode_audio16() work at 16 kHz; decode()
     returns the 8 kHz model like the other versions."""
 
-    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, **kw):
+    def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, **kw):
         """vowel: None (no high band in voiced frames), "guess" (voiced frames at the guess
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
@@ -203,6 +203,9 @@ class SottoV38(vl.SottoV37):
         self.vowel_shape, self.smooth_ms = vowel_shape, smooth_ms
         self.peak_hz, self.peak_db, self.peak_bw, self.peak_floor = peak_hz, peak_db, peak_bw, peak_floor
         self.spk_pc = spk_pc                  # vowel_shape="fine": 3 speaker-shape coefficients (side channel)
+        self.whisper = whisper                # encoder: send whispered vowels (mixed runs with no
+                                              # real harmonics and a wandering pitch) as unvoiced
+        self.blend = blend                    # one layer: max(vowel, consonant) power, flickers bridged
         if model:                                       # None while training the guess
             z = np.load(model, allow_pickle=True)
             self.W, self.cb = z["W"].item(), z["cb"]
@@ -257,6 +260,8 @@ class SottoV38(vl.SottoV37):
         x8 = resample_poly(x16, 1, 2)
         bits = vl.SottoV37.encode(self, x8)
         self._onsets(x8, bits)
+        if self.whisper:
+            self._whisper(x8, bits)
         P = np.abs(stft(x16)) ** 2
         hb = bands_db(P, HB)
         m = self.decode(bits)
@@ -265,6 +270,40 @@ class SottoV38(vl.SottoV37):
         for t in np.where((top[1:] - top[:-1] > BURST_DB) & (top[1:] > low[1:] - 15))[0] + 1:
             bits[f[t], 0] = bits[f[t], 1] = 0            # burst: send as UU
         return bits, hb, self.decode(bits)
+
+    def _whisper(self, x8, bits, min_frames=10, snr_db=6.0, jit=0.025):
+        """A whispered vowel has no glottal pulses, but the tracker still finds a 'pitch' and
+        v3.7 sends it as mixed: harmonics below 1 kHz at a wandering pitch, heard as a low
+        warble. Runs of >= `min_frames` mixed/edge frames whose median harmonic SNR below
+        1 kHz is < `snr_db` and whose pitch moves > `jit` (log ratio per 10 ms, median) are
+        sent as UU instead. Real voiced runs: SNR ~11-16 dB, jitter ~0.003-0.016."""
+        import sinusoid as sn
+        m = vl.analyse(x8, self.PITCH)
+        Sw = sn.spectra(np.round(x8 * 32767))
+        n = min(len(m), len(Sw))
+        snr = np.full(n, np.nan)
+        for k in range(n):
+            if m["voiced"][k] > 0:
+                wo = m["Wo"][k]
+                L = sn.n_harm(wo)
+                fh = np.arange(L + 1) * wo * 8000 / (2 * np.pi)
+                snr[k] = sn.harmonic_snr(Sw[k], wo, L)[(fh > 0) & (fh < 1000)].mean()
+        jt = np.r_[0.0, np.abs(np.diff(np.log(m["Wo"][:n])))]
+        code = bits[:, 0] * 2 + bits[:, 1]
+        g = 0
+        while g < len(bits):
+            if code[g] not in (2, 3):
+                g += 1
+                continue
+            h = g
+            while h < len(bits) and code[h] in (2, 3):
+                h += 1
+            if h - g >= min_frames:
+                sl = slice(2 * g, min(2 * h, n))
+                s_, j_ = snr[sl], jt[sl]
+                if np.nanmedian(s_) < snr_db and np.median(j_) > jit:
+                    bits[g:h, 0] = bits[g:h, 1] = 0
+            g = h
 
     def _onsets(self, x8, bits, loud_db=10.0, lowdom=3.0):
         m = vl.analyse(x8, self.PITCH)
@@ -375,6 +414,17 @@ class SottoV38(vl.SottoV37):
             a = np.exp(-10.0 / self.smooth_ms)
             lv, wv = vt.copy(), np.zeros(nfr)
             want = ((v == 1) | (v == 2)) & (mask != 1)
+            if self.blend:
+                # a short unvoiced flicker (<= 40 ms) inside a vowel keeps the vowel layer on
+                w0 = want.copy()
+                for g0 in range(1, nfr):
+                    if w0[g0] or not w0[g0 - 1]:
+                        continue                        # only at the start of a gap
+                    g1 = g0
+                    while g1 < nfr and not w0[g1]:
+                        g1 += 1
+                    if g1 < nfr and g1 - g0 <= 4:
+                        want[g0:g1] = True
             w = 0.0
             for t in range(nfr):
                 if t: lv[t] = a * lv[t - 1] + (1 - a) * vt[t]
@@ -389,7 +439,16 @@ class SottoV38(vl.SottoV37):
                 lvl2 = lvl2 - self.peak_floor + pk[None, :]
             mag2 = np.sqrt(10 ** (lvl2 / 10)) * np.clip((FR - 3900) / 200, 0, 1) * wv[:, None]
             ph2 = np.exp(2j * np.pi * np.random.default_rng(seed + 1).random(mag2.shape))
-            X = X + mag2 * ph2
+            if self.blend:
+                # one hiss layer: per bin, the louder of the vowel layer and the consonant hiss,
+                # the consonant part held with a 20 ms release so it never drops in one frame
+                pc = np.abs(X) ** 2
+                ar = np.exp(-10.0 / 20.0)
+                for t in range(1, nfr):
+                    pc[t] = np.maximum(pc[t], ar * pc[t - 1])
+                X = np.sqrt(np.maximum(pc, mag2 ** 2)) * ph2
+            else:
+                X = X + mag2 * ph2
         if self.texture == "pulsed" and nfr:
             # voiced/mixed frames: noise shaped in time by the pitch pulses of the decoded
             # 2-3.8 kHz band (real voiced high band is pulsed; steady noise sounds scratchy)
