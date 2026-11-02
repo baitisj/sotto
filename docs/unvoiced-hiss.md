@@ -426,3 +426,35 @@ Ranked by expected audible gain per hour, with what each would cost.
 7. **Voiced phase model.** c2sim `--phase0` is zero-phase per harmonic; a dispersion
    filter or Codec 2's newer phase synthesis would change the voiced texture. Independent
    of the hiss work, large, ears.
+
+### The "t" of "strikes", taken apart (p095, 1.10-1.20 s)
+
+10 ms energies from the analysis: vowel tail 63.8 / 60.2 / 55.8 / 48.9, closure 44.4 /
+38.3 at 1.12-1.13 s, burst 43.8 / 49.2, then the s at 53-56 dB. The decoder's level track
+(43.8 -> 53.1 with the odd subframe interpolated to 48.5) is right to 1 dB; the burst is
+not lost in the energy field. Band levels against the original, per 10 ms, 1.10-1.20 s:
+
+| | 200-1200 Hz | 2-4 kHz |
+|---|---|---|
+| v3.7, postfilter 1.35 | 3 2 -5 -15 -10 -11 -8 -14 -14 -15 | 2 5 5 -2 2 -11 -6 -4 -3 -7 |
+| v3.7, no postfilter | 3 -2 -1 -9 -1 1 8 -3 -5 -4 | 6 4 1 -4 1 -6 -10 -1 -2 -5 |
+| unquantised model | 5 2 1 -6 -4 0 6 -1 -2 0 | 2 -1 1 -1 2 -8 -9 -2 -3 -6 |
+
+The shape quantiser is not the problem (no-postfilter and unquantised agree within a few
+dB); the formant postfilter takes 8-15 dB out of the burst's 200-1200 Hz, which is what
+turns "strikes" into "srikes". The burst frames are broadband: their 200-1200 Hz level
+minus their 2-4 kHz level ("tilt") is +6.8 and +2.1 dB, where the s frames that follow
+are -6 to -13 dB. 79% of all UU/edge frames have a positive tilt (pauses, breath,
+background), so tilt alone is no selector.
+
+Decoder rules on the v3.8 bits (`flat_pf_db`, `flat_onset`, `flat_pf` in
+`vocoder_lab.SottoV0.decode`; `play2.py` set 3), PESQ-NB over 12 clips, base 2.886:
+no postfilter on every UU/edge frame with tilt >= 0 dB: -0.033 (0 wins / 11 losses);
+tilt >= -5: -0.064. Only within two frames of a voiced/mixed frame (the onset gate
+`onset_pf` used): tilt >= 0 -0.020, tilt >= -5 -0.020, **tilt >= -5 with postfilter 1.15
+instead of none: -0.004 (6 wins / 4 losses), p095 +0.056, p047 +0.026, p051 +0.027.**
+The last is on the v3.8 page as row 7 for p095 ("burst, flat onsets only"); the earlier
+row 5 (`onset_pf=1.0`, every onset frame, -0.038) is the same idea without the tilt
+gate. PESQ likes the postfilter on unvoiced frames in general, so this is as far as a
+decoder rule goes; the next step for stops, if the ear wants more, is to spend bits
+(a per-frame postfilter-off flag) rather than infer.

@@ -32,6 +32,7 @@ def _mel(f):
 
 
 KFREQ = 700 * (10 ** (np.linspace(_mel(200), _mel(3700), K) / 2595) - 1)   # Hz
+KLOMID, KHIGH = (KFREQ >= 200) & (KFREQ < 1200), KFREQ >= 2000
 _n = np.arange(K)
 DCT = np.sqrt(2 / K) * np.cos(np.pi * (_n[None, :] + 0.5) * _n[:, None] / K)
 DCT[0] /= np.sqrt(2)                                     # orthonormal DCT-II
@@ -401,6 +402,12 @@ class SottoV0:
                     and en[2 * f] - en[2 * f - 2] >= getattr(self, "burst_db", 8.0):
                 pf = self.burst_pf              # v3.8 study: an unvoiced frame that jumps up
                                                 # in level (a stop burst) keeps its broadband shape
+            fl = getattr(self, "flat_pf_db", None)
+            if vcode in (0, 3) and fl is not None and \
+                    (since_vm <= 2 or not getattr(self, "flat_onset", False)) and \
+                    shape[KLOMID].mean() - shape[KHIGH].mean() >= -fl:
+                pf = getattr(self, "flat_pf", 1.0)   # v3.8 study: a broadband unvoiced frame
+                                                     # (a stop burst, not an s) keeps its low-mid
             if pf and pf != 1.0:
                 shape = postfilter_rk(shape[None], pf)[0]
             rk[2 * f] = shape

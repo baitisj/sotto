@@ -35,6 +35,9 @@ SETS = {'1': [('base', {}), ('bpf1.0d8', dict(burst_pf=1.0, burst_db=8)), ('bpf1
               ('att8+bpf', dict(attack_db=8, burst_pf=1.0, burst_db=8))],
         '2': [('base', {}), ('att10', dict(attack_db=10)), ('att12', dict(attack_db=12)), ('att14', dict(attack_db=14)),
               ('att16', dict(attack_db=16)), ('early12', dict(attack_db=12, early=True))]}
+SETS['3'] = [('base', {}), ('flat0', dict(flat_pf_db=0)), ('flat5', dict(flat_pf_db=5)),
+             ('on0', dict(flat_pf_db=0, flat_onset=True)), ('on5', dict(flat_pf_db=5, flat_onset=True)),
+             ('on5_1.15', dict(flat_pf_db=5, flat_onset=True, flat_pf=1.15)), ('on0+att12', dict(flat_pf_db=0, flat_onset=True, attack_db=12))]
 vars_ = SETS[os.environ.get('SET', '1')]
 out = []
 for k, o in vars_:
