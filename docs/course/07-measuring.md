@@ -47,7 +47,7 @@ Reading it from left to right:
 | + quantized pitch and energy, 20 ms | Pitch and energy rounded, every other frame sent | 0 to 0.2 |
 | Codec 2 2400 | The actual codec, start to finish | |
 
-The tallest step down for both men is the LPC-10 envelope. That is the single finding that shaped sotto v0: replace the envelope first (chapter 3). The diamonds at the right are sotto v3.5, the actual 48-bit codec today. (They were scored later, with the corrected alignment described below, so compare them loosely.) It's well above Codec 2 for all three voices.
+The tallest step down for both men is the LPC-10 envelope. That is the single finding that shaped sotto v0: replace the envelope first (chapter 3). The diamonds at the right are sotto v3.5, the full 48-bit codec as it was when the ladder was redrawn. (They were scored later, with the corrected alignment described below, so compare them loosely.) It's well above Codec 2 for all three voices.
 
 Two other things jump out:
 
@@ -113,13 +113,13 @@ Good science says what it *didn't* test, and fixes its own mistakes:
 - **A scoring bug.** PESQ and ESTOI compare the decoded clip with the original, so the two must be lined up in time. The scripts used to line them up by matching waveforms, but vocoders with made-up phases don't follow the original waveform, so the match picked delays anywhere from 50 to 180 samples when the right answer is about 160. That made scores wrong by up to ±0.1 (and ESTOI too low). Now every codec is scored with the same fixed delay of 160 samples. Old write-ups got their rankings right but some numbers wrong, and the course uses the corrected numbers.
 - **Few listeners.** Most listening rounds had one listener. That's enough to find problems, not to prove small differences.
 - **Training speech.** The codebook is trained on CC BY speech only, so it can be shipped. Another collection (EARS) is used only for testing because its license doesn't allow shipping.
-- **Not on the radio yet.** sotto now has a C version (`c/`) that gives the same bits as the Python on 99.97% of frames, and a fixed-point version (`c/fixed/`) for the radio's chip. On TI's simulator of that chip, the fixed-point decoder needs about 37 MHz of the chip's 200 MHz, but the encoder needs about 188 MHz on average and 212 MHz on its worst frame: too much, so it still has to get faster. None of it has run on a real radio.
+- **Not on the radio yet.** sotto now has a C version (`c/`) that gives the same bits as the Python on 99.97% of frames, and a fixed-point version (`c/fixed/`) for the radio's chip. The first fixed-point encoder needed more than the whole chip. After two rounds of speed-ups, on TI's simulator of that chip, the v3.7 encoder needs about 82 MHz of the chip's 200 MHz (91 on its worst frame) and the decoder about 20. The 16 kHz v3.8 encoder needs about 137 (157 worst). So it fits, on a simulator. None of it has run on a real radio, because getting new code onto the radio's chip is still an open problem.
 
 ## What's next for sotto
 
 From `docs/encoder-v1.md`:
 
-1. Making the fixed-point encoder fast enough for the radio's DSP chip, a TI C5517 (the target is about 100 MHz), and measuring v3.8's hiss band on it.
+1. Running the fixed-point code on real hardware: the radio's DSP chip (a TI C5517) once there's a way to load it, or another radio such as one running OpenRTX, where a simulated Cortex-M4 also has room for it.
 2. Deciding whether to spread each frame's bits across *two* radio frames (200 ms). It's built, and PESQ says it helps from 30 km/h up, but in the first listening round it won 3, lost 2 and tied 1, so more tests come first.
 3. Retraining the codebook on more speech when it's available.
 4. Working out, by ear, what listeners want for very high voices.

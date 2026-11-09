@@ -57,40 +57,41 @@ Versions v0 to v2 used a **scalar** quantizer (the `ShapeQ` class): it rounded e
 
 ### Since v3: a vector quantizer
 
-A **vector quantizer** (VQ) rounds all the numbers *together*. Picture a book of typical envelope shapes, learned from real speech: the **codebook**. Each page holds one shape, written as a list of 19 numbers. The encoder and the decoder have identical copies of the book. The encoder finds the page closest to this frame's shape and sends just its page number; the decoder looks up that page and reads the shape back out. The shape itself never travels, only the page number. With 12 bits, the codebook can have 2¹² = 4,096 pages.
+A **vector quantizer** (VQ) rounds all the numbers *together*. Picture a book of typical envelope shapes, learned from real speech: the **codebook**. Each page holds one shape, written as a list of 19 numbers. The encoder and the decoder have identical copies of the book. The encoder finds the page closest to this frame's shape and sends just its page number; the decoder looks up that page and reads the shape back out. The shape itself never travels, only the page number. With 9 bits, the codebook can have 2⁹ = 512 pages.
 
 It's like ordering paint by its number on a color chart: you don't describe the color, you say "number 2417", and the store has the same chart.
 
-4,096 shapes still can't match every frame closely. So sotto uses **three stages**:
+512 shapes can't match every frame closely. So sotto uses **four stages**:
 
-1. **Stage 1** (12 bits): pick the closest of 4,096 shapes.
-2. **Stage 2** (11 bits): look at what's left over (the true shape minus the stage-1 shape). Pick the closest of 2,048 *corrections*.
-3. **Stage 3** (11 bits): correct what's left after that, again from 2,048 choices.
+1. **Stage 1** (9 bits): pick the closest of 512 shapes.
+2. **Stage 2** (9 bits): look at what's left over (the true shape minus the stage-1 shape). Pick the closest of 512 *corrections*.
+3. **Stage 3** (8 bits): correct what's left after that, from 256 choices.
+4. **Stage 4** (8 bits): one last correction, again from 256 choices.
 
-The decoder adds the three entries together. 12 + 11 + 11 = 34 bits. This is called a **multistage VQ**.
+The decoder adds the four entries together. 9 + 9 + 8 + 8 = 34 bits. This is called a **multistage VQ**. (Until v3.5 there were three bigger stages, 12 + 11 + 11 bits; the section below explains why it changed.)
 
-![The three VQ stages on one frame, and the error compared with the older scalar quantizer](figures/vq.svg)
+![The four VQ stages on one frame, and the error compared with the v3.5 codebook and the older scalar quantizer](figures/vq.svg)
 
-Left: on the man's vowel, stage 1 gets the overall shape, and each later stage fixes details. Right: the average error over the whole clip. After all three stages the VQ's error is about half of what the old scalar quantizer had with the same 34 bits. On a large set of test voices the team measured 45% less error (2.54 against 4.66 dB²), with both quantizers trained on the same speech.
+Left: on the man's vowel, stage 1 gets the overall shape, and each later stage fixes details. Right: the average error over the whole clip. After all four stages the error is 2.4 dB², a little more than the bigger v3.5 codebook (2.3) and much less than the old scalar quantizer (4.0) with the same 34 bits. On a large set of test voices the team measured 45% less error for the VQ than for the scalar quantizer (2.54 against 4.66 dB², for the v3.5 codebook), with both trained on the same speech.
 
 One more trick: the best stage-1 choice doesn't always lead to the best final answer. So the encoder keeps the **8 best paths** at each stage, not just one, and picks the best total at the end. This is called an **M-best search** (M = 8).
 
 ### Training the codebook
 
-Where do the 8,192 codebook entries come from? From **training** on recordings of real people. The method is called **k-means clustering**:
+Where do the codebook entries come from? From **training** on recordings of real people. The method is called **k-means clustering**:
 
 1. Start with a guess for each codebook entry.
 2. Sort every training shape into the group of the entry it's closest to.
 3. Move each entry to the average of its group.
 4. Repeat until the entries stop moving.
 
-Stage 2 is trained the same way, on what stage 1 left over, and so on. sotto's codebook is trained on about 480,000 frames from more than 600 speakers: short words from Google's *Speech Commands* collection (300 lower and 300 higher voices) plus audiobook readers from *LibriSpeech*. Both collections are free to reuse (CC BY 4.0). It's stored in the file `sim/data/shape_msvq_34.npz`.
+Stage 2 is trained the same way, on what stage 1 left over, and so on. sotto's codebook is trained on about 480,000 frames from more than 600 speakers: short words from Google's *Speech Commands* collection (300 lower and 300 higher voices) plus audiobook readers from *LibriSpeech*. Both collections are free to reuse (CC BY 4.0). The v3.5 codebook is stored in `sim/data/shape_msvq_34.npz`, and today's in `sim/data/shape_msvq_9988.npz`.
 
 To keep the tests fair, the voices used for testing are never used for training. That's called keeping test data **held out**. On 16 held-out voices from LibriSpeech and another studio collection (EARS), sotto beat Codec 2 on every one, by about 0.45 to 0.6 PESQ.
 
-### Shrinking the codebook for the radio (v3.6)
+### Why the codebook shrank (v3.6)
 
-The codebook has to be stored inside the radio. All three stages together have 8,192 pages × 19 numbers = 155,648 numbers. The DSP chip in the radio (a TI C5517) has only 320 KB of memory, and the radio modem needs to share it. Even with each number squeezed into 8 bits (one byte), the codebook would take 152 KB, about half of the chip.
+The codebook has to be stored inside the radio. The v3.5 codebook's three stages together have 8,192 pages × 19 numbers = 155,648 numbers. The DSP chip in the radio (a TI C5517) has only 320 KB of memory, and the radio modem needs to share it. Even with each number squeezed into 8 bits (one byte), the codebook would take 152 KB, about half of the chip.
 
 The codebook is also slow. To find the best pages, the encoder compares the shape with every page in every stage, keeping 8 paths. That's about 700,000 multiply-and-add steps every 20 ms, and **90% of the encoder's work**.
 
@@ -111,7 +112,7 @@ v3.6 also changed how **energy** is measured. The envelope only covers 200 to 3,
 
 ![The 48 bits of one frame](figures/frame48.svg)
 
-The bits go out in order of importance: voicing first, then pitch, then energy, then the three shape stages. If the radio link can protect some bits better than others, the important ones are easy to find.
+The bits go out in order of importance: voicing first, then pitch, then energy, then the four shape stages. If the radio link can protect some bits better than others, the important ones are easy to find.
 
 ## Two more tricks
 
@@ -123,19 +124,19 @@ The bits go out in order of importance: voicing first, then pitch, then energy, 
 
 1. If energy had 6 bits instead of 5 over the same 10–80 dB range, what would the step size be? Where could that extra bit come from?
 2. sotto's pitch levels are each 1.83% apart. Starting at 50 Hz, what are the next two levels? How many steps make one octave (doubling)?
-3. A friend says: "Why not one stage with 34 bits instead of three stages?" How many codebook entries would that need? Why might that be a problem?
+3. A friend says: "Why not one stage with 34 bits instead of four stages?" How many codebook entries would that need? Why might that be a problem?
 4. Check the v3.6 codebook: how many pages do stages of 9, 9, 8 and 8 bits have in total? With 19 numbers per page and one byte per number, how many bytes is that?
 
 ## Where this is in the code
 
-- `sim/vocoder_lab.py`: `q_uniform()` (uniform quantizer), `q_wo()` (log pitch quantizer), `ShapeMSVQ` (the 3-stage VQ and its M-best search), `ShapeQ` (the older scalar quantizer), `SottoV0.encode()` and `SottoV0.decode()` (the 48-bit layout), `decimate_interp()` and `interp_wo()` (filling in the 10 ms frames).
-- `tools/train_shape_vq.py`, `tools/sc_corpus.py`, `tools/clean_corpus.py`: building the training data and the codebook. `sim/data/shape_msvq_34.npz`: the v3.5 codebook. `sim/data/shape_msvq_9988.npz`: the smaller v3.6 codebook, used by `SottoV36` and the C port (`docs/c-port.md` has the memory and speed numbers).
+- `sim/vocoder_lab.py`: `q_uniform()` (uniform quantizer), `q_wo()` (log pitch quantizer), `ShapeMSVQ` (the multistage VQ and its M-best search), `round_codebook()` (the 8-bit values), `ShapeQ` (the older scalar quantizer), `SottoV0.encode()` and `SottoV0.decode()` (the 48-bit layout), `decimate_interp()` and `interp_wo()` (filling in the 10 ms frames).
+- `tools/train_shape_vq.py`, `tools/sc_corpus.py`, `tools/clean_corpus.py`: building the training data and the codebook. `sim/data/shape_msvq_34.npz`: the v3.5 codebook. `sim/data/shape_msvq_9988.npz`: the smaller v3.6 codebook, used by `SottoV36`, `SottoV37` and the C port (`docs/c-port.md` has the memory and speed numbers).
 
 <details markdown="1"><summary>Answers</summary>
 
 1. 70 ÷ 63 ≈ 1.11 dB. It would have to come from another field, for example one less bit for the shape (33 instead of 34).
 2. 50 × 1.0183 ≈ 50.9 Hz, then ≈ 51.8 Hz. An octave takes about 38 steps (1.0183³⁸ ≈ 2). From 50 to 500 Hz is a factor of 10, about 3.3 octaves, and 3.3 × 38 ≈ 127 steps, which is why 128 levels cover it.
-3. 2³⁴ is about 17 billion entries. That's far too many to store on a small radio chip or to search 50 times a second, and there isn't nearly enough training speech to learn them. Three stages need only 4,096 + 2,048 + 2,048 = 8,192 entries.
+3. 2³⁴ is about 17 billion entries. That's far too many to store on a small radio chip or to search 50 times a second, and there isn't nearly enough training speech to learn them. v3.5's three stages needed only 4,096 + 2,048 + 2,048 = 8,192 entries, and today's four need 1,536.
 4. 512 + 512 + 256 + 256 = 1,536 pages. 1,536 × 19 = 29,184 bytes, about 29 KB (one KB is 1,024 bytes).
 
 </details>

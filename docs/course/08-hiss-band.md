@@ -167,7 +167,7 @@ The usual PESQ (chapter 7) works at 8,000 samples per second, so it can't hear a
 
 - **Bits:** none. Still 48 bits every 20 ms. It is a new stream version, though: a v3.7 decoder can play a v3.8 stream, but it reads the hiss index as a pitch and plays rougher noise, with no high band.
 - **Delay:** the encoder rules (whisper, voicing smoothing and the rest) look at the frames around each frame, so the encoder now waits 10 frames: 320 ms instead of v3.7's 90 ms. The decoder adds 100 ms instead of 20. For push-to-talk radio that's acceptable; for a phone call it would be a lot.
-- **The radio:** the C version of v3.8 exists in both floating point and fixed point (95% of frames identical between the two, hiss levels within 0.3 dB). Its speed on the radio's DSP chip hasn't been measured yet. And there's an open question: the hiss band only helps if the FTM-300D's microphone and speaker can pass 4,000 to 8,000 Hz. Nobody knows yet.
+- **The radio:** the C version of v3.8 exists in both floating point and fixed point (95% of frames identical between the two, hiss levels within 0.3 dB). On a simulator of the radio's DSP chip, the v3.8 encoder needs about 137 MHz of the chip's 200 (157 on its worst frame), so it fits. And there's an open question: the hiss band only helps if the FTM-300D's microphone and speaker can pass 4,000 to 8,000 Hz. Nobody knows yet.
 
 ## Try it
 

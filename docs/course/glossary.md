@@ -13,7 +13,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 ### A
 **A (amplitudes)**: `A` in the model. The loudness of each harmonic in one 10 ms frame. `A[1]` is the first harmonic, `A[L]` the last. [2]
 
-**Analysis**: the encoder's first job: measuring pitch, voicing and harmonic amplitudes from the microphone signal. sotto uses Codec 2's analysis, with its own pitch and voicing tracker on top (v3.5 uses `analyse(x, "tracked3")` in `sim/vocoder_lab.py`; the tracker is in `sim/sinusoid.py`). [2]
+**Analysis**: the encoder's first job: measuring pitch, voicing and harmonic amplitudes from the microphone signal. sotto uses Codec 2's analysis, with its own pitch and voicing tracker on top (v3.7 uses `analyse(x, "tracked4")` in `sim/vocoder_lab.py`; the tracker is in `sim/sinusoid.py`). [2]
 
 **AMBE / AMBE+2** (say *AM-bee, AM-bee plus two*): the closed, licensed vocoder used by Yaesu System Fusion and other digital radios. sotto aims to match its quality with open code.
 
@@ -43,7 +43,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **c2sim, c2enc, c2dec** (say *see-two-sim, see-two-enk, see-two-dek*): Codec 2's command-line programs. `c2sim` runs the analysis and synthesis separately, so experiments can edit the model in between (`--modelout`, `--modelin`). `c2enc` and `c2dec` are the full Codec 2 encoder and decoder. [7]
 
-**Codebook**: the list of allowed patterns in a vector quantizer, like a numbered color chart. The encoder and decoder have identical copies; the encoder sends the *number* of the closest entry instead of the pattern itself. In v3.5 the three stages have 4,096, 2,048 and 2,048 entries of 19 numbers each (152 KB at one byte per number). v3.6 shrank it to four stages of 512, 512, 256 and 256 entries (29 KB) so it fits in the radio's DSP chip and searches about four times faster, with no audible loss. [4]
+**Codebook**: the list of allowed patterns in a vector quantizer, like a numbered color chart. The encoder and decoder have identical copies; the encoder sends the *number* of the closest entry instead of the pattern itself. Since v3.6, sotto's four stages have 512, 512, 256 and 256 entries of 19 numbers each (29 KB at one byte per number). Up to v3.5 there were three stages of 4,096, 2,048 and 2,048 entries (152 KB); they were shrunk so the codebook fits in the radio's DSP chip and searches about four times faster, with no audible loss. [4]
 
 **CODEC_DELAY**: the fixed 160-sample (20 ms) delay used to line up every decoded clip with the original before scoring (`sim/audio_race.py`). It replaced a waveform-matching search that picked wrong delays for vocoders with made-up phases. [7]
 
@@ -156,7 +156,7 @@ Terms used in the sotto code, the design notes in `docs/`, and this course, in p
 
 **Mixed voicing (mixed excitation, MBE, MELP)** (MBE is said as letters; MELP rhymes with "help"): letting a sound be partly buzz and partly hiss, like "z" or "v". Since v3.2, sotto has three kinds of frame: **U** (unvoiced, all noise), **V** (voiced, all harmonics) and **M** (mixed: harmonics below 1,000 Hz, noise above). A frame becomes M when it's voiced but its harmonics fit poorly below 1,000 Hz (`voicing_classes()`). MBE and MELP split voicing into more bands. [2, 5]
 
-**Multistage VQ (MSVQ)**: a vector quantizer done in steps. Stage 1 picks the closest codebook entry; stage 2 picks an entry that best corrects what stage 1 got wrong; stage 3 corrects what's left. sotto's shape quantizer uses 3 stages of 12, 11 and 11 bits in v3.5 and 4 stages of 9, 9, 8 and 8 bits in v3.6, 34 bits either way (`ShapeMSVQ`). [4]
+**Multistage VQ (MSVQ)**: a vector quantizer done in steps. Stage 1 picks the closest codebook entry; stage 2 picks an entry that best corrects what stage 1 got wrong; later stages correct what's left. sotto's shape quantizer uses 4 stages of 9, 9, 8 and 8 bits since v3.6, and used 3 stages of 12, 11 and 11 bits before that: 34 bits either way (`ShapeMSVQ`). [4]
 
 **Model**: the vocoder's description of one 10 ms frame: `Wo`, `L`, `A`, `phi` and `voiced`. Stored in the `MODEL` record type in `sim/vocoder_lab.py`. [2]
 

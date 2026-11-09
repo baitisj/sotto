@@ -87,7 +87,7 @@ When a frame fails its CRC, the decoder has to play *something* for those 20 ms.
 
 - **Codec 2 (and sotto up to v3.3)**: repeat the last good frame up to 3 times (60 ms) at full level, then go silent. Holding a buzzy vowel steady sounds like "springs", a sound listeners complain about on fading digital voice.
 - **sotto v3.4** faded slowly over 300 ms. The computer scores liked it, because it fills the gap. But a listener found it made dropouts *more* obvious: it sounded like the last sound dragging on.
-- **sotto v3.5** holds for 40 ms, fades 6 dB every 20 ms, and goes silent after 80 ms. In listening tests it beat or tied the old rule every time. People prefer a short, quiet gap to a long, smeared one.
+- **sotto since v3.5** holds for 40 ms, fades 6 dB every 20 ms, and goes silent after 80 ms. In listening tests it beat or tied the old rule every time. People prefer a short, quiet gap to a long, smeared one.
 
 Why 80 ms? At 30 to 60 km/h, 40% of lost frames come in runs of exactly five: a whole 100 ms radio frame, since the code spreads each radio frame's bits across all five vocoder frames. When a fade is deep enough to beat the code, the whole radio frame goes.
 
@@ -101,7 +101,7 @@ sotto includes a **softmodem**: a program that does all of this in software. It 
 
 ## How well does it work?
 
-From `docs/encoder-v1.md` and `docs/results/encoder_race.json`, with every codec sent through the identical radio chain (scores are PESQ, chapter 7; higher is better; averaged over 3 fading patterns):
+From `docs/encoder-v1.md` and `docs/results/encoder_race.json`, with every codec sent through the identical radio chain (scores are PESQ, chapter 7; higher is better; averaged over 3 fading patterns). This race was run on v3.5. Over 19 voices without the radio, v3.6's smaller codebook scored within 0.01 of v3.5's (chapter 4).
 
 | Condition | Codec | Woman | Man (LibriSpeech) | Man (VE9QRP) |
 |---|---|---:|---:|---:|
@@ -117,7 +117,7 @@ From `docs/encoder-v1.md` and `docs/results/encoder_race.json`, with every codec
 
 sotto v3.5 beats Codec 2 for every voice in every condition, by 0.3 to 0.9. The slow VHF fades are the hardest, as the fading picture suggests, and that's where v3.5's better concealment and quantizer help most: 0.27 to 0.4 better than v1.
 
-You can hear sotto v3.5 against Codec 2 over these channels on the [listening page](../index.html).
+You can hear sotto (now v3.8) against Codec 2 over these channels on the [listening page](../index.html).
 
 ## Try it
 
