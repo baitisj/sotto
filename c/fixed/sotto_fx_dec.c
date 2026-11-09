@@ -64,6 +64,20 @@ typedef struct {
   int32_t g[2];               /* concealment gain of the two halves, dB Q8 */
 } dframe_t;
 
+#ifdef FX_SYNTH_STATE
+/* -DFX_SYNTH_STATE: synth's arrays in the decoder's state instead of on the stack (2 KB of its
+   2.2 KB frame on the M0): the K6 keeps the state in its RAM arena, whose stack is short. The
+   same arithmetic: every array is written before it's read, A cleared as the stack one is */
+typedef struct {
+  int32_t A[MAXL + 1];
+  uint32_t phi[MAXL + 1], ph[NBIN];
+  int16_t bin[MAXL], re[MAXL], im[MAXL];
+#ifdef FX_NARROW_MUL
+  fx_acc ab[NSAMP];
+#endif
+} synth_ws_t;
+#endif
+
 struct sotto_dec {
   int32_t sn[2 * NSAMP];      /* overlap-add buffer, samples Q4 */
   uint32_t ex_phase;          /* pitch-pulse phase, Q32 turns */
@@ -74,6 +88,9 @@ struct sotto_dec {
   int32_t n;                  /* frames received */
   dframe_t prev;
   fx_dec_info_t info;
+#ifdef FX_SYNTH_STATE
+  synth_ws_t ws;
+#endif
 };
 
 const fx_dec_info_t *sotto_dec_info(const struct sotto_dec *d) { return &d->info; }
@@ -288,8 +305,15 @@ static void model_bands(const int32_t *A, int L, int32_t f0, int32_t *out) {
 static void synth(struct sotto_dec *d, uint32_t wo, int v, const int32_t *rk, int32_t en, int32_t g,
                   short *out, int half) {
   int h, i, j;
+#ifdef FX_SYNTH_STATE
+  int32_t *A = d->ws.A;                      /* harmonic levels, dB Q8 */
+  uint32_t *phi = d->ws.phi, *ph = d->ws.ph;
+  int16_t *bin = d->ws.bin, *re = d->ws.re, *im = d->ws.im;
+  memset(A, 0, sizeof d->ws.A);
+#else
   int32_t A[MAXL + 1] = {0};                 /* harmonic levels, dB Q8 */
   uint32_t phi[MAXL + 1], ph[NBIN];
+#endif
   FX_YIELD();
   if (!v && (V38_UV || wo < WO_MIN)) wo = WO_MIN;   /* v3.8: unvoiced noise harmonics 50 Hz apart */
   int L = (int)(0x80000000u / wo);          /* 8 (500 Hz) .. 80 */
@@ -349,7 +373,9 @@ static void synth(struct sotto_dec *d, uint32_t wo, int v, const int32_t *rk, in
   int32_t l2 = fx_db_to_log2_amp(amax);
   int qa = 13 - (int)((l2 + 65535) >> 16);
   if (qa > 30) qa = 30;
+#ifndef FX_SYNTH_STATE
   int16_t bin[MAXL], re[MAXL], im[MAXL];
+#endif
   int nb = 0;
   for (h = 1; h <= L; h++) {
     int16_t b = (int16_t)(((uint32_t)h * wo + ((uint32_t)1 << 22)) >> 23);
@@ -374,7 +400,11 @@ static void synth(struct sotto_dec *d, uint32_t wo, int v, const int32_t *rk, in
 #ifdef FX_NARROW_MUL
   /* the sums harmonic by harmonic, NSAMP samples at a time (sample i is at n = 433 + i mod
      512): half the stack of all 160 at once (the K6's ran short), the same sums */
+#ifdef FX_SYNTH_STATE
+  fx_acc *ab = d->ws.ab;
+#else
   fx_acc ab[NSAMP];
+#endif
 #endif
   for (i = 0; i < 2 * NSAMP; i++) {
     int n = i < NSAMP - 1 ? 512 - NSAMP + 1 + i : i - (NSAMP - 1);
