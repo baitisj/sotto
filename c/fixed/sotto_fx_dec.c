@@ -170,6 +170,21 @@ static int32_t env_at(const int32_t *rk, int32_t f) {
   return rk[j] + (int32_t)((fx_mul32(rk[j + 1] - rk[j], fr) + 32768) >> 16);
 }
 
+#ifdef FX_MP_ROWGEN
+/* -DFX_MP_ROWGEN (the K6 builds): min_phase builds each row of fx_mp_cos / fx_mp_sin as it needs
+   it, from fx_cos512, instead of reading the two 4 KB tables. Every entry of those tables is an
+   fx_cos512 entry: row n's cos(2 pi j n / 128) is fx_cos512[4 j n mod 512], and sin is the same
+   a quarter turn on (+384 mod 512), so the sums and the output are the same bit for bit, with
+   8,064 bytes less flash and 126 bytes more stack. Row layout as the tables: the even j
+   (2, 4, .. 62), then the odd j (1, 3, .. 63). */
+static void mp_row(int16_t *row, int n, unsigned quarter) {
+  unsigned a = 8u * (unsigned)n + quarter, step = 8u * (unsigned)n;
+  int k;
+  for (k = 0; k < 31; k++, a += step) row[k] = fx_cos512[a & 511];
+  for (a = 4u * (unsigned)n + quarter; k < 63; k++, a += step) row[k] = fx_cos512[a & 511];
+}
+#endif
+
 /* minimum phase at the 65 bins (Q32 turns) from the harmonic levels A[1..L] (dB Q8) */
 static void min_phase(const int32_t *A, int L, uint32_t wo, uint32_t *ph) {
   int i, n, j;
@@ -196,7 +211,12 @@ static void min_phase(const int32_t *A, int L, uint32_t wo, uint32_t *ph) {
     for (j = 0; j < 31; j++) gh[j] = FX_HI(G[2 * j + 2]), gl[j] = FX_LO(G[2 * j + 2]);
     for (j = 0; j < 32; j++) gh[31 + j] = FX_HI(G[2 * j + 1]), gl[31 + j] = FX_LO(G[2 * j + 1]);
     for (n = 1; n <= 32; n++) {
+#ifdef FX_MP_ROWGEN
+      int16_t row[63];
+      mp_row(row, n, 0);
+#else
       const int16_t *row = fx_mp_cos + (n - 1) * 63;
+#endif
       fx_acc sums[4], eh, el, oh, ol, a;
       if ((n & 7) == 0) FX_YIELD();
       fx_mp_sums(gh, gl, row, 31, 32, sums);   /* the even j, then the odd j */
@@ -223,7 +243,12 @@ static void min_phase(const int32_t *A, int L, uint32_t wo, uint32_t *ph) {
     for (n = 0; n < 32; n++) ch[31 + n] = FX_HI(cc[2 * n + 1]), cl[31 + n] = FX_LO(cc[2 * n + 1]);
     ph[0] = ph[64] = 0;
     for (i = 1; i <= 32; i++) {
+#ifdef FX_MP_ROWGEN
+      int16_t row[63];
+      mp_row(row, i, 384);
+#else
       const int16_t *row = fx_mp_sin + (i - 1) * 63;
+#endif
       fx_acc sums[4], eh, el, oh, ol;
       int r;
       if ((i & 7) == 0) FX_YIELD();
