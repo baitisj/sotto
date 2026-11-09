@@ -308,7 +308,28 @@ https://claude.ai/artifact/79NkXTdhNK7d9ttUvzK3Pi). `c/k6/mod/aisships.c`, recei
   second burst within ~0.1 s is missed (the base station's B, 53 ms after its A).
 
 Bench: `tools/k6_upload.py mod-aisships.bin --api-level 2 --run-s 920`, keeping the serial log,
-and `python3 tools/k6_aivdm.py LOG` for the sentences.
+and `python3 tools/k6_aivdm.py LOG` for the sentences. Run 7 used the no-ARQ upload instead
+(`modem.k6 mod ... --phy F --baud 1800 --payload XL --cw-id AG7EW`, sent with `k6_bench send`), so
+the K6 never keyed.
+
+## Run 7, 2026-11-09 08:29-08:44Z (aisships b4bddbc, cf9516e vlrh, big antenna, receive only)
+
+The module came over on the first send (46 of 46 chunks), sat on 162.009 MHz for 15 minutes and
+returned 1: one station. Log `tests/data/k6/air/aisships-20261109T0829Z.log.gz`.
+
+- **41 frames, all from the shore base station 003669705** (20 message 4, 21 message 20), all on
+  channel A. All 41 `!AIVDM` sentences pass `tools/k6_aivdm.py`'s checksum and decode on the
+  host, and every message 4's time matches the log's NTP stamp to the second (the `a` line comes
+  0.95-1.13 s after the second it states). The `a` lines give d=0.0 b=0: the base station is home.
+- **No ships, no channel B.** The floor went from 850 in the first minute to 1,055-1,131 for the
+  rest (run 6 at the same tuning: 812-905, and 15 B frames), and bursts stood only 10-11 dB over
+  it, so B's copy of each burst (53 ms after A, already inside the ~0.1 s decode) and anything
+  weaker were lost. The same rise showed in run 6 at 06:02Z; hamlet sent nothing, so its cause is
+  outside the bench.
+- 684 B of stack to spare; ret in 900,013 ms.
+
+So the whole chain works on the radio: decode at both places, table, home, NMEA out. What it
+needs now is traffic: a quieter hour or a K6 nearer the water.
 
 ## One clock from AIS and APRS
 
@@ -382,11 +403,12 @@ K6's 136-174 MHz filter. A longer listen at a busy hour, with the gain at maximu
 5. RDS: `tools/k6_upload.py mod-aiscap_fm.bin --api-level 2 --run-s 40`, then the captures'
    spectrum on the host.
 6. Both channels: `mod-aiscap_dual.bin --run-s 620`, then `python3 -m sim.k6if.ais cap LOG
-   --tune 162009000`. The ship list: `mod-aisships.bin --run-s 920`, then `tools/k6_aivdm.py LOG`.
+   --tune 162009000`. The ship list: `mod-aisships.bin --run-s 920` (receive only, so the no-ARQ
+   upload), then `tools/k6_aivdm.py LOG`.
 
 ## Next
 
-- aisships on the bench. Then: a second try for channel A's wandering place, a way to set home,
+- aisships worked on the bench (run 7) but heard only the base station. Then: a second try for channel A's wandering place, a way to set home,
   and two-slot messages (5's ship names) if a streaming decoder can make room.
 - ACARS (Jeff, 03:54Z): a coarse clock after APRS if the K6 hears it, and then a fuller ACARS
   receiver (flights, positions, messages) too (Jeff, 03:55Z).

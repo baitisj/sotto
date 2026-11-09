@@ -915,6 +915,8 @@ what would settle it.
       aisclk set the level 8 core clock on air (clkget inside its bound 15 min later).
     - aisships (Jeff chose to build it, 07:54Z): tuned between the channels, each burst decoded
       at both places; 16 stations, distance and bearing from the first base station, NMEA out.
+      Run 7 (08:29Z): 41 frames on air, all valid !AIVDM, but only the base station (no ships;
+      the floor rose ~25% after a minute and B was lost).
 47. **A module can be a two-radio game: send moves, not state.**
     - From: Jeff, 2026-11-09 (the GROUNDWAVE thread). Built and emulator-tested
       (`c/k6/mod/gw.c`, docs/k6-gw.md); the bot calls went out and decoded on the bench.
