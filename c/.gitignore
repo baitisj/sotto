@@ -1,6 +1,7 @@
 sotto_codebook_gen.c
 tables.chk/
 rowgen.chk/
+synthstate.chk/
 *.o
 libsotto.a
 libsotto.so*
