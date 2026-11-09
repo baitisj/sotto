@@ -267,16 +267,20 @@ void fx_mp_sums(const int16_t *h, const int16_t *l, const int16_t *row, int n1, 
    same integer sums, so the decoder's output is the same bit for bit (make check-rowgen), with
    8,064 bytes less flash and no more stack */
 void fx_mp_sums_row(const int16_t *h, const int16_t *l, int n, unsigned quarter, fx_acc out[4]) {
-  unsigned step = 8u * (unsigned)n, a = step + quarter;
+  /* byte offsets into fx_cos512, wrapped at 1 KB: 2 bytes an entry, 4 entries a step of j n */
+  const char *cs = (const char *)fx_cos512;
+  unsigned step = 16u * (unsigned)n, a = (step + 2u * quarter) & 1022u;
   fx_acc s0 = 0, s1 = 0;
   int j;
-  for (j = 0; j < 31; j++, a += step) {
-    int32_t c = fx_cos512[a & 511];
+  for (j = 0; j < 31; j++) {
+    int32_t c = *(const int16_t *)(cs + a);
+    a = (a + step) & 1022u;
     s0 += FX_P16(h[j], c), s1 += FX_P16(l[j], c);
   }
   out[0] = s0, out[1] = s1, s0 = s1 = 0;
-  for (a = 4u * (unsigned)n + quarter; j < 63; j++, a += step) {
-    int32_t c = fx_cos512[a & 511];
+  for (a = (8u * (unsigned)n + 2u * quarter) & 1022u; j < 63; j++) {
+    int32_t c = *(const int16_t *)(cs + a);
+    a = (a + step) & 1022u;
     s0 += FX_P16(h[j], c), s1 += FX_P16(l[j], c);
   }
   out[2] = s0, out[3] = s1;
