@@ -196,10 +196,13 @@ static void min_phase(const int32_t *A, int L, uint32_t wo, uint32_t *ph) {
     for (j = 0; j < 31; j++) gh[j] = FX_HI(G[2 * j + 2]), gl[j] = FX_LO(G[2 * j + 2]);
     for (j = 0; j < 32; j++) gh[31 + j] = FX_HI(G[2 * j + 1]), gl[31 + j] = FX_LO(G[2 * j + 1]);
     for (n = 1; n <= 32; n++) {
-      const int16_t *row = fx_mp_cos + (n - 1) * 63;
       fx_acc sums[4], eh, el, oh, ol, a;
       if ((n & 7) == 0) FX_YIELD();
-      fx_mp_sums(gh, gl, row, 31, 32, sums);   /* the even j, then the odd j */
+#ifdef FX_MP_ROWGEN
+      fx_mp_sums_row(gh, gl, n, 0, sums);
+#else
+      fx_mp_sums(gh, gl, fx_mp_cos + (n - 1) * 63, 31, 32, sums);   /* the even j, then the odd j */
+#endif
       eh = sums[0], el = sums[1], oh = sums[2], ol = sums[3];
       a = (fx_acc)(G[0] + ((n & 1) ? -G[64] : G[64])) * 32768 + FX_JOIN(eh + oh, el + ol) * 2;
       FX_ACC_CHECK(a);
@@ -223,11 +226,14 @@ static void min_phase(const int32_t *A, int L, uint32_t wo, uint32_t *ph) {
     for (n = 0; n < 32; n++) ch[31 + n] = FX_HI(cc[2 * n + 1]), cl[31 + n] = FX_LO(cc[2 * n + 1]);
     ph[0] = ph[64] = 0;
     for (i = 1; i <= 32; i++) {
-      const int16_t *row = fx_mp_sin + (i - 1) * 63;
       fx_acc sums[4], eh, el, oh, ol;
       int r;
       if ((i & 7) == 0) FX_YIELD();
-      fx_mp_sums(ch, cl, row, 31, 32, sums);   /* the even n, then the odd n */
+#ifdef FX_MP_ROWGEN
+      fx_mp_sums_row(ch, cl, i, 384, sums);
+#else
+      fx_mp_sums(ch, cl, fx_mp_sin + (i - 1) * 63, 31, 32, sums);   /* the even n, then the odd n */
+#endif
       eh = sums[0], el = sums[1], oh = sums[2], ol = sums[3];
       for (r = 0; r < 2; r++) {
         fx_acc a;

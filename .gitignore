@@ -19,3 +19,4 @@ c/fixed/c55x/*.buildlog
 c/wasm/objfx/
 c/wasm/sotto_fx.wasm
 c/fixed/sotto_dec_fx_k6
+c/fixed/sotto_dec_fx_k6_rowgen

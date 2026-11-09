@@ -260,6 +260,33 @@ void fx_mp_sums(const int16_t *h, const int16_t *l, const int16_t *row, int n1, 
 }
 #endif
 
+#ifdef FX_MP_ROWGEN
+/* fx_mp_sums on row n of fx_mp_cos (quarter 0) or fx_mp_sin (quarter 384) without the tables:
+   every entry of theirs is an fx_cos512 entry, cos(2 pi j n / 128) = fx_cos512[4 j n mod 512]
+   and sin a quarter turn on, the row the even j (2, 4, .. 62) then the odd j (1, 3, .. 63). The
+   same integer sums, so the decoder's output is the same bit for bit (make check-rowgen), with
+   8,064 bytes less flash and no more stack */
+void fx_mp_sums_row(const int16_t *h, const int16_t *l, int n, unsigned quarter, fx_acc out[4]) {
+  /* byte offsets into fx_cos512, wrapped at 1 KB: 2 bytes an entry, 4 entries a step of j n */
+  const char *cs = (const char *)fx_cos512;
+  unsigned step = 16u * (unsigned)n, a = (step + 2u * quarter) & 1022u;
+  fx_acc s0 = 0, s1 = 0;
+  int j;
+  for (j = 0; j < 31; j++) {
+    int32_t c = *(const int16_t *)(cs + a);
+    a = (a + step) & 1022u;
+    s0 += FX_P16(h[j], c), s1 += FX_P16(l[j], c);
+  }
+  out[0] = s0, out[1] = s1, s0 = s1 = 0;
+  for (a = (8u * (unsigned)n + 2u * quarter) & 1022u; j < 63; j++) {
+    int32_t c = *(const int16_t *)(cs + a);
+    a = (a + step) & 1022u;
+    s0 += FX_P16(h[j], c), s1 += FX_P16(l[j], c);
+  }
+  out[2] = s0, out[3] = s1;
+}
+#endif
+
 #if !(defined(__TMS320C55X__) && !defined(FX_OA_C))
 fx_acc fx_oa_pair(const int16_t *bin, const int16_t *re, const int16_t *im, int nb, int n, fx_acc *a1) {
   int j;

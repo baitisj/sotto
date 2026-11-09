@@ -93,6 +93,22 @@ K6HISS_SRC = sotto_dec.c fixed/sotto_fx_hiss.c fixed/sotto_fx_dec.c fixed/sotto_
 fixed/sotto_dec_fx_k6: $(K6HISS_SRC) fixed/fx.h fixed/fx_tables.h fixed/fx_internal.h sotto.h sotto_vlr.h sotto_vlr_tables.h \
 	sotto_lr_dec.inc sotto_vlr_dec.inc
 	$(CC) -O2 -std=c99 -ffp-contract=off -I. $(FXFLAGS) $(K6HISS) -o $@ $(K6HISS_SRC)
+# the same decoder with -DFX_MP_ROWGEN (min_phase's cos / sin rows built from fx_cos512 instead
+# of the two 4 KB tables, as the K6 builds it): check-rowgen decodes every sample bitstream in
+# docs/samples/rates with both, at 8 and 16 kHz, and fails on any byte that differs
+fixed/sotto_dec_fx_k6_rowgen: $(K6HISS_SRC) fixed/fx.h fixed/fx_tables.h fixed/fx_internal.h sotto.h sotto_vlr.h \
+	sotto_vlr_tables.h sotto_lr_dec.inc sotto_vlr_dec.inc
+	$(CC) -O2 -std=c99 -ffp-contract=off -I. $(FXFLAGS) $(K6HISS) -DFX_MP_ROWGEN -o $@ $(K6HISS_SRC)
+ROWGEN_CHK = rowgen.chk
+check-rowgen: fixed/sotto_dec_fx_k6 fixed/sotto_dec_fx_k6_rowgen
+	@mkdir -p $(ROWGEN_CHK); n=0; for f in ../docs/samples/rates/*.bit; do \
+	  r=$$(echo $$f | sed 's/.*__\([0-9]*\)\.bit$$/\1/'); \
+	  case $$r in 2400) modes="x -16";; 1200) modes="-1200 -16_-1200";; *) modes="-16_-$$r";; esac; \
+	  for m in $$modes; do a=$$(echo $$m | sed 's/^x$$//; s/_/ /'); \
+	    fixed/sotto_dec_fx_k6 $$a $$f $(ROWGEN_CHK)/a.raw && fixed/sotto_dec_fx_k6_rowgen $$a $$f $(ROWGEN_CHK)/b.raw || exit 1; \
+	    cmp $(ROWGEN_CHK)/a.raw $(ROWGEN_CHK)/b.raw || { echo "FX_MP_ROWGEN differs: $$f $$a"; exit 1; }; n=$$((n + 1)); \
+	  done; \
+	done; echo "FX_MP_ROWGEN: $$n decodes, the same bytes"
 fixed/sotto_dec_fx: sotto_dec.o $(FX_DEC_OBJS) $(FX_OBJS)
 	$(CC) -o $@ $^
 fixed/sotto_enc_fx: sotto_enc.o $(FX_ENC_OBJS) $(FX_OBJS)
@@ -186,6 +202,8 @@ clean:
 	rm -rf tables.chk
 	rm -f fixed/*.o fixed/sotto_dec_fx fixed/sotto_enc_fx fixed/sotto_dec_fx_arm fixed/sotto_enc_fx_arm
 	rm -f fixed/sotto_dec_fx_m0 fixed/sotto_enc_fx_m0 fixed/sotto_vlr_dec_fx fixed/sotto_dec_fx_k6
+	rm -f fixed/sotto_dec_fx_k6_rowgen
+	rm -rf rowgen.chk
 	rm -rf fixed/arm fixed/m0
 
 .PHONY: all fixed check install clean tables check-tables
