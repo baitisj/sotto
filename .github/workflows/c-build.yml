@@ -26,3 +26,36 @@ jobs:
       - run: pip install numpy scipy
       - name: committed tables match the generators
         run: make check-tables PYTHON=python
+  # The K6 firmware moved to baitisj/blowfang (2026-11-09). A new file under one of its old paths
+  # here would fork it quietly, so this fails and points there. One path per line.
+  k6-moved-to-blowfang:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: no K6 firmware files in sotto
+        run: |
+          bad=$(git ls-files \
+            'c/k6/*' \
+            'firmware/*' \
+            'sim/k6if/*' \
+            'sim/k6digi/*' \
+            'modem/k6*.py' \
+            'modem/pager.py' \
+            'modem/fsk.py' \
+            'modem/psk31.py' \
+            'modem/aprs.py' \
+            'modem/civ.py' \
+            'tools/k6_*' \
+            'tools/k6-*' \
+            'tools/midi_songs/*' \
+            'tests/test_k6*.py' \
+            'tests/k6_live_emu.py' \
+            'tests/data/k6/*' \
+            'docs/k6-*' \
+            'docs/results/k6/*')
+          if [ -n "$bad" ]; then
+            echo "The K6 firmware lives in https://github.com/baitisj/blowfang now. Move these there:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "clean"

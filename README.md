@@ -56,10 +56,9 @@ the API and the input level the codec expects (speech near −26 dBFS).
 ## Contents
 
 - `modem/`: the **softmodem**. It sends and receives YSF frames carrying sotto voice through a radio's 9600 data port and a sound card, or through an SDR (IQ). `python -m modem tx voice.bit tx.flac`, then `python -m modem rx rx.flac voice.bit`. See `docs/softmodem.md`.
-- `modem/k6.py`: the **K6 voice pager softmodem**. It packs a `.sot` message into the Baofeng UV-K6 RF chip's FSK packets (K6 voice-pager packet format v1) and makes transmit audio for an FM radio such as the IC-7100: direct NRZ FSK for a flat 9600 input, or FFSK tones for USB audio. It also includes a demodulator, path calibration and CI-V PTT. `python -m modem.k6 tx msg.sot tx.wav`. See `docs/k6-pager.md`.
 - `sim/sotto_lr.py`, `c/sotto_lr.c`, `c/fixed/sotto_fx_lr.c`: **sotto 1200**, 48 bits per 40 ms on the v3.7 core, for the K6 pager at FFSK 1800 baud (`sotto_enc -1200`, `sotto_dec -1200`). PESQ 2.58 against Codec 2 1200's 2.16 on 16 held-out voices. See `docs/sotto-1200.md`.
 - `sim/sotto_vlr.py`, `c/fixed/sotto_fx_vlr.c`: **sotto 600 and sotto 400**, 48 bits per 80 or 120 ms on the same v3.7 core (Python reference and fixed-point decoder, 56 MHz on the K6's Cortex-M0; tables trained by `tools/train_vlr.py`). sotto 600 scores PESQ 2.09 / ESTOI 0.69 against Codec 2 700C's 1.91 / 0.61; sotto 400 is level with 700C. See `docs/sotto-vlr.md`.
-- `c/k6/` and `firmware/k6-aura/`: the **K6 voice pager receiver**. A C library (packet reassembly in RAM, the fixed-point decoder on the K6's Cortex-M0, PWM playback) and a patch that adds a VOICE MSG app to Aura, the open Rust firmware for the Baofeng UV-K6. See `docs/k6-receiver.md`.
+- **The Baofeng UV-K6 firmware** (the K6 voice pager, its C library and modules, the Aura patch, the K6 softmodem `modem.k6` and the bench tools) moved to [baitisj/blowfang](https://github.com/baitisj/blowfang) on 2026-11-09, with its history. Paths such as `c/k6/`, `firmware/k6-aura/`, `tools/k6_*` and `docs/k6-*.md` that comments and docs here still mention are in blowfang. Blowfang uses this repository as a git submodule for the codec.
 - `tests/`: `python -m pytest tests`.
 - `c/`: the **C port** of the sotto v3.7 encoder and v3.6 decoder (float, links Codec 2), built as `libsotto` by `make` (see Build libsotto above). See `c/README.md` and `docs/c-port.md` for the plan to run it on the radio's DSP.
 - `tools/listening/` and `docs/listening-tests.md`: the blind A/B listening-test pages used to check each codec change by ear.
@@ -73,8 +72,8 @@ the API and the input level the codec expects (speech near −26 dBFS).
 - `codec/codec2/`: our working fork of Codec 2 (LGPL-2.1), where the oracle experiments and the 2400 bps improvements happen.
 - `docs/course/`: **How sotto works**, an illustrated beginner course (about 10th-grade level) with a glossary. Figures and demos are rebuilt by `tools/course_figures.py`. Online at https://baitisj.github.io/sotto/course/.
 - `docs/`: design memos (TWELP survey, Codec 2 improvement plan, FEC race, waveform race,
-  softmodem, audio results), and `docs/ht-survey.md`, which handheld to run sotto on first (Yaesu
-  handhelds vs OpenRTX radios such as the TYT MD-UV380/390).
+  softmodem, audio results). The handheld survey (which radio to run sotto on first) moved to blowfang's
+  `docs/ht-survey.md`.
 - `c/fixed/cm4/` and `tools/cm4_build.sh`: a Cortex-M4 cycle bench for the fixed-point code
   (STM32F405, as in the MD-UV380/390); results in `docs/c-port.md`.
 
