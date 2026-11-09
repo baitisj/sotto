@@ -35,7 +35,7 @@ from modem.link import Transmitter
 SAMPLES = os.path.join(ROOT, "docs", "samples")
 FS = 8000
 MALE, FEMALE = "male_ve9qrp_15s", "female_libri198_14s"
-CODEC = vl.SottoV35            # the version the course describes
+CODEC = vl.SottoV37            # the version chapters 1-7 describe (v3.6 frame, v3.7 tracker)
 PITCH = CODEC.PITCH
 
 # Reference palette (light mode), see the figures' README
@@ -278,50 +278,60 @@ def fig_dct(out, m, i):
     save(fig, out, "dct.svg")
 
 
-def fig_vq(out, m, i, vq, sq):
-    """The 3-stage shape VQ on one frame, and its error against v0-v2's scalar quantizer."""
+def fig_vq(out, m, i, vq, old, sq):
+    """The multistage shape VQ on one frame, and the error after each stage against the
+    v3.5 codebook and v0-v2's scalar quantizer."""
     rk = vl.to_rate_k(m)
     shape = rk[i] - rk[i].mean()
     idx = vq.indices(shape)[0]
-    fig, axs = plt.subplots(1, 2, figsize=(9.5, 3.9), gridspec_kw=dict(width_ratios=[1.6, 1], wspace=0.3))
+    n = len(vq.bits)
+    fig, axs = plt.subplots(1, 2, figsize=(9.5, 3.9), gridspec_kw=dict(width_ratios=[1.45, 1], wspace=0.3))
     ax = axs[0]
     ax.plot(vl.KFREQ, shape, "s", ms=6, color=INK2, mec=BG, mew=1, label="the shape to send", zorder=3)
     c = np.zeros(vl.K)
-    for s_, (col, lab) in enumerate(((YELLOW, "stage 1 (12 bits)"), (ORANGE, "+ stage 2 (11 bits)"),
-                                     (AQUA, "+ stage 3 (11 bits)"))):
+    cols = (YELLOW, ORANGE, AQUA, BLUE)
+    for s_ in range(n):
         c[1:] += vq.cb[s_][idx[s_]]
-        ax.plot(vl.KFREQ, vl.DCT.T @ c, color=col, lw=1.8, label=lab)
+        lab = f"{'+ ' if s_ else ''}stage {s_ + 1} ({vq.bits[s_]} bits)"
+        ax.plot(vl.KFREQ, vl.DCT.T @ c, color=cols[s_], lw=1.8, label=lab)
     ax.set_xlim(0, 4000)
     ax.set_xlabel("frequency (Hz)")
     ax.set_ylabel("dB above or below average")
-    ax.set_title("Three codebook entries, added up")
+    ax.set_title(f"{n} codebook entries, added up")
     ax.legend(fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=2)
     # mean squared error over the clip's speech frames
     e = vl.frame_energy_db(m)
     keep = e > np.percentile(e, 95) - 30
     sh = rk[keep] - rk[keep].mean(1, keepdims=True)
-    err = []
-    for k in (1, 2, 3):
+
+    def stage_err(q, k):
         cs_ = np.zeros((len(sh), vl.K))
-        ii = vq.indices(sh)
+        ii = q.indices(sh)
         for s_ in range(k):
-            cs_[:, 1:] += vq.cb[s_][ii[:, s_]]
-        err.append(np.mean((sh - cs_ @ vl.DCT) ** 2))
+            cs_[:, 1:] += q.cb[s_][ii[:, s_]]
+        return np.mean((sh - cs_ @ vl.DCT) ** 2)
+
+    err = [stage_err(vq, k) for k in range(1, n + 1)]
+    err_old = stage_err(old, len(old.bits))
     err_sq = np.mean((sh - sq.quantize(sh)) ** 2)
     ax = axs[1]
-    labels = ["VQ\n1 stage\n12 bits", "VQ\n2 stages\n23 bits", "VQ\n3 stages\n34 bits", "scalar\n(v0–v2)\n34 bits"]
-    vals = err + [err_sq]
-    ax.bar(range(4), vals, color=[AQUA, AQUA, AQUA, INK2], width=0.65)
+    cum = np.cumsum(vq.bits)
+    labels = [f"{k + 1}\n{cum[k]} bits" for k in range(n)]
+    labels += ["v3.5\n34 bits", "scalar\n34 bits"]
+    vals = err + [err_old, err_sq]
+    ax.bar(range(len(vals)), vals, color=[AQUA] * n + ["#9a9a9a", INK2], width=0.65)
     for k, v in enumerate(vals):
         ax.text(k, v + 0.2, f"{v:.1f}", ha="center", va="bottom", fontsize=9, color=INK2)
-    ax.set_xticks(range(4))
+    ax.set_xticks(range(len(vals)))
     ax.set_xticklabels(labels, fontsize=8)
     ax.set_ylabel("average error (dB²)")
+    ax.axvline(n - 0.5, color=INK2, lw=0.8, ls=(0, (3, 3)))
+    ax.set_xlabel("stages used, then the older quantizers", fontsize=8.5)
     ax.set_title("Error on this clip")
     ax.grid(axis="x", visible=False)
     ax.set_ylim(0, max(vals) * 1.2)
     save(fig, out, "vq.svg")
-    return err, err_sq
+    return err, err_old, err_sq
 
 
 def fig_mixed(out, m, i):
@@ -644,7 +654,7 @@ def demos(out, x):
         "monotone": vl.synthesise(robot),
         "flat_envelope": vl.synthesise(flat, postfilter=False),
         "mixed": vl.synthesise(mixed),
-        "sotto_v35": codec.decode_audio(codec.encode(x)),
+        "sotto_v37": codec.decode_audio(codec.encode(x)),
     }
     for name, y in clips.items():
         y = np.asarray(y)[:len(x)]
@@ -724,7 +734,8 @@ def main(out):
     fig_envelope(out, xm, mm, iv)
     fig_dct(out, mm, iv)
     sq = vl.ShapeQ(vl.training_set("tracked"))
-    print("VQ error by stage, scalar error:", *fig_vq(out, mm, iv, vl.ShapeMSVQ.load(), sq))
+    vq = vl.round_codebook(vl.ShapeMSVQ.load(os.path.join(ROOT, "sim", "data", "shape_msvq_9988.npz")))
+    print("VQ error by stage, v3.5 codebook, scalar:", *fig_vq(out, mm, iv, vq, vl.ShapeMSVQ.load(), sq))
     fig_quantize(out, mm)
     fig_synthesis(out, xm, mm, iv)
     fig_mixed(out, mm, iv)

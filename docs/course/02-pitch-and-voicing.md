@@ -69,7 +69,7 @@ How common is it? Compared with a careful offline pitch tracker (pYIN), Codec 2'
 sotto's tracker (orange) starts from Codec 2's answer and cleans it up. It decides **pitch and voicing together**, for the whole recording at once. For every 10 ms frame it lists the possibilities:
 
 - **unvoiced**, or
-- **voiced** at one of several candidate pitches: Codec 2's estimate for this frame or the frames just before and after, each also doubled and halved, and each fine-tuned.
+- **voiced** at one of several candidate pitches: Codec 2's estimate for this frame or the frames just before and after, each also doubled and halved, and each fine-tuned. Since v3.7 there's one more: a *third* of this frame's estimate. Sometimes Codec 2 says three times the true pitch for several frames in a row, and then none of the other candidates was anywhere near the truth. A listener heard it as short, high-pitched pops; the extra candidate halved the number of big pitch mistakes over 19 voices (51 frames down to 26).
 
 Then it picks one possibility per frame, choosing the path through the whole recording with the lowest total "cost". The costs are:
 
@@ -134,7 +134,7 @@ So 95 Hz is Wo ≈ 0.075 radians per sample. The number of harmonics is L = ⌊�
 - `codec/codec2/src/sine.c`: `est_voicing_mbe()`, the voicing detector.
 - `sim/sinusoid.py`: `track_pitch_voicing()` (the joint tracker, with its `lag` look-ahead option), `odd_even_db()` (the missing-odd-harmonics check), `unvoice_tails()` (the tail rule), and a Python copy of Codec 2's analysis.
 - `sim/vocoder_lab.py`: `voicing_classes()` (finds mixed frames) and `SottoV32` (packs U/V/M into 2 bits).
-- `sim/vocoder_lab.py`: `analyse()` runs Codec 2's analysis (`c2sim --modelout`) and returns one record per 10 ms with `Wo`, `L`, `A`, `phi` and `voiced`. `analyse(x, "tracked3")` uses sotto's tracker instead.
+- `sim/vocoder_lab.py`: `analyse()` runs Codec 2's analysis (`c2sim --modelout`) and returns one record per 10 ms with `Wo`, `L`, `A`, `phi` and `voiced`. `analyse(x, "tracked4")` uses sotto's v3.7 tracker instead (`"tracked3"` is v3.5's, without the third).
 
 <details markdown="1"><summary>Answers</summary>
 

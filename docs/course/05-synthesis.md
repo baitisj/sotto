@@ -14,8 +14,8 @@ The decoder turns the 48 bits back into pitch, voicing, energy and envelope, and
 
 For each 10 ms piece of sound the decoder:
 
-1. **Unpacks the bits** into the voicing code, pitch (Wo), energy and the three codebook numbers (chapter 4).
-2. **Rebuilds the envelope**: adds up the three codebook entries to get the 20-point shape, and adds the level.
+1. **Unpacks the bits** into the voicing code, pitch (Wo), energy and the four codebook numbers (chapter 4).
+2. **Rebuilds the envelope**: adds up the four codebook entries to get the 20-point shape, and adds the level.
 3. **Sharpens the envelope** with a *formant postfilter* (see below).
 4. **Places the harmonics**: with pitch Wo, there are L = ⌊π ÷ Wo⌋ harmonics. Each one's loudness is read off the envelope at its frequency.
 5. **Sets the total loudness** to the sent energy.
@@ -65,7 +65,7 @@ The best way to understand each part is to switch it off and listen. Each of the
 | <audio controls preload="none" src="audio/monotone.flac"></audio><br>[monotone.flac](audio/monotone.flac) | Pitch fixed at 110 Hz; envelope kept | Pitch off: a robot. The words survive, the melody doesn't |
 | <audio controls preload="none" src="audio/flat_envelope.flac"></audio><br>[flat_envelope.flac](audio/flat_envelope.flac) | All harmonics equally loud; pitch and voicing kept | Envelope off: a buzz with a tune, and the words get much harder to make out |
 | <audio controls preload="none" src="audio/mixed.flac"></audio><br>[mixed.flac](audio/mixed.flac) | Every voiced frame made *mixed* | Hiss on top of every vowel: breathy, like a stage whisper |
-| <audio controls preload="none" src="audio/sotto_v35.flac"></audio><br>[sotto_v35.flac](audio/sotto_v35.flac) | The real thing: sotto v3.5, 48 bits per 20 ms | Everything rounded to fit 2,400 bits per second |
+| <audio controls preload="none" src="audio/sotto_v37.flac"></audio><br>[sotto_v37.flac](audio/sotto_v37.flac) | The real thing: sotto v3.7, 48 bits per 20 ms | Everything rounded to fit 2,400 bits per second |
 
 What these show:
 
@@ -75,7 +75,7 @@ What these show:
 
 ## Seeing the whole thing rebuilt
 
-Here are spectrograms of the woman's voice, before and after.
+Here are spectrograms of the woman's voice, before and after. These were made with v3.5, which differs from v3.7 only in its bigger codebook and in a few pitch frames.
 
 ![Spectrograms: original, Codec 2, sotto v3.5, and sotto v3.5 over a radio](figures/rebuild.svg)
 
@@ -83,7 +83,7 @@ Here are spectrograms of the woman's voice, before and after.
 - **Codec 2 2400** and **sotto v3.5**: both keep the stripes and the main bands, but finer detail is blurred. Where Codec 2's pitch tracker made octave errors, its stripes land in the wrong places; sotto's tracker avoids many of those (chapter 2). The difference is easier to hear than to see: PESQ scores this voice 2.21 for Codec 2 and 2.90 for sotto v3.5.
 - **sotto v3.5 over a weak, fading 446 MHz signal** from a moving car: close to the no-radio version, with short smudges where frames were lost and hidden (chapter 6).
 
-You can hear all of these, for three voices, on the [listening page](../index.html).
+You can hear the same three voices, with today's sotto (v3.8), on the [listening page](../index.html).
 
 ## Try it
 
