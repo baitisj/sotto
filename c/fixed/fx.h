@@ -226,6 +226,9 @@ void fx_fft5_stage32(int32_t *re, int32_t *im, const int32_t *sr, const int32_t 
 /* the decoder's minimum-phase sums (c55x/mp_sums.asm on the C55x): the dot products of
    row[0..n1+n2) with h and l, split at n1: out = { h.row, l.row (j < n1), h.row, l.row (j >= n1) } */
 void fx_mp_sums(const int16_t *h, const int16_t *l, const int16_t *row, int n1, int n2, fx_acc out[4]);
+/* -DFX_MP_ROWGEN (the K6): the same sums on row n of fx_mp_cos (quarter 0) or fx_mp_sin (quarter
+   384), read from fx_cos512 instead of those tables (fx_math.c) */
+void fx_mp_sums_row(const int16_t *h, const int16_t *l, int n, unsigned quarter, fx_acc out[4]);
 /* the decoder's overlap-add sums for samples n and n + 1 (c55x/oa_pair.asm on the C55x):
    a(n) = sum_j re[j] cos512[bin[j] n mod 512] - im[j] cos512[(bin[j] n - 128) mod 512],
    a(n) returned, a(n + 1) stored at *a1 */
