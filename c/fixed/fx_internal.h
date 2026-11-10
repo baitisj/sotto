@@ -43,6 +43,26 @@ typedef struct {
 void sotto_enc_analyse_block(struct sotto_enc *e, const short x8[80]);
 void sotto_enc_flush_core(struct sotto_enc *e);
 int sotto_enc_pop_frame(struct sotto_enc *e, fx_enc_frame_t *f);
+/* the same, with the frame's fields before shape quantization as the low-rate coders take
+   them (the float core's sotto_enc_frame_t.p: the shape target, the onset-edge pitch); f or p
+   may be NULL */
+int sotto_enc_pop_frame_p(struct sotto_enc *e, fx_enc_frame_t *f, fx_fparams_t *p);
+/* on: the core skips its own 4-stage shape search (frames' shape bits are 0), for a coder
+   that quantises the shape itself (sotto 1200) */
+void sotto_enc_set_no_shape(struct sotto_enc *e, int on);
+
+/* the encoder core's M-best codebook search (sotto_fx_enc.c), for sotto 1200's coder:
+   fx_msvq_paths searches the first nst stages for target c (dB Q16) and returns the number
+   of surviving paths, with their indices and reconstructions (dB Q16), in list order;
+   fx_shape_err is the squared error of a reconstruction, sum of (c - rec)^2 in dB Q8;
+   fx_cb_best is the nearest vector of stage s to residual r (codebook steps Q6, FX_NC values
+   and a 0 pad, |r|^2 = rr), the first of equals. hv: scratch for 512 values */
+#define FX_MBEST 8
+#define FX_MAXST 5
+int fx_msvq_paths(const int32_t *c, int nst, int16_t path[FX_MBEST][FX_MAXST], int32_t recon[FX_MBEST][FX_NC],
+                  int32_t *hv);
+fx_acc fx_shape_err(const int32_t *c, const int32_t *rec);
+int fx_cb_best(int s, const int16_t *r, fx_acc rr, int32_t *hv);
 void sotto_dec_frame(struct sotto_dec *d, const fx_fparams_t *p, int run, short speech[160]);
 const fx_dec_info_t *sotto_dec_info(const struct sotto_dec *d);
 

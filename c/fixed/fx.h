@@ -46,6 +46,8 @@ void fx_acc_check(fx_acc a);
 unsigned sotto_fx_enc_bytes(void);
 unsigned sotto_fx_dec_bytes(void);
 unsigned sotto_fx_enc16_bytes(void);
+unsigned sotto_fx_lr_enc_bytes(void);      /* sotto 1200's encoders, with their cores */
+unsigned sotto_fx_lr_enc16_bytes(void);
 unsigned sotto_fx_dec16_bytes(void);
 
 /* optional per-block cycle counts (c55x/bench.c): FX_PROF(id, 1) starts block id,
