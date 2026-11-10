@@ -75,10 +75,10 @@ check() {
 check lr "$ELF8" "$CLIP8" "-1200" "$X86/sotto_dec_fx"
 check lr16 "$W/b16/lr16.elf" "$CLIP16" "-16 -1200" "$DEC16"
 
-python3 - "$W/lr.json" "$W/lr16.json" "$OPT" "$LR16" "${FPU:+hard float}" >"$W/table.md" <<'EOF'
+python3 - "$W/lr.json" "$W/lr16.json" "$OPT" "$LR16" "${FPU:+hard float}" "${CM4_CC:-clang}" >"$W/table.md" <<'EOF'
 import json, sys
-opt, layer, fpu = sys.argv[3], sys.argv[4], sys.argv[5] or 'soft float'
-print(f'### sotto 1200 on the Cortex-M4 bench ({opt}, {fpu}, 16 kHz hiss layer: {layer})\n')
+opt, layer, fpu, cc = sys.argv[3], sys.argv[4], sys.argv[5] or 'soft float', sys.argv[6]
+print(f'### sotto 1200 on the Cortex-M4 bench ({cc} {opt}, {fpu}, 16 kHz hiss layer: {layer})\n')
 print('MHz for real time at zero wait states (mean / worst 40 ms call); bytes.\n')
 print('| Mode | Encoder MHz | Decoder MHz | Encoder state | Decoder state | Stack enc / dec | Static RAM | Flash |')
 print('|---|---:|---:|---:|---:|---:|---:|---:|')
