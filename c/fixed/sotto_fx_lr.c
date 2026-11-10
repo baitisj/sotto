@@ -73,7 +73,7 @@ static void b_shape(const int32_t *ca, const int32_t *cn, int sb, int32_t *c) {
 
 const char *sotto_lr_format(void) { return LR_FORMAT; }
 
-#ifdef FX_HISS_FB                   /* the K6 hiss layer (sotto_fx_hiss.c) hooks in, dB Q8 */
+#ifdef SOTTO_V38                    /* the hiss layers (sotto_fx_hiss.c: the K6's, or the full one) hook in, dB Q8 */
 #define LR_HISS
 #define LR_HISS_T int32_t
 #define LR_HISS_HOOK_T fx_lr_hiss_hook_t
@@ -86,7 +86,23 @@ const char *sotto_lr_format(void) { return LR_FORMAT; }
 #define lr_shape_b b_shape
 #include "../sotto_lr_dec.inc"
 
+unsigned sotto_fx_lr_dec_bytes(void) { return (unsigned)sizeof(struct sotto_lr_dec); }
+
 #ifdef LR_HISS
 void sotto_lr_dec_set_hook(struct sotto_lr_dec *d, fx_lr_hiss_hook_t hook, void *ctx) { d->hook = hook, d->hctx = ctx; }
 const struct sotto_dec *sotto_lr_dec_core(const struct sotto_lr_dec *d) { return d->core; }
+#endif
+
+#ifdef SOTTO_V38
+/* sotto 1200 hiss's encoder (sotto_fx_hiss.c): the decoder's A(s) and B(s) from superframe s
+   and the next one (NULL: s is the last), for its local decoder */
+void fx_lr_frames(const unsigned char *sf, const unsigned char *next, fx_fparams_t *a, fx_fparams_t *b) {
+  lr_fields_t f, fn;
+  fx_fparams_t an;
+  unpack(sf, &f);
+  a_params(&f, a);
+  if (next) unpack(next, &fn), a_params(&fn, &an);
+  else an = *a;
+  b_frame(a, &an, &f, b);
+}
 #endif

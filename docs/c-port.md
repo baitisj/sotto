@@ -169,7 +169,7 @@ Python does); a 1 dB histogram would replace it on the DSP, changing a vowel-fra
 decision only when a level sits within the bin.
 
 **sotto 1200 hiss.** *2026-11-06.* The same layer runs under sotto 1200 at 48 bits per
-40 ms (`sotto_lr_enc16` / `sotto_lr_dec16` in `c/sotto_hiss.c`, float only for now): 14 of
+40 ms (`sotto_lr_enc16` / `sotto_lr_dec16` in `c/sotto_hiss.c`; fixed point since 2026-11-10): 14 of
 the 16 test voices bit-exact with `sim/sotto_lr_hiss.py`, the other two one superframe off.
 Details, delay and check in `docs/sotto-1200-hiss.md` ("C port").
 
@@ -338,6 +338,14 @@ as the MD-UV380 (the K6 only receives).
 - State on x86: 37.5 KB with the core (35.2 KB; the core grew 0.75 KB for the frame fields it
   now queues), of which the coder is 2.3 KB (1.4 KB the two kept path searches). 2 KB of
   stack scratch per search. No new tables.
+
+**sotto 1200 hiss (16 kHz) encoder and decoder: done** (`sotto_lr_enc16` / `sotto_lr_dec16` in
+`c/fixed/sotto_fx_hiss.c`; `sotto_enc_fx -16 -1200`, `sotto_dec_fx -16 -1200`). *2026-11-10.*
+The fixed v3.8 front end feeds the fixed sotto 1200 coder, and the full v3.8 decoder layer
+hooks into the fixed sotto 1200 decoder, as in the float port. On five 16 kHz clips 93.9% of
+superframes match the float encoder's and PESQ-WB through the float decoder is 1.664 against
+1.666; details, the PESQ-NB spread and state sizes in `docs/sotto-1200-hiss.md` ("Fixed
+point"). The 2400 bit/s v3.8 bits and samples are unchanged.
 
 ## Fixed point on the C55x: measured
 
