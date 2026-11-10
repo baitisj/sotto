@@ -302,6 +302,43 @@ API as the float layer, `make fixed` with the default `VARIANT=v3.8`; `-16` on t
   and saves 36 KB). All ring sizes are checked at run time under `FX_CHECK`.
 - Measured on the C55x simulator: see "v3.8 on the C55x" below.
 
+**sotto 1200 encoder: done** (`c/fixed/sotto_fx_lr_enc.c`, the same `sotto_lr_enc_*` API as
+`c/sotto_lr.c`; `sotto_enc_fx -1200`). *2026-11-10.* For radios that transmit sotto 1200, such
+as the MD-UV380 (the K6 only receives).
+
+- The v3.7 fixed-point core hands over each 20 ms frame's fields with its shape target
+  (`sotto_enc_pop_frame_p`, the float core's `sotto_enc_frame_t.p`, including the onset edge's
+  pitch) and skips its own 4-stage shape search (`sotto_enc_set_no_shape`), which sotto 1200
+  doesn't use. The 2400 bit/s encoder's bits are unchanged.
+- The coder follows `c/sotto_lr.c` step by step. A's M-best paths over stages 1-2 come from the
+  core's own search, refactored so both use it (`fx_msvq_paths`, the same 16 x 16-bit
+  multiply-adds and SMLAD on the M4); each A frame's paths are kept, since its first pass and
+  its joint search both need them. B's stage-3 codeword is the same search with one survivor,
+  on the residual in steps of 1.5 x the stage's step. The joint choice adds shape errors in
+  dB Q8 squared (at most 2^38.6, inside 40 bits) with the float's frame weights 1 and 0.1 as
+  10 and 1. No division in the coder.
+- Fed the float core's frame fields, the coder gives the float coder's superframes bit for bit
+  (checked on one clip with a test harness). Over the 16 voices (`tools/check_fx.py --lr`,
+  `docs/results/fx_lr_enc_check.json`), the fixed encoder against the float one:
+
+  | | Float encoder | Fixed encoder |
+  |---|---:|---:|
+  | Superframes whose 48 bits match the float encoder's (of 4,487) | | 95.1% |
+  | PESQ, float decoder, clean | 2.596 | 2.586 |
+  | PESQ, float decoder, one superframe in 8 lost | 2.178 | 2.166 |
+  | PESQ, fixed decoder on the fixed bits, clean / one in 8 lost | | 2.587 / 2.167 |
+
+  Per clip the match is 88-98% and the PESQ difference -0.14 to +0.06 (EARS p095 the worst:
+  7 superframes differ). Every differing superframe comes from a frame where the fixed core's
+  fields differ from the float core's (its shape targets differ by 0.004 dB median, and the
+  core's own near-ties, as in the 2400 bit/s check above).
+- `sotto_enc_fx_arm -1200` (`FX_ARM_DSP`) and `sotto_enc_fx_m0 -1200` give the same bits
+  (`tests/test_fx_lr.py`). Stress signals run clean under AddressSanitizer,
+  UndefinedBehaviorSanitizer and `FX_CHECK`.
+- State on x86: 37.5 KB with the core (35.2 KB; the core grew 0.75 KB for the frame fields it
+  now queues), of which the coder is 2.3 KB (1.4 KB the two kept path searches). 2 KB of
+  stack scratch per search. No new tables.
+
 ## Fixed point on the C55x: measured
 
 *2026-11-02.* Built with TI's C5500 compiler 4.4.1 (`-O3`, large memory model, the C5517's

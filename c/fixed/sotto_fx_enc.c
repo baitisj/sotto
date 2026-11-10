@@ -42,7 +42,6 @@
 #define RING 16
 #define TAIL_HOLD 30
 #define MIXED 2
-#define MBEST 8
 #define MAXH 80
 #define WO_MIN 26843546u      /* 2 pi / 160, Q32 turns */
 #define WO_HI 268435456u      /* 2 pi / 16 */
@@ -89,10 +88,13 @@ struct sotto_enc {
   uint32_t wo_e;
   int32_t en_e;
   int16_t idx_e[5], cls_e;
+  int32_t c_e[NC];            /* its shape target, dB Q16 */
   fx_enc_frame_t cur;         /* the frame being built: per-half features for v3.8 */
   int32_t peak;               /* causal loudness reference, dB Q16 (hiss_band._onsets) */
   fx_enc_frame_t q[8];
+  fx_fparams_t qp[8];         /* the queued frames' fields before shape quantization (sotto 1200) */
   int16_t q_head, q_n, flushed;
+  int16_t no_shape;           /* skip the shape search: its bits are 0 (sotto_enc_set_no_shape) */
 };
 
 #define R(e, t) (&(e)->ring[(t) % RING])
@@ -723,108 +725,140 @@ static int32_t h_limit(fx_acc worst, fx_acc rr) {
   return t > INT32_MAX ? INT32_MAX : t < INT32_MIN ? INT32_MIN : (int32_t)t;
 }
 
-/* M-best multistage search; c in dB Q16; hv: scratch for 512 values */
-static void msvq_search(const int32_t *c, int16_t *idx, int32_t *hv) {
-  int s, p, k, v, i;
+/* One stage of the M-best search: stage s's vectors against residual r (codebook steps Q6,
+   NC values and the 0 pad, |r|^2 = rr) as path p, into the list kd / kp / kc of *pnk <= mb
+   entries (distances in increasing order, first of equals first). hv: scratch for 512 values */
+static void cb_stage(int s, const int16_t *r, fx_acc rr, int p, int mb, fx_acc *kd, int *kp, int *kc, int *pnk,
+                     int32_t *hv) {
+  int n = 1 << fx_cb_bits[s], nk = *pnk, k, v;
+  const int16_t *cb = fx_cb[s];
+  const int32_t *e2 = fx_cb_e2[s];
+  int32_t hthr;
+  (void)hv;
+  FX_ACC_CHECK(rr);
+  /* d = sum (r - 64 y)^2 = rr - 128 r.y + 4096 |y|^2 = rr + 128 h, h = 32 |y|^2 - r.y,
+     exactly. The inner loop is one 16 x 16 multiply-accumulate per value, and h fits in
+     32 bits (r.y < 2^27, 32 |y|^2 < 2^24), so most vectors are rejected with a 32-bit
+     compare against hthr, the largest h that could still enter the list */
+  hthr = nk < mb ? INT32_MAX : h_limit(kd[nk - 1], rr);
+  /* list insertion for vector v with h = 32 |y|^2 - r.y, in increasing v */
+#define CB_CONSIDER(vv, hh) do { \
+    int32_t h_ = (hh); \
+    if (h_ <= hthr) { \
+      fx_acc d = rr + (fx_acc)h_ * 128;                   /* < 2^36 */ \
+      FX_ACC_CHECK(d); \
+      if (nk < mb || d < kd[nk - 1]) { \
+        int i = nk < mb ? nk++ : mb - 1; \
+        while (i > 0 && kd[i - 1] > d) kd[i] = kd[i - 1], kp[i] = kp[i - 1], kc[i] = kc[i - 1], i--; \
+        kd[i] = d, kp[i] = p, kc[i] = (vv); \
+        if (nk == mb) hthr = h_limit(kd[nk - 1], rr); \
+      } \
+    } \
+  } while (0)
+#ifdef FX_CB_UNPACKED
+  /* every vector's h first (on the C55x an assembly loop with one dual multiply-
+     accumulate per value pair), then the list in increasing v, as before */
+  FX_PROF(28, 1);
+  fx_cb_dots(r, cb, n, e2, hv);
+  FX_PROF(28, 0);
+  {   /* the smallest h of each run of 8: a run whose smallest h is above hthr has nothing
+         to add, and hthr only falls, so whole runs are skipped (most of them, once the
+         list is full) and the rest go through in order, as before */
+    int32_t bm[512 / 8];
+    int b;
+    FX_PROF(36, 1);
+    for (b = 0; b < n / 8; b++) {
+      const int32_t *hb = hv + 8 * b;
+      int32_t m = hb[0];
+      for (k = 1; k < 8; k++) m = hb[k] < m ? hb[k] : m;
+      bm[b] = m;
+    }
+    FX_PROF(36, 0);
+    FX_PROF(37, 1);
+    for (b = 0; b < n / 8; b++)
+      if (bm[b] <= hthr)
+        for (v = 8 * b; v < 8 * b + 8; v++) CB_CONSIDER(v, hv[v]);
+    FX_PROF(37, 0);
+  }
+#else
+  for (v = 0; v < n; v++) {
+    const int16_t *y = cb + v * FX_CBW;
+    /* 256 x each value, as a 16-bit word, without unpacking: the high byte with the
+       low one cleared, the low byte shifted up (two operations a word, not five) */
+    fx_acc a = 0;
+    for (k = 0; k < FX_CBW; k++)
+      a += (fx_acc)r[2 * k] * (int16_t)(y[k] & -256) + (fx_acc)r[2 * k + 1] * (int16_t)((uint16_t)y[k] << 8);
+    CB_CONSIDER(v, e2[v] * 32 - (int32_t)(a >> 8));      /* exact: a is a multiple of 256 */
+  }
+#endif
+#undef CB_CONSIDER
+  *pnk = nk;
+}
+
+int fx_cb_best(int s, const int16_t *r, fx_acc rr, int32_t *hv) {
+  fx_acc kd[1];
+  int kp[1], kc[1], nk = 0;
+  cb_stage(s, r, rr, 0, 1, kd, kp, kc, &nk, hv);
+  return kc[0];
+}
+
+int fx_msvq_paths(const int32_t *c, int nst, int16_t path[FX_MBEST][FX_MAXST], int32_t recon[FX_MBEST][FX_NC],
+                  int32_t *hv) {
+  int s, p, k, i;
   int np = 1;
-  int16_t path[MBEST][5];
-  int32_t recon[MBEST][NC];                                  /* dB Q16 */
-  memset(recon, 0, sizeof recon);
-  memset(path, 0, sizeof path);
-  for (s = 0; s < fx_cb_stages; s++) {
-    int n = 1 << fx_cb_bits[s], nk = 0;
+  memset(recon, 0, sizeof(int32_t) * FX_MBEST * FX_NC);
+  memset(path, 0, sizeof(int16_t) * FX_MBEST * FX_MAXST);
+  for (s = 0; s < nst; s++) {
     const int16_t *cb = fx_cb[s];
-    const int32_t *e2 = fx_cb_e2[s];
-    fx_acc kd[MBEST];
-    int kp[MBEST], kc[MBEST];
+    int nk = 0;
+    fx_acc kd[FX_MBEST];
+    int kp[FX_MBEST], kc[FX_MBEST];
     for (p = 0; p < np; p++) {
       int16_t r[NC + 1];                                     /* residual in codebook steps, Q6 */
       fx_acc rr = fx_cb_resid(c, recon[p], r, NC, fx_cb_istep[s]);
-      int32_t hthr;
       r[NC] = 0;                                             /* the padding value */
-      FX_ACC_CHECK(rr);
-      /* d = sum (r - 64 y)^2 = rr - 128 r.y + 4096 |y|^2 = rr + 128 h, h = 32 |y|^2 - r.y,
-         exactly. The inner loop is one 16 x 16 multiply-accumulate per value, and h fits in
-         32 bits (r.y < 2^27, 32 |y|^2 < 2^24), so most vectors are rejected with a 32-bit
-         compare against hthr, the largest h that could still enter the list */
-      hthr = nk < MBEST ? INT32_MAX : h_limit(kd[nk - 1], rr);
-      /* list insertion for vector v with h = 32 |y|^2 - r.y, in increasing v */
-#define CB_CONSIDER(vv, hh) do { \
-        int32_t h_ = (hh); \
-        if (h_ <= hthr) { \
-          fx_acc d = rr + (fx_acc)h_ * 128;                   /* < 2^36 */ \
-          FX_ACC_CHECK(d); \
-          if (nk < MBEST || d < kd[nk - 1]) { \
-            int i = nk < MBEST ? nk++ : MBEST - 1; \
-            while (i > 0 && kd[i - 1] > d) kd[i] = kd[i - 1], kp[i] = kp[i - 1], kc[i] = kc[i - 1], i--; \
-            kd[i] = d, kp[i] = p, kc[i] = (vv); \
-            if (nk == MBEST) hthr = h_limit(kd[nk - 1], rr); \
-          } \
-        } \
-      } while (0)
-#ifdef FX_CB_UNPACKED
-      /* every vector's h first (on the C55x an assembly loop with one dual multiply-
-         accumulate per value pair), then the list in increasing v, as before */
-      FX_PROF(28, 1);
-      fx_cb_dots(r, cb, n, e2, hv);
-      FX_PROF(28, 0);
-      {   /* the smallest h of each run of 8: a run whose smallest h is above hthr has nothing
-             to add, and hthr only falls, so whole runs are skipped (most of them, once the
-             list is full) and the rest go through in order, as before */
-        int32_t bm[512 / 8];
-        int b;
-        FX_PROF(36, 1);
-        for (b = 0; b < n / 8; b++) {
-          const int32_t *hb = hv + 8 * b;
-          int32_t m = hb[0];
-          for (k = 1; k < 8; k++) m = hb[k] < m ? hb[k] : m;
-          bm[b] = m;
-        }
-        FX_PROF(36, 0);
-        FX_PROF(37, 1);
-        for (b = 0; b < n / 8; b++)
-          if (bm[b] <= hthr)
-            for (v = 8 * b; v < 8 * b + 8; v++) CB_CONSIDER(v, hv[v]);
-        FX_PROF(37, 0);
-      }
-#else
-      for (v = 0; v < n; v++) {
-        const int16_t *y = cb + v * FX_CBW;
-        /* 256 x each value, as a 16-bit word, without unpacking: the high byte with the
-           low one cleared, the low byte shifted up (two operations a word, not five) */
-        fx_acc a = 0;
-        for (k = 0; k < FX_CBW; k++)
-          a += (fx_acc)r[2 * k] * (int16_t)(y[k] & -256) + (fx_acc)r[2 * k + 1] * (int16_t)((uint16_t)y[k] << 8);
-        CB_CONSIDER(v, e2[v] * 32 - (int32_t)(a >> 8));      /* exact: a is a multiple of 256 */
-      }
-#endif
-#undef CB_CONSIDER
+      cb_stage(s, r, rr, p, FX_MBEST, kd, kp, kc, &nk, hv);
     }
-    int16_t npath[MBEST][5];
-    int32_t nrec[MBEST][NC];
+    int16_t npath[FX_MBEST][FX_MAXST];
+    int32_t nrec[FX_MBEST][NC];
     /* step = sh 2^15 + sl, so a value times the step is two 16 x 16 products (the C55x
        compiler's 16 x 32 multiply is a library call) */
     int16_t sh = (int16_t)(fx_cb_step[s] >> 15), sl = (int16_t)(fx_cb_step[s] & 0x7FFF);
     for (i = 0; i < nk; i++) {
-      memcpy(npath[i], path[kp[i]], sizeof path[0]);
+      memcpy(npath[i], path[kp[i]], sizeof npath[0]);
       npath[i][s] = (int16_t)kc[i];
       for (k = 0; k < NC; k++) {
         int16_t v = (int16_t)FX_CB_VAL(cb + kc[i] * FX_CBW, k);
         nrec[i][k] = recon[kp[i]][k] + (int32_t)(((fx_acc)v * sh) * 32768 + (fx_acc)v * sl);
       }
     }
-    memcpy(path, npath, sizeof path);
-    memcpy(recon, nrec, sizeof recon);
+    memcpy(path, npath, sizeof npath);
+    memcpy(recon, nrec, sizeof nrec);
     np = nk;
   }
-  int best = 0;
+  return np;
+}
+
+fx_acc fx_shape_err(const int32_t *c, const int32_t *rec) {
+  int k;
+  fx_acc d = 0;
+  for (k = 0; k < NC; k++) {
+    int32_t q = fx_rshr(c[k] - rec[k], 8);
+    d += (fx_acc)q * q;
+  }
+  FX_ACC_CHECK(d);
+  return d;
+}
+
+/* M-best multistage search over every stage; c in dB Q16; hv: scratch for 512 values */
+static void msvq_search(const int32_t *c, int16_t *idx, int32_t *hv) {
+  int p, best = 0;
+  int16_t path[FX_MBEST][FX_MAXST];
+  int32_t recon[FX_MBEST][NC];                               /* dB Q16 */
   fx_acc bd = 0;
+  int np = fx_msvq_paths(c, fx_cb_stages, path, recon, hv);
   for (p = 0; p < np; p++) {
-    fx_acc d = 0;
-    for (k = 0; k < NC; k++) {
-      int32_t q = fx_rshr(c[k] - recon[p][k], 8);
-      d += (fx_acc)q * q;
-    }
+    fx_acc d = fx_shape_err(c, recon[p]);
     if (p == 0 || d < bd) bd = d, best = p;
   }
   memcpy(idx, path[best], fx_cb_stages * sizeof(int16_t));
@@ -846,7 +880,7 @@ static int32_t power_db(int ex, fx_acc p, int xb) {
   return fx_log2_to_db_pow(fx_log2_acc((fx_uacc)p) + 2 * ((int32_t)ex * 65536 + fx_sw_l2) + (int32_t)xb * 65536);
 }
 
-static void emit(struct sotto_enc *e, int cls);
+static void emit(struct sotto_enc *e, int cls, uint32_t wo_o);
 
 static void decide(struct sotto_enc *e, int32_t t, int k) {
   int h, i, l, j;
@@ -947,8 +981,9 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
       FX_ACC_CHECK(v);
       c[j - 1] = fx_rshr(v / 20, 7);                         /* Q8 x Q15 x 20 -> dB Q16 */
     }
+    memcpy(e->c_e, c, sizeof e->c_e);
     FX_PROF(6, 1);
-    msvq_search(c, e->idx_e, e->re);                     /* e->re is free here */
+    if (!e->no_shape) msvq_search(c, e->idx_e, e->re);   /* e->re is free here */
     FX_PROF(6, 0);
     e->wo_e = wo;
     /* v3.6: energy of the envelope at the harmonics */
@@ -957,18 +992,28 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
     e->en_e = fx_db_power_sum(lv, L);
     e->cls_e = (int16_t)cls;
   } else {
-    emit(e, cls);
+    emit(e, cls, wo);
   }
 }
 
-static void emit(struct sotto_enc *e, int cls) {
+static int wo_index(uint32_t wo) {
+  int wi = 0;
+  while (wi < 127 && fx_wo_thr[wi] <= wo) wi++;
+  return wi;
+}
+
+/* pack the frame: the even half's parameters and both halves' voicing classes. The low-rate
+   modes' pitch (qp's wi) at an onset edge (unvoiced, then voiced half) is the voiced half's
+   (wo_o), as the float core's (../sotto.c emit) */
+static void emit(struct sotto_enc *e, int cls, uint32_t wo_o) {
   int s;
   int a = e->cls_e, b = cls, code = a == b ? a : (a == 0 || b == 0) ? 3 : 1;
-  fx_enc_frame_t *q = &e->q[(e->q_head + e->q_n++) % 8];
+  int qi = (e->q_head + e->q_n++) % 8;
+  fx_enc_frame_t *q = &e->q[qi];
+  fx_fparams_t *qp = &e->qp[qi];
   unsigned char *out = q->bits;
   *q = e->cur;
-  int pos = 0, wi = 0, ei;
-  while (wi < 127 && fx_wo_thr[wi] <= e->wo_e) wi++;
+  int pos = 0, wi = wo_index(e->wo_e), ei;
   int32_t num = (e->en_e - DB(10)) * 31;                     /* rint((en - 10) / 70 x 31) */
   ei = num <= 0 ? 0 : (int)((num + 8960) / 17920);
   if (ei > 31) ei = 31;
@@ -976,7 +1021,11 @@ static void emit(struct sotto_enc *e, int cls) {
   put_bits(out, &pos, code, 2);
   put_bits(out, &pos, wi, 7);
   put_bits(out, &pos, ei, 5);
-  for (s = 0; s < fx_cb_stages; s++) put_bits(out, &pos, e->idx_e[s], fx_cb_bits[s]);
+  for (s = 0; s < fx_cb_stages; s++) put_bits(out, &pos, e->no_shape ? 0 : e->idx_e[s], fx_cb_bits[s]);
+  qp->code = (int16_t)code;
+  qp->wi = (int16_t)(a == 0 && b != 0 ? wo_index(wo_o) : wi);
+  qp->ei = (int16_t)ei;
+  memcpy(qp->c, e->c_e, sizeof qp->c);
 }
 
 static void decide_from(struct sotto_enc *e, int32_t t, int32_t last) {
@@ -1048,13 +1097,18 @@ static void analyse_10ms(struct sotto_enc *e, const short *x) {
   }
 }
 
-int sotto_enc_pop_frame(struct sotto_enc *e, fx_enc_frame_t *f) {
+int sotto_enc_pop_frame_p(struct sotto_enc *e, fx_enc_frame_t *f, fx_fparams_t *p) {
   if (!e->q_n) return 0;
-  *f = e->q[e->q_head];
+  if (f) *f = e->q[e->q_head];
+  if (p) *p = e->qp[e->q_head];
   e->q_head = (int16_t)((e->q_head + 1) % 8);
   e->q_n--;
   return 1;
 }
+
+int sotto_enc_pop_frame(struct sotto_enc *e, fx_enc_frame_t *f) { return sotto_enc_pop_frame_p(e, f, NULL); }
+
+void sotto_enc_set_no_shape(struct sotto_enc *e, int on) { e->no_shape = (int16_t)(on != 0); }
 
 static int pop(struct sotto_enc *e, unsigned char *out) {
   fx_enc_frame_t f;
@@ -1082,7 +1136,7 @@ void sotto_enc_flush_core(struct sotto_enc *e) {
     frame_costs(e, n - 1, 0);
     viterbi_step(e, n - 1);
     while (e->n_dec < n) decide_from(e, e->n_dec++, n - 1);
-    if (n % 2) emit(e, e->cls_e);                            /* odd frame count: the last half repeated */
+    if (n % 2) emit(e, e->cls_e, e->wo_e);                    /* odd frame count: the last half repeated */
     e->flushed = 1;
   }
 }

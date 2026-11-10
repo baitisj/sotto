@@ -97,8 +97,12 @@ mean PESQ-NB / ESTOI and the whole-utterance tracker. Every row except the 49-bi
   decoders agree to ≥ 99.7 dB SNR, and ≥ 98.2 dB with 10% superframe loss
   (`docs/results/lr_c_port_check.json`, `docs/results/lr_c_port_check_loss10.json`,
   `tools/check_lr.py`).
-- **Fixed point** (`c/fixed/sotto_fx_lr.c`): decoder only. `sotto_lr_enc_create` returns NULL
-  in the fixed build, because the K6 only receives. It sits on the v3.7 fixed-point decoder
+- **Fixed-point encoder** (`c/fixed/sotto_fx_lr_enc.c`, `c/fixed/sotto_enc_fx -1200`), for
+  radios that transmit (the MD-UV380's Cortex-M4); details in `docs/c-port.md` ("sotto 1200
+  encoder"). 95.1% of 4,487 superframes on the 16 voices are bit-exact with the float encoder,
+  and PESQ through the float decoder is within 0.012 of the float encoder's, clean and with one
+  superframe in 8 lost (`docs/results/fx_lr_enc_check.json`, `tools/check_fx.py --lr`).
+- **Fixed-point decoder** (`c/fixed/sotto_fx_lr.c`). It sits on the v3.7 fixed-point decoder
   core, which now takes per-frame fields (`sotto_dec_frame`). v3.7 and v3.8 outputs are
   unchanged on x86, M4 and M0. The fixed decoder follows the float one as v3.7's does: about
   60 dB SNR, the same PESQ.
