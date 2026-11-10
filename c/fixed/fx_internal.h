@@ -41,6 +41,12 @@ typedef struct {
 } fx_dec_info_t;
 
 void sotto_enc_analyse_block(struct sotto_enc *e, const short x8[80]);
+/* the encoder core with its FFT scratch (FX_ENC_SCRATCH values, free between calls) at
+   scratch, shared with its owner's (the v3.8 layer's STFT), or its own (NULL, as
+   sotto_enc_create); sotto_fx_enc_shared_bytes is its state without the scratch */
+#define FX_ENC_SCRATCH 1024
+struct sotto_enc *sotto_enc_create_scratch(int32_t *scratch);
+unsigned sotto_fx_enc_shared_bytes(void);
 void sotto_enc_flush_core(struct sotto_enc *e);
 int sotto_enc_pop_frame(struct sotto_enc *e, fx_enc_frame_t *f);
 /* the same, with the frame's fields before shape quantization as the low-rate coders take

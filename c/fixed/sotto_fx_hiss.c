@@ -1848,20 +1848,36 @@ int sotto_vlr_dec16_flush(struct sotto_vlr_dec16 *V, short *speech) {
 /* ================================================================== encoder */
 #define EX16 1024                           /* 16 kHz input samples kept */
 #define EX8 256
-#define LY16 1024
+#define LY16 512                            /* holds an STFT frame and the next two samples (enc_advance_local) */
 #define OUTQ 64
 
 typedef struct {                            /* features of one STFT frame of the input, dB Q8 */
-  int32_t top, low, one, b2530, tot, hb[4], Y[16];
+  int32_t top, low, one, hb[4], Y[16];
   int16_t vow;
 } sframe_t;
 
-typedef struct {                            /* one core frame in the rule ring */
-  fx_enc_frame_t raw;
+typedef struct {                            /* one core frame in the rule ring: what the rules read of it */
+  int32_t lwo[2];                           /* fx_enc_frame_t's */
+  int16_t snr[2];                           /* fx_enc_frame_t's, FX_SNR_NONE as SNR16_NONE */
+  int16_t tilt0;                            /* fx_enc_frame_t's tilt[0] */
   int16_t code;                             /* after the rules */
   int16_t pwi;                              /* the core's low-rate pitch index (the voiced half's at an onset edge) */
+  unsigned char raw[SOTTO_BYTES_PER_FRAME]; /* the core's bits */
   unsigned char bits[SOTTO_BYTES_PER_FRAME];
+  unsigned char loud0;                      /* fx_enc_frame_t's loud[0] */
 } rframe_t;
+#define SNR16_NONE INT16_MIN
+
+/* a value the encoder keeps in 16 bits: frame levels (dB Q8, -120 .. 69 dB), the core's
+   harmonic SNR (a mean of log ratios of two sums below 2^39: under 118 dB) and tilt (two means
+   of an envelope that spans 50 dB); FX_CHECK checks it */
+static int16_t keep16(int32_t v) {
+#ifdef FX_CHECK
+  if (v <= INT16_MIN || v > INT16_MAX) abort();
+#endif
+  return (int16_t)v;
+}
+typedef char fftw_holds_the_core_scratch[sizeof(fftw_t) >= FX_ENC_SCRATCH * sizeof(int32_t) ? 1 : -1];
 
 #define LR_PRING 32                         /* sotto 1200 hiss: frames' shape targets kept */
 typedef char lr_pring_holds_the_rule_lag[SOTTO_RULE_LAG + 4 <= LR_PRING ? 1 : -1];
@@ -1877,7 +1893,7 @@ struct sotto_enc16 {
   int32_t nblk;                             /* 10 ms blocks analysed */
   sframe_t sf[SRING];
   int32_t nst;                              /* input STFT frames computed */
-  int32_t pct[FX_PCT_MAX];                  /* sorted frame levels for the running percentile */
+  int16_t pct[FX_PCT_MAX];                  /* sorted frame levels for the running percentile (keep16) */
   int32_t npct;
   rframe_t rf[FRING];
   int32_t nraw;                             /* core frames in the ring: 0 .. nraw - 1 */
@@ -1890,7 +1906,6 @@ struct sotto_enc16 {
   int16_t ly16[LY16];
   int32_t ly16n;
   int32_t lenv[MRING][NFB];
-  int16_t lcls[MRING];
   int32_t lkmax;
   int32_t lnst;                             /* local STFT frames done (pr) */
   int32_t pr[SRING][16];
@@ -1900,7 +1915,6 @@ struct sotto_enc16 {
   int16_t msg[MSG_BITS], msgpos;
   unsigned char outq[OUTQ][SOTTO_BYTES_PER_FRAME];
   int16_t qh, qn;
-  int16_t code[FRING], c0[FRING];           /* rule scratch */
   int16_t onset_wi;                         /* the low-rate modes: an onset edge's pitch bits from the
                                                core's pwi (the voiced half's), as Sotto1200.params */
   int32_t (*lc)[FX_NC];                     /* sotto 1200 hiss: the frames' shape targets (ring of LR_PRING) */
@@ -1908,7 +1922,7 @@ struct sotto_enc16 {
 
 static void enc_init(struct sotto_enc16 *e) {
   init_tables();
-  e->core = sotto_enc_create();
+  e->core = sotto_enc_create_scratch(e->w.re);            /* the core's FFT scratch is the STFT's */
   e->ldec = sotto_dec_create();
   e->nend = -1;
   e->lkmax = -1;
@@ -1952,7 +1966,7 @@ static int enc_above_pct(struct sotto_enc16 *e, int32_t v) {
   if (e->npct < FX_PCT_MAX) {
     int32_t i = e->npct;
     while (i > 0 && e->pct[i - 1] > v) e->pct[i] = e->pct[i - 1], i--;
-    e->pct[i] = v;
+    e->pct[i] = keep16(v);
     e->npct++;
   }
   return above;
@@ -1963,20 +1977,20 @@ static void enc_input_stft(struct sotto_enc16 *e, int32_t t) {
   sframe_t *s = &e->sf[t % SRING];
   int16_t x[HN];
   uint32_t P[NBIN];
-  int32_t ref;
+  int32_t ref, b2530, tot;
   int i, b, ex, above;
   for (i = 0; i < HN; i++) x[i] = e->x16[(HH * t + i) & (EX16 - 1)];
   stft_power(&e->w, x, P, &ex);
   s->top = band_db(P, ex, 4000, 8000);
   s->low = band_db(P, ex, 0, 3900);
   s->one = band_db(P, ex, 0, 1000);
-  s->b2530 = band_db(P, ex, 2500, 3000);
-  s->tot = total_db(P, ex);
+  b2530 = band_db(P, ex, 2500, 3000);
+  tot = total_db(P, ex);
   for (b = 0; b < 4; b++) s->hb[b] = band_db(P, ex, 4000 + 1000 * b, 5000 + 1000 * b);
   ref = band_db(P, ex, 3000, 3500);
   for (b = 0; b < 16; b++) s->Y[b] = band_db(P, ex, 4000 + 250 * b, 4250 + 250 * b) - ref;
-  above = enc_above_pct(e, s->tot);
-  s->vow = (int16_t)((s->one - s->b2530 > DB(10)) && t >= PCT_WARM && above);
+  above = enc_above_pct(e, tot);
+  s->vow = (int16_t)((s->one - b2530 > DB(10)) && t >= PCT_WARM && above);
 }
 
 /* ---- the rules over the ring (hiss_band.encode_low) ---- */
@@ -2001,27 +2015,27 @@ static int32_t median2(int32_t *v, int n) {
 static void enc_rules(struct sotto_enc16 *e) {
   int32_t g0 = e->nraw > FRING ? e->nraw - FRING : 0, g1 = e->nraw, t, t0;   /* frames [g0, g1) */
   int n = (int)(g1 - g0), i, j;
-  int16_t *code = e->code, *c0 = e->c0;
+  signed char code[FRING], c0[FRING];       /* voicing codes 0..3 */
   rframe_t *rf = e->rf;
   if (g1 == g0) return;
 #define RF(g) (&rf[(g) % FRING])
   for (i = 0; i < n; i++) {
     rframe_t *r = RF(g0 + i);
-    memcpy(r->bits, r->raw.bits, SOTTO_BYTES_PER_FRAME);
+    memcpy(r->bits, r->raw, SOTTO_BYTES_PER_FRAME);
     if (e->onset_wi)
       for (j = 0; j < 7; j++) set_bit(r->bits, 2 + j, (r->pwi >> (6 - j)) & 1);
-    code[i] = c0[i] = (int16_t)frame_code(r->raw.bits);
+    code[i] = c0[i] = (signed char)frame_code(r->raw);
   }
   /* _onsets: a loud, low-heavy unvoiced frame next to a voiced or mixed one -> MM with its pitch */
   for (i = 0; i < n; i++) {
-    const fx_enc_frame_t *f = &RF(g0 + i)->raw;
+    const rframe_t *f = RF(g0 + i);
     static const int dd[6] = {1, -1, 2, -2, 3, -3};
-    if (c0[i] || !f->loud[0] || f->tilt[0] <= ONSET_LOWDOM) continue;
+    if (c0[i] || !f->loud0 || f->tilt0 <= ONSET_LOWDOM) continue;
     for (j = 0; j < 6; j++) {
       int h = i + dd[j];
       if (h >= 0 && h < n && (c0[h] == 1 || c0[h] == 2)) {
         unsigned char *b = RF(g0 + i)->bits;
-        const unsigned char *nb = RF(g0 + h)->raw.bits;
+        const unsigned char *nb = RF(g0 + h)->raw;
         int p;
         code[i] = 2;
         for (p = 2; p < 9; p++) set_bit(b, p, frame_bit(nb, p));
@@ -2042,12 +2056,12 @@ static void enc_rules(struct sotto_enc16 *e) {
       int hj = h < i + SOTTO_RULE_LAG + 1 ? h : i + SOTTO_RULE_LAG + 1, g, ns = 0, nj = 0;
       int32_t sv[2 * (SOTTO_RULE_LAG + 1)], jv[2 * (SOTTO_RULE_LAG + 1)];
       for (g = i; g < hj; g++) {
-        const fx_enc_frame_t *f = &RF(g0 + g)->raw;
+        const rframe_t *f = RF(g0 + g);
         int half;
         for (half = 0; half < 2; half++) {
           int32_t prev, dl;
-          if (f->snr[half] != FX_SNR_NONE) sv[ns++] = f->snr[half];
-          prev = half ? f->lwo[0] : (g0 + g > 0 ? RF(g0 + g - 1)->raw.lwo[1] : f->lwo[0]);
+          if (f->snr[half] != SNR16_NONE) sv[ns++] = f->snr[half];
+          prev = half ? f->lwo[0] : (g0 + g > 0 ? RF(g0 + g - 1)->lwo[1] : f->lwo[0]);
           dl = f->lwo[half] - prev;
           jv[nj++] = g0 + g == 0 && half == 0 ? 0 : (dl < 0 ? -dl : dl);
         }
@@ -2070,7 +2084,7 @@ static void enc_rules(struct sotto_enc16 *e) {
       for (g = i; g < h; g++) code[g] = 2;
     i = h;
   }
-  memcpy(c0, code, n * sizeof(int16_t));
+  for (i = 0; i < n; i++) c0[i] = code[i];
   for (i = 0; i < n; i++) {
     int w[7], nw = 0, sw = 0;
     if (c0[i] != 1 && c0[i] != 2) continue;
@@ -2111,7 +2125,6 @@ static void enc_take_local(struct sotto_enc16 *e, const short *y8, int32_t g, in
     for (h = 0; h < 2; h++) {
       int32_t k = 2 * (g - 1) + h;
       memcpy(e->lenv[k % MRING], info->env[h], sizeof info->env[h]);
-      e->lcls[k % MRING] = info->cls[h];
       e->lkmax = k;
     }
 }
@@ -2245,7 +2258,14 @@ static void enc_pull(struct sotto_enc16 *e) {
   fx_fparams_t p;
   while (sotto_enc_pop_frame_p(e->core, &f, &p)) {
     rframe_t *r = &e->rf[e->nraw % FRING];
-    r->raw = f;
+    int h;
+    memcpy(r->raw, f.bits, SOTTO_BYTES_PER_FRAME);
+    for (h = 0; h < 2; h++) {
+      r->lwo[h] = f.lwo[h];
+      r->snr[h] = f.snr[h] == FX_SNR_NONE ? SNR16_NONE : keep16(f.snr[h]);
+    }
+    r->tilt0 = keep16(f.tilt[0]);
+    r->loud0 = (unsigned char)(f.loud[0] != 0);
     r->pwi = p.wi;
     if (e->lc) memcpy(e->lc[e->nraw % LR_PRING], p.c, sizeof p.c);
     e->nraw++;
@@ -2403,7 +2423,7 @@ void sotto_lr_enc16_destroy(struct sotto_lr_enc16 *L) {
 
 /* the state's size with its core, local decoder and coder, bytes */
 unsigned sotto_fx_lr_enc16_bytes(void) {
-  return (unsigned)sizeof(struct sotto_lr_enc16) + sotto_fx_enc_bytes() + sotto_fx_dec_bytes() + sotto_fx_lr_coder_bytes();
+  return (unsigned)sizeof(struct sotto_lr_enc16) + sotto_fx_enc_shared_bytes() + sotto_fx_dec_bytes() + sotto_fx_lr_coder_bytes();
 }
 
 static void lr_take(struct sotto_lr_enc16 *L) {

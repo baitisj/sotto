@@ -39,7 +39,7 @@
 #endif
 #define NCAND 10
 #define NST (NCAND + 1)
-#define RING 16
+#define RING (LAG + 2)        /* tracker frames: decide_from walks LAG + 1 back from the newest but one */
 #define TAIL_HOLD 30
 #define MIXED 2
 #define MAXH 80
@@ -73,7 +73,7 @@ typedef struct {
 
 struct sotto_enc {
   int16_t hist[HIST];         /* input; the last MPITCH samples are the analysis buffer */
-  int32_t re[512], im[512];   /* FFT scratch */
+  int32_t *re, *im;           /* FFT scratch, 512 values each (sotto_enc_create_scratch) */
   /* the last SRING frames' spectra: the 16-bit copy (the tracker's and decide()'s harmonic
      fits) and, for decide()'s harmonic levels, the bins rounded to 16 bits as 2-bit codes
      against it (spectrum_keep), so the 32-bit bins needn't be kept */
@@ -100,6 +100,7 @@ struct sotto_enc {
   fx_fparams_t qp[8];         /* the queued frames' fields before shape quantization (sotto 1200) */
   int16_t q_head, q_n, flushed;
   int16_t no_shape;           /* skip the shape search: its bits are 0 (sotto_enc_set_no_shape) */
+  int32_t own[];              /* the scratch, when the encoder has its own */
 };
 
 #define R(e, t) (&(e)->ring[(t) % RING])
@@ -191,7 +192,7 @@ static int spectrum_fft(struct sotto_enc *e, const int16_t *buf) {
     uint32_t a = (uint32_t)(x[i] < 0 ? -x[i] : x[i]);
     if (a > mx) mx = a;
   }
-  memset(re, 0, sizeof e->re);
+  memset(re + 139, 0, (373 - 139) * sizeof(int32_t));     /* the rest of re[0..511] is written below */
   int s = 0;                                                  /* x * 2^-s, largest in [2^22, 2^23) */
   if (mx) {
     while ((mx >> s) >= ((uint32_t)1 << 23)) s++;
@@ -1062,18 +1063,23 @@ static void decide_from(struct sotto_enc *e, int32_t t, int32_t last) {
 
 /* ---------------------------------------------------------------- API */
 
-struct sotto_enc *sotto_enc_create(void) {
+struct sotto_enc *sotto_enc_create_scratch(int32_t *scratch) {
   int i;
-  struct sotto_enc *e = calloc(1, sizeof *e);
+  struct sotto_enc *e = calloc(1, sizeof *e + (scratch ? 0 : FX_ENC_SCRATCH * sizeof(int32_t)));
   if (!e) return NULL;
+  e->re = scratch ? scratch : e->own;
+  e->im = e->re + 512;
   for (i = 0; i < HIST; i++) e->hist[i] = 1;
   e->prev_bin = 16;                                          /* 50 Hz */
   e->peak = INT32_MIN / 2;
   return e;
 }
 
+struct sotto_enc *sotto_enc_create(void) { return sotto_enc_create_scratch(NULL); }
+
 void sotto_enc_destroy(struct sotto_enc *e) { free(e); }
-unsigned sotto_fx_enc_bytes(void) { return (unsigned)sizeof(struct sotto_enc); }
+unsigned sotto_fx_enc_bytes(void) { return (unsigned)(sizeof(struct sotto_enc) + FX_ENC_SCRATCH * sizeof(int32_t)); }
+unsigned sotto_fx_enc_shared_bytes(void) { return (unsigned)sizeof(struct sotto_enc); }
 
 static void analyse_10ms(struct sotto_enc *e, const short *x) {
   int i;
