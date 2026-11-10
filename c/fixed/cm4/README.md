@@ -40,9 +40,12 @@ Files: `shim.c` (bump allocator, memory functions, 64-bit division), `divmod.s` 
 
 The code that runs on the M4 is the ordinary `c/fixed/` C. `FX_ARM_DSP` (fx.h) is on for any
 ARM target with the DSP extension. It takes 32 x 32-bit products directly (`FX_WIDE_MUL`),
-because the M4's SMULL and SMLAL take one cycle, searches an unpacked codebook with SMLAD,
-and does the 16-bit dot products (resamplers, minimum phase), the overlap-add and the NLP
-pitch DFT with SMLALD/SMLSLD, two products per instruction into 64 bits. Results and the method's limits are in `docs/c-port.md`, "Fixed point on the
-Cortex-M4".
+because the M4's SMULL and SMLAL take one cycle, searches an unpacked codebook with SMLAD
+(four vectors a pass), multiplies the half-band resamplers' 19-bit taps whole with SMLAL,
+and does the 16-bit dot products (minimum phase), the overlap-add and the NLP pitch DFT with
+SMLALD/SMLSLD, two products per instruction into 64 bits. On an ARMv7E-M with GCC or clang the
+FFT's butterfly loops are two naked assembly functions in `fx_math.c` (`-DFX_FFT_C` builds the
+C, which gives the same bits). Results and the method's limits are in `docs/c-port.md`, "Fixed
+point on the Cortex-M4".
 
 SPDX-License-Identifier: MIT

@@ -221,11 +221,10 @@ Same API, same delay, the same structure as the float port:
 - `FX_ARM_DSP` and `FX_NARROW_MUL` builds give the same bits and samples
   (`tests/test_fx_lr.py`). Stress signals, empty input, random bits and 40% loss run clean
   under AddressSanitizer, UndefinedBehaviorSanitizer and `FX_CHECK` (ring checks included).
-- State on x86: the encoder 120 KB with its core, local decoder and coder (84 KB with
-  `FX_PCT_MAX=3000`, the Cortex-M4 bench setting: v3.8's encoder plus 5.3 KB), the decoder
-  27.7 KB with sotto 1200's decoder and its core. Code for the M4 (clang -O2):
-  `sotto_fx_lr_enc.o` 6.1 KB, `sotto_fx_lr.o` 4.2 KB. No new tables
-  (`fx_lr_hiss_bcb` already existed for the K6).
+- State on x86: the encoder 73.6 KB with its core, local decoder and coder (55.6 KB with
+  `FX_PCT_MAX=3000`, the Cortex-M4 bench setting), the decoder 27.7 KB with sotto 1200's
+  decoder and its core. Code for the M4 (clang -O2): `sotto_fx_lr_enc.o` 6.2 KB,
+  `sotto_fx_lr.o` 4.2 KB. No new tables (`fx_lr_hiss_bcb` already existed for the K6).
 
 ## Open
 

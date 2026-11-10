@@ -769,83 +769,125 @@ Clips: the 14 s and 15 s LibriSpeech voices of `docs/samples` (198 and 3436), at
 
 Every run's bits and samples equal the x86 build's, for both compilers at -O2 and -Os. The
 code is integer only: with clang, the hard-float build's image is byte for byte the soft-float
-one; GCC uses the FPU for one 8-byte constant copy in `sotto_enc_create`, which the emulator
-runs as it is. MHz for real time is cycles per 40 ms call x 25. "With flash" adds the flash
-model's wait states to each call before taking the worst.
+one; GCC uses the FPU for one 8-byte constant copy in `sotto_enc_create_scratch`, which the
+emulator runs as it is. MHz for real time is cycles per 40 ms call x 25. "With flash" adds the
+flash model's wait states to each call before taking the worst.
 
 | sotto 1200, 8 kHz, MHz | Encoder mean / worst | Encoder worst with flash | Decoder mean / worst | Decoder worst with flash |
 |---|---:|---:|---:|---:|
-| GCC -O2, hard float (OpenRTX's compiler and ABI) | 76.5-77.0 / 104.8-106.8 | **112.8-114.8** | 14.5-14.9 / 21.7 | 22.4 |
-| GCC -O2, prefetch off | | 113.7-115.6 | | 22.5 |
-| GCC -Os, hard float | 97.7-98.3 / 129.8-132.2 | 137.7-140.1 | 18.9-19.3 / 27.4 | 28.0 |
-| clang -O2 | 65.2-65.8 / 86.3-87.8 | 95.2-96.6 | 15.0-15.4 / 22.8 | 23.7 |
-| clang -O2, prefetch off | | 103.0-104.4 | | 26.1 |
-| clang -Os | 82.4-82.9 / 113.2-114.9 | 121.0-122.7 | 15.4-15.8 / 22.4 | 23.0 |
+| GCC -O2, hard float (OpenRTX's compiler and ABI) | 58.2-59.0 / 65.1-65.9 | **68.9-69.7** | 14.5-14.9 / 21.8 | 22.4 |
+| GCC -O2, prefetch off | | 69.6-70.3 | | 22.5 |
+| GCC -Os, hard float | 69.6-70.6 / 78.0-78.8 | 82.0-82.8 | 18.9-19.3 / 27.4 | 28.0 |
+| clang -O2 | 58.8-59.4 / 66.2-67.2 | 71.7-72.6 | 15.0-15.4 / 22.8 | 23.7 |
+| clang -O2, prefetch off | | 82.5-83.7 | | 26.1 |
+| clang -Os | 62.2-62.9 / 69.2-70.1 | 73.2-74.1 | 15.4-15.8 / 22.4 | 23.0 |
 
 | sotto 1200 hiss, 16 kHz, MHz | Encoder mean / worst | Encoder worst with flash | Decoder mean / worst | Decoder worst with flash |
 |---|---:|---:|---:|---:|
-| GCC -O2, hard float (OpenRTX's compiler and ABI) | 116.5-117.1 / 133.4-133.9 | **138.8-139.4** | 34.7-35.0 / 41.7 | 43.3 |
-| GCC -O2, prefetch off | | 139.9-140.7 | | 43.6 |
-| GCC -Os, hard float | 149.8-150.6 / 170.1-170.7 | 175.6-176.2 | 44.3-44.6 / 52.4 | 54.0 |
-| clang -O2 | 102.5-103.3 / 118.9-119.7 | 125.4-126.4 | 33.6-33.9 / 41.1 | 42.7 |
-| clang -O2, prefetch off | | 137.0-138.0 | | 46.0 |
-| clang -Os | 127.6-128.3 / 144.2-144.9 | 149.3-150.1 | 37.9-38.3 / 44.7 | 46.1 |
+| GCC -O2, hard float (OpenRTX's compiler and ABI) | 92.9-93.8 / 107.9-108.5 | **112.9-113.5** | 33.4-33.7 / 40.4 | 41.7 |
+| GCC -O2, prefetch off | | 114.0-114.6 | | 42.0 |
+| GCC -Os, hard float | 111.3-112.4 / 129.5-130.1 | 135.3-136.0 | 39.8-40.1 / 47.9 | 49.2 |
+| clang -O2 | 92.0-92.7 / 107.5-108.4 | 114.1-115.1 | 32.8-33.1 / 40.3 | 41.6 |
+| clang -O2, prefetch off | | 127.6-128.8 | | 44.8 |
+| clang -Os | 100.7-101.5 / 115.6-116.2 | 121.1-121.8 | 36.6-36.9 / 43.3 | 44.5 |
 
-The worst 8 kHz encoder call is always the first superframe (call 4): the coder's first pass
-searches A's paths for three frames at once, where later calls search one. From call 8 on the
-worst is 73 (clang -O2) and 86 MHz (GCC -O2). The 16 kHz encoder's worst calls are ordinary
-voiced frames; its p99 is within 2 MHz of its worst.
+**What changed since the first run.** The first run (commit 1366c13) measured the encoders as
+they were; these numbers come from the same clips, bench and flash model after eight changes,
+none of which changes a bit or a sample: every mode of the x86 tools (2400 bit/s v3.8 and
+v3.7, sotto 1200 at both rates, the K6's light hiss layers, 600 and 400 bit/s) gives the same
+output on the clips, on every prefix length of them and on synthetic worst cases, and the
+K6's decoder objects are the same size.
 
-**Where the 16 kHz encoder's time goes** (GCC -O2, `--profile`, 120 calls; MHz with inlining):
-sotto 1200's shape search (`cb_stage`, the M-best paths and B's codeword) 16, the NLP pitch DFT
-16, the pitch-track costs 10, the 2:1 decimator 6, the FFT 11, the local decoder (overlap-add,
-minimum phase, synthesis) 12, then the harmonic fit, bin loops, reciprocals and 64-bit
-division at 2 MHz or less each. The bench's `memset` is a byte loop (1.6 MHz); newlib's is
-faster. Nothing needs cutting to fit at -O2. Should a build need it: the first superframe's
-burst could spread over the look-ahead calls before it, and the NLP DFT and the decimator are
-the same SMLALD sums as at 2400 bit/s, so the remaining lever there is fewer of them, not
-faster ones.
+| Hard float | 8 kHz before | 8 kHz now | 16 kHz before | 16 kHz now |
+|---|---:|---:|---:|---:|
+| Encoder worst with flash, GCC -O2, MHz | 112.8-114.8 | 68.9-69.7 | 138.8-139.4 | 112.9-113.5 |
+| Encoder worst with flash, GCC -Os, MHz | 137.7-140.1 | 82.0-82.8 | 175.6-176.2 | 135.3-136.0 |
+| Encoder worst with flash, clang -O2, MHz | 95.2-96.6 | 71.7-72.6 | 125.4-126.4 | 114.1-115.1 |
+| Encoder state, bytes | 37,520 | 24,400 | 84,048 | 55,584 |
+| Encoder stack, GCC -O2, bytes | 4,880 | 5,096 | 5,312 | 5,544 |
+| Flash, GCC -O2, bytes | 108,500 | 109,224 | 125,136 | 125,584 |
+
+- **The first superframe, spread out.** sotto 1200's coder searched A(0), A(1) and A(2) and
+  ran A(0)'s joint search in one call, the 8 kHz encoder's worst (call 4). A(0)'s search now
+  runs when frame 0 comes in, A(1)'s with A(0)'s joint search when frame 2 does, and the
+  superframe's call finds them done. The 8 kHz encoder's worst call is now an ordinary one.
+- **The core's spectra in 16 bits.** `decide()` read frame t's 32-bit bins from a ring of 10
+  frames to rebuild a 16-bit copy and the bins rounded for the harmonic levels. The ring now
+  holds the 16-bit copy, which the tracker reads too, and per value a 2-bit code that turns it
+  back into the level bin exactly (`FX_CHECK` checks every value): the core is 24.3 KB
+  instead of 35.2 KB, and `decide()` no longer recomputes the bins.
+- **The NLP low-pass at the kept samples only.** The 48-tap filter ran at all 80 squared
+  samples of a block, but the decimation by 5 keeps 16: about 5.5 MHz and 1 KB.
+- **A smaller v3.8 front end** (45.7 KB to 34.4 KB). The core's FFT scratch is the STFT work
+  area (both are free between calls); the percentile history keeps its frame levels in
+  16 bits (-120 to 69 dB) and the rule ring the harmonic SNR and tilt (under 118 and 50 dB),
+  each checked under `FX_CHECK`; the rule ring keeps only the fields the rules read; the
+  local 16 kHz output ring is 512 samples, the tracker's ring the 10 frames `decide_from`
+  walks, and an unused class ring is gone.
+- **Codebook dots, NLP DFT, resamplers** (`FX_ARM_DSP`). The shape search's SMLAD dots take
+  four codebook vectors a pass, so each pair of the residual is loaded once for four; the NLP
+  DFT takes four samples a pass; the half-band resamplers multiply the 19-bit taps whole with
+  SMLAL, each symmetric pair once (11 products, not 82 half products).
+- **The decimator reads its ring in place** instead of copying 41 samples per output, and
+  the tracker's harmonic sums take four harmonics a pass.
+- **CLZ** for the reciprocal's and the harmonic fit's normalisation (about 1 MHz).
+- **The FFT's butterfly loops in assembly** (two naked Thumb-2 functions in `fx_math.c`, for
+  ARMv7E-M with GCC or clang; `-DFX_FFT_C` builds the C, with the same bits): the compilers'
+  C spilled the butterfly's registers. About 2 MHz at 16 kHz and 1.5 at 8 kHz; with the
+  resamplers, the 16 kHz decoder gains 1.6.
+
+**Where the 16 kHz encoder's time goes now** (GCC -O2, `--profile`, 120 calls; MHz with
+inlining, before in brackets): the shape search 11.5 (16.4), the NLP pitch DFT 9.8 (16.3),
+the pitch-track costs 8.1 (11.3), the FFT 9.3 (11.0), the local decoder (overlap-add,
+minimum phase, synthesis) 13.7 (13.7), then the analysis, `decide()`, the harmonic fit,
+reciprocals and 64-bit division at 3.3 MHz or less each; the decimator (6.3) and the
+bench's byte-loop `memset` (1.6) are under 1.5. The mean call is 92 MHz (116). What is left
+is spread out: the overlap-add and the NLP DFT in assembly might give 1-2 MHz each.
 
 | RAM, bytes | 8 kHz | 16 kHz |
 |---|---:|---:|
-| Encoder state | 37,520 | 84,048 |
+| Encoder state | 24,400 | 55,584 |
 | Decoder state | 1,192 | 27,728 (K6 light layer: 1,872) |
-| Encoder stack, clang -O2 / GCC -O2 | 7,364 / 4,880 | 9,260 / 5,312 |
-| Decoder stack, clang -O2 / GCC -O2 | 2,492 / 2,364 | 3,352 / 3,176 |
-| Static (`.data`, `.bss`) | 2,313 | 4,578 |
-| Flash, GCC -O2 / GCC -Os / clang -O2 | 108,500 / 103,553 / 140,145 | 125,136 / 118,000 / 174,520 |
+| Encoder stack, clang -O2 / GCC -O2 | 7,308 / 5,096 | 9,084 / 5,544 |
+| Decoder stack, clang -O2 / GCC -O2 | 2,492 / 2,364 | 3,324 / 3,116 |
+| Static (`.data`, `.bss`) | 2,313 | 4,330 |
+| Flash, GCC -O2 / GCC -Os / clang -O2 | 109,224 / 104,417 / 140,869 | 125,584 / 118,648 / 175,096 |
 
-The 16 kHz encoder's state is four blocks: the v3.8 front end and rules 45,688 bytes (12,000
-of them the percentile history at `FX_PCT_MAX=3000`, 7,168 the 128-frame rule ring, 6,656 the
-STFT feature ring, 5,120 the FFT work area), the v3.7 core 35,244, the sotto 1200 coder 2,272
-and the local decoder 836. The decoder is three blocks: 26,536, 348 and 836.
+The 16 kHz encoder's state is four blocks: the v3.8 front end and rules 34,440 bytes (6,000
+of them the percentile history at `FX_PCT_MAX=3000`, 6,144 the STFT feature ring, 5,120 the
+STFT work area that the core's FFT shares, 4,096 the 128-frame rule ring, 4,096 the local
+decoder's predictions, 2,432 the shape targets, 2,048 the input ring, 1,792 the local
+envelopes), the v3.7 core 18,020 (11,600 of it the 16-bit spectra and their codes, 2,056 the
+two frames' bin powers), the sotto 1200 coder 2,276 and the local decoder 836. The 8 kHz
+encoder is the core with its own 4,096-byte FFT scratch (22,116) and the coder (2,276). The
+decoder is three blocks: 26,536, 348 and 836.
 
 **Verdict.**
 
-- **CPU: fits at -O2, both rates.** The worst 40 ms call with the flash wait states is
-  113-115 MHz at 8 kHz and 139 MHz at 16 kHz with GCC -O2, OpenRTX's compiler and float ABI
-  (clang's code is 10-15 % faster). That leaves about 53 and 29 MHz of the 168 for OpenRTX
-  while transmitting, close to the 25 that v3.8 at 2400 bit/s leaves. Receiving is easy: the
-  decoders' worst is 22 and 43 MHz. At -Os, OpenRTX's default, the 16 kHz encoder needs
-  176 MHz and does not fit, so the sotto files must be built -O2 (a per-file flag in
-  OpenRTX's meson build); the 8 kHz encoder at -Os (140 MHz) would fit, tightly. With the
-  prefetch off, as OpenRTX's `SystemInit` leaves it, the GCC -O2 build loses only about
-  1 MHz (clang's -O2 code, longer straight runs, about 8); setting `PRFTEN` costs nothing.
+- **CPU: fits at -O2 and at -Os, both rates.** The worst 40 ms call with the flash wait
+  states is 69-70 MHz at 8 kHz and 113-114 MHz at 16 kHz with GCC -O2, OpenRTX's compiler
+  and float ABI. That leaves about 98 and 54 MHz of the 168 for OpenRTX while transmitting,
+  more than v3.8 at 2400 bit/s leaves. Receiving is easy: the decoders' worst is 22 and
+  42 MHz. At -Os, OpenRTX's default, the encoders need 83 and 136 MHz, so the sotto files no
+  longer need a per-file -O2 (it still buys 23 MHz at 16 kHz). With the prefetch off, as
+  OpenRTX's `SystemInit` leaves it, the GCC -O2 build loses only about 1 MHz (clang's -O2
+  code, longer straight runs, 11-14); setting `PRFTEN` costs nothing. clang's -O2 code is now
+  no faster than GCC's: most of the gain was in loops GCC spilled or did not unroll.
 - **RAM.** On a half-duplex radio only one state is alive: create the encoder on PTT and the
-  decoder after it. The 8 kHz encoder (37.5 KB), the 16 kHz decoder (27.7 KB) and the 8 kHz
-  decoder (1.2 KB) each fit the 64 KB CCM, if OpenRTX's own `.data` and `.bss` there leave
-  room (its link map, `main.map`, says). The 16 kHz encoder's 84 KB does not, and a smaller
-  percentile history cannot make it fit: all 12 KB of it gone still leaves 72 KB. Split it
-  instead, by block: the core, coder and local decoder (38.4 KB) in CCM and the front end
-  (45.7 KB) in SRAM's heap, or the other way round. The codec allocates each block with its
-  own `calloc`, so this is an allocator for the sotto files (a static arena in `.bss`, which
-  OpenRTX's linker script places in CCM, falling back to `malloc`), with no change to the
-  codec and no CPU cost: the CPU reads CCM and SRAM with no wait state, and nothing in the
-  state is a DMA buffer. `FX_PCT_MAX=1000` (10 s of history) would save 8 KB more, at the
-  price of bits that differ from the default build's (only the side channel's percentile
-  sees it), and needs listening first. Stack: up to 5.3 KB with GCC (9.3 KB with clang -O2),
-  within the codec thread's 16 KB, and with GCC within an 8 KB stack too.
-- **Flash: fits.** 108-125 KB with GCC -O2, of the firmware's 848 KB.
+  decoder after it. Every state now fits the 64 KB CCM whole, if OpenRTX's own `.data` and
+  `.bss` there leave room (its link map, `main.map`, says): the 16 kHz encoder's 55,584 bytes
+  leave 9,952, the 8 kHz encoder needs 24.4 KB and the decoders 27.7 and 1.2 KB. If
+  OpenRTX's CCM use leaves less, split the 16 kHz encoder by block as before: the core, coder
+  and local decoder (21.1 KB) in CCM and the front end (34.4 KB) in SRAM's heap. The codec
+  allocates each block with its own `calloc`, so this is an allocator for the sotto files (a
+  static arena in `.bss`, which OpenRTX's linker script places in CCM, falling back to
+  `malloc`), with no change to the codec and no CPU cost: the CPU reads CCM and SRAM with no
+  wait state, and nothing in the state is a DMA buffer. `FX_PCT_MAX=1000` (10 s of history)
+  would save 4 KB more, at the price of bits that differ from the default build's (only the
+  side channel's percentile sees it), and needs listening first. Stack: up to 5.5 KB with
+  GCC (9.1 KB with clang -O2), within the codec thread's 16 KB, and with GCC within an
+  8 KB stack too.
+- **Flash: fits.** 109-126 KB with GCC -O2, of the firmware's 848 KB.
 
 **Caveats.** As above: no bus contention, a sampled model of the ART accelerator, clang and
 GCC from Ubuntu rather than OpenRTX's arm-miosix-eabi GCC, a byte-loop `memset` and a simple

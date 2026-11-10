@@ -65,7 +65,7 @@
 #define SOTTO_RULE_LAG 10                   /* frames of look-ahead for the encoder rules */
 #endif
 #ifndef FX_PCT_MAX
-#define FX_PCT_MAX 12000                    /* frames the running percentile remembers (120 s, 4 bytes each) */
+#define FX_PCT_MAX 12000                    /* frames the running percentile remembers (120 s, 2 bytes each) */
 #endif
 #define FRING 128                           /* frames of history the rules see */
 #define SRING 64                            /* STFT frames of features kept */
