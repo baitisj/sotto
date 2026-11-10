@@ -264,7 +264,8 @@ def lr_run(m4, a, k16):
 
     def stats(cs):
         srt = sorted(cs)
-        return {'mean': mhz40(sum(cs) / len(cs)), 'p99': mhz40(srt[int(0.99 * (len(cs) - 1))]), 'worst': mhz40(srt[-1])}
+        return {'mean': mhz40(sum(cs) / len(cs)), 'p99': mhz40(srt[int(0.99 * (len(cs) - 1))]), 'worst': mhz40(srt[-1]),
+                'worst_call': cs.index(srt[-1])}
 
     def timed(fn, *args):
         f0 = fl.cyc if fl else 0
