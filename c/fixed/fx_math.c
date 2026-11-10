@@ -109,6 +109,119 @@ static inline void bfly(int32_t *ar, int32_t *ai, int32_t *br, int32_t *bi, int1
 /* the two butterfly loops (c55x/fft.asm on the C55x): cnt butterflies with one twiddle,
    the pointers stepping by stride values; and the 2q consecutive butterflies of one group
    with the twiddles W^(k step), whose sine index k step + 384 passes 512 at k = q */
+#if defined(FX_ARM_DSP) && defined(__ARM_ARCH_7EM__) && defined(__GNUC__) && !defined(FX_FFT_C)
+/* The Cortex-M4's butterfly loops in assembly: bfly's arithmetic, instruction for instruction
+   (the rounding constant preloaded, one SMLAL a product, -s for xi, the 64-bit sums shifted
+   by 15), with the four data words and the twiddle in registers and the stores together, which
+   GCC and clang don't manage in C (it spills); -DFX_FFT_C builds the C loops instead. The b
+   words are h bytes past the a words. fx_bfly_m4_tw: n butterflies on consecutive words, the
+   twiddle (cos | sin << 16, fx_cs512) at tw, stepping ts bytes; fx_bfly_m4_1: n butterflies
+   ds bytes apart with one twiddle (c, s). */
+__attribute__((naked)) static void fx_bfly_m4_tw(int32_t *ar, int32_t *ai, int h, int n, const uint32_t *tw, int ts) {
+  __asm__ volatile(
+    ".syntax unified\n"
+    "push {r4-r11, lr}\n"
+    "ldr r4, [sp, #36]\n"                  /* tw */
+    "ldr r5, [sp, #40]\n"                  /* ts */
+    "add r3, r0, r3, lsl #2\n"             /* the end of ar */
+    "1:\n"
+    "ldr r6, [r4]\n"                       /* cos | sin << 16 */
+    "ldr r8, [r0, r2]\n"                   /* br */
+    "ldr r9, [r1, r2]\n"                   /* bi */
+    "add r4, r4, r5\n"
+    "sxth r7, r6\n"                        /* c */
+    "asrs r6, r6, #16\n"                   /* s */
+    "mov r10, #16384\n"
+    "mov r11, #0\n"
+    "smlal r10, r11, r8, r7\n"
+    "smlal r10, r11, r9, r6\n"
+    "lsrs r10, r10, #15\n"
+    "orr r10, r10, r11, lsl #17\n"         /* xr = (br c + bi s + 2^14) >> 15 */
+    "rsbs r6, r6, #0\n"
+    "mov r11, #16384\n"
+    "mov r12, #0\n"
+    "smlal r11, r12, r9, r7\n"
+    "smlal r11, r12, r8, r6\n"
+    "lsrs r11, r11, #15\n"
+    "orr r11, r11, r12, lsl #17\n"         /* xi = (bi c - br s + 2^14) >> 15 */
+    "ldr r8, [r0]\n"
+    "ldr r9, [r1]\n"
+    "adds r8, r8, #1\n"
+    "adds r9, r9, #1\n"
+    "adds r6, r8, r10\n"
+    "subs r7, r8, r10\n"
+    "adds r8, r9, r11\n"
+    "subs r9, r9, r11\n"
+    "asrs r6, r6, #1\n"
+    "asrs r7, r7, #1\n"
+    "asrs r8, r8, #1\n"
+    "asrs r9, r9, #1\n"
+    "str r7, [r0, r2]\n"
+    "str r9, [r1, r2]\n"
+    "str r6, [r0], #4\n"
+    "str r8, [r1], #4\n"
+    "cmp r0, r3\n"
+    "bne 1b\n"
+    "pop {r4-r11, pc}\n");
+}
+__attribute__((naked)) static void fx_bfly_m4_1(int32_t *ar, int32_t *ai, int h, int n, int ds, int32_t cs) {
+  __asm__ volatile(
+    ".syntax unified\n"
+    "push {r4-r11, lr}\n"
+    "ldr r4, [sp, #36]\n"                  /* ds */
+    "ldr r6, [sp, #40]\n"                  /* c << 16 | s */
+    "mul r3, r3, r4\n"
+    "add r3, r0, r3\n"                     /* the end of ar */
+    "asrs r5, r6, #16\n"                   /* c */
+    "sxth r6, r6\n"                        /* s */
+    "rsbs r7, r6, #0\n"                    /* -s */
+    "1:\n"
+    "ldr r8, [r0, r2]\n"                   /* br */
+    "ldr r9, [r1, r2]\n"                   /* bi */
+    "mov r10, #16384\n"
+    "mov r11, #0\n"
+    "smlal r10, r11, r8, r5\n"
+    "smlal r10, r11, r9, r6\n"
+    "lsrs r10, r10, #15\n"
+    "orr r10, r10, r11, lsl #17\n"         /* xr */
+    "mov r11, #16384\n"
+    "mov r12, #0\n"
+    "smlal r11, r12, r9, r5\n"
+    "smlal r11, r12, r8, r7\n"
+    "lsrs r11, r11, #15\n"
+    "orr r11, r11, r12, lsl #17\n"         /* xi */
+    "ldr r8, [r0]\n"
+    "ldr r9, [r1]\n"
+    "adds r8, r8, #1\n"
+    "adds r9, r9, #1\n"
+    "adds r12, r8, r10\n"
+    "subs r8, r8, r10\n"
+    "adds r10, r9, r11\n"
+    "subs r9, r9, r11\n"
+    "asrs r12, r12, #1\n"
+    "asrs r8, r8, #1\n"
+    "asrs r10, r10, #1\n"
+    "asrs r9, r9, #1\n"
+    "str r8, [r0, r2]\n"
+    "str r9, [r1, r2]\n"
+    "str r12, [r0]\n"
+    "str r10, [r1]\n"
+    "add r0, r0, r4\n"
+    "add r1, r1, r4\n"
+    "cmp r0, r3\n"
+    "bne 1b\n"
+    "pop {r4-r11, pc}\n");
+}
+void fx_fft_bfly1(int32_t *ar, int32_t *ai, int32_t *br, int32_t *bi, int cnt, int stride, int32_t cs) {
+  (void)bi;
+  if (cnt > 0) fx_bfly_m4_1(ar, ai, (int)((char *)br - (char *)ar), cnt, 4 * stride, cs);
+}
+void fx_fft_bfly_grp(int32_t *ar, int32_t *ai, int32_t *br, int32_t *bi, int q, int step) {
+  (void)bi;
+  /* twiddle k step (< 256): cos512[k step] and cos512[(k step + 384) mod 512], fx_cs512's word */
+  if (q > 0) fx_bfly_m4_tw(ar, ai, (int)((char *)br - (char *)ar), 2 * q, fx_cs512(), 4 * step);
+}
+#else
 void fx_fft_bfly1(int32_t *ar, int32_t *ai, int32_t *br, int32_t *bi, int cnt, int stride, int32_t cs) {
   int16_t c = (int16_t)(cs >> 16), s = (int16_t)(uint16_t)(cs & 0xFFFF);
   for (; cnt > 0; cnt--, ar += stride, ai += stride, br += stride, bi += stride) bfly(ar, ai, br, bi, c, s);
@@ -120,6 +233,7 @@ void fx_fft_bfly_grp(int32_t *ar, int32_t *ai, int32_t *br, int32_t *bi, int q, 
   sp = fx_cos512;
   for (k = 0; k < q; k++, cp += step, sp += step) bfly(ar++, ai++, br++, bi++, *cp, *sp);
 }
+#endif
 #endif
 
 /* in-place radix-2 FFT, decimation in time, forward (e^-j), every stage halves, so the
