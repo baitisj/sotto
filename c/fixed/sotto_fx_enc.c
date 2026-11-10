@@ -100,8 +100,7 @@ struct sotto_enc {
   fx_fparams_t qp[8];         /* the queued frames' fields before shape quantization (sotto 1200) */
   int16_t q_head, q_n, flushed;
   int16_t no_shape;           /* skip the shape search: its bits are 0 (sotto_enc_set_no_shape) */
-  int32_t own[];              /* the scratch, when the encoder has its own */
-};
+};                            /* followed by the scratch when the encoder has its own */
 
 #define R(e, t) (&(e)->ring[(t) % RING])
 
@@ -1091,7 +1090,7 @@ struct sotto_enc *sotto_enc_create_scratch(int32_t *scratch) {
   int i;
   struct sotto_enc *e = calloc(1, sizeof *e + (scratch ? 0 : FX_ENC_SCRATCH * sizeof(int32_t)));
   if (!e) return NULL;
-  e->re = scratch ? scratch : e->own;
+  e->re = scratch ? scratch : (int32_t *)(void *)(e + 1);
   e->im = e->re + 512;
   for (i = 0; i < HIST; i++) e->hist[i] = 1;
   e->prev_bin = 16;                                          /* 50 Hz */
