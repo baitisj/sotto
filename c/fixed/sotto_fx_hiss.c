@@ -370,7 +370,11 @@ static int16_t sat16(fx_acc v) { return (int16_t)(v > 32767 ? 32767 : v < -32768
 #if !FB_ONLY
 static int16_t down2(const int16_t *x) {
 #ifdef FX_ARM_DSP
-  fx_acc s = FX_JOIN(fx_dot16(tdh, x, NTAPS), fx_dot16(tdl, x, NTAPS));
+  /* SMLAL takes the 19-bit taps whole: the odd taps (tap j = tap 40 - j, so the two samples
+     are added first) and x[20], the same integer as the halves' sums below */
+  fx_acc s = (fx_acc)fx_hs_taps[20] * x[20];
+  int j;
+  for (j = 1; j < 20; j += 2) s += (fx_acc)fx_hs_taps[j] * ((int32_t)x[j] + x[40 - j]);
 #else
   /* a half-band filter: the even taps are 0 but the centre one, so only the odd taps and
      x[20] are multiplied (the same sum; the paired MACs above keep all 41) */
@@ -395,7 +399,12 @@ static int16_t down2(const int16_t *x) {
 static void up2(const int16_t *x, int16_t *y) {
   /* half-band: the even outputs' taps are 0 but the centre one, and toh/tol[0] is 0 */
   fx_acc e = FX_JOIN(FX_P16(teh[10], x[10]), FX_P16(tel[10], x[10]));
-#if defined(FX_ARM_DSP) || defined(__TMS320C55X__)
+#if defined(FX_ARM_DSP)
+  /* the whole 19-bit taps, as in down2 */
+  fx_acc o = 0;
+  int k;
+  for (k = 1; k <= 10; k++) o += (fx_acc)fx_hs_taps[41 - 2 * k] * ((int32_t)x[k] + x[21 - k]);
+#elif defined(__TMS320C55X__)
   fx_acc o = FX_JOIN(fx_dot16(toh + 1, x + 1, 20), fx_dot16(tol + 1, x + 1, 20));
 #else
   /* the odd taps are symmetric (toh/tol[k] = [21 - k]): add the two samples first. lo (< 2^15)
