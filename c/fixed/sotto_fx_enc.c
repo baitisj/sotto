@@ -559,6 +559,12 @@ fx_acc fx_hsum(const uint32_t *p, uint32_t acc, uint32_t w, int m);
 #else
 static fx_acc fx_hsum(const uint32_t *p, uint32_t acc, uint32_t w, int m) {
   fx_acc E = 0;
+  for (; m >= 4; m -= 4, acc += 4 * w) {    /* four a pass */
+    E += p[(int)(acc >> 23)];
+    E += p[(int)((acc + w) >> 23)];
+    E += p[(int)((acc + 2 * w) >> 23)];
+    E += p[(int)((acc + 3 * w) >> 23)];
+  }
   for (; m > 0; m--, acc += w) E += p[(int)(acc >> 23)];
   return E;
 }

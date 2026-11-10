@@ -2328,11 +2328,12 @@ static void enc_decimate_block(struct sotto_enc16 *e, int32_t limit) {
   for (i = 0; i < 80; i++) {
     int16_t x[NTAPS];
     int32_t m = 2 * (n0 + i) - 20;
-    if (m >= 0 && m + NTAPS <= limit)                      /* the usual case, without tests */
-      for (j = 0; j < NTAPS; j++) x[j] = e->x16[(m + j) & (EX16 - 1)];
-    else
+    if (m >= 0 && m + NTAPS <= limit && (m & (EX16 - 1)) + NTAPS <= EX16)
+      x8[i] = down2(&e->x16[m & (EX16 - 1)]);              /* the usual case: the ring in place */
+    else {
       for (j = 0; j < NTAPS; j++) x[j] = m + j < 0 || m + j >= limit ? 0 : e->x16[(m + j) & (EX16 - 1)];
-    x8[i] = down2(x);
+      x8[i] = down2(x);
+    }
   }
   FX_PROF(17, 1);
   sotto_enc_analyse_block(e->core, x8);
