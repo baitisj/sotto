@@ -97,7 +97,7 @@ done
 $CC $CFLAGS -ffreestanding -fno-builtin -c "$ROOT/c/fixed/cm4/shim.c" -o "$OUT/shim.o"
 ${CM4_AS:-clang} --target=thumbv7em-none-eabi -mcpu=cortex-m4 $FLOAT -c "$ROOT/c/fixed/cm4/divmod.s" -o "$OUT/divmod.o"
 LIBS="$OUT/shim.o $OUT/divmod.o $LIBGCC"
-LDF="-T $ROOT/c/fixed/cm4/link.ld --gc-sections -u heap_used"
+LDF="-T $ROOT/c/fixed/cm4/link.ld --gc-sections -u heap_used -u alloc_log -u alloc_n"
 # shellcheck disable=SC2086
 $LD $LDF -e sotto_encode -u sotto_enc_create -u sotto_enc_flush \
   -u sotto_dec_create -u sotto_decode -u sotto_dec_flush $SYMS $OBJS $LIBS -o "$OUT/bench.elf"

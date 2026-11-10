@@ -5,15 +5,15 @@
 # tools', and prints a Markdown table of MHz, RAM and flash (also to $GITHUB_STEP_SUMMARY when set).
 # Fails on any byte that differs, or on a worst 40 ms call over 168 MHz (the STM32F405's clock).
 # Usage: make -C c fixed && sh tools/cm4_lr_check.sh [-O2 | -Os | other clang options]
-# Env: LR16=k6|full, the 16 kHz decoder's hiss layer (default k6: the K6's, the one there is
-#      today; full once the fixed-point v3.8 sotto 1200 hiss decoder is in); CLIP8 (8 kHz raw),
+# Env: LR16=full|k6, the 16 kHz build's hiss layer (default full, v3.8's; k6 the K6's, decoder
+#      only); CLIP8 (8 kHz raw),
 #      CLIP16 (16 kHz raw or .flac), BITS (sotto 1200 superframes to decode while a build's
 #      encoder is a stub); FPU=1 for the hard-float build; CM4_CHECK_DIR for the work files.
 # SPDX-License-Identifier: MIT
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OPT=${*:--O2}
-LR16=${LR16:-k6}
+LR16=${LR16:-full}
 W=${CM4_CHECK_DIR:-"$ROOT/c/fixed/cm4/check"}
 CLIP8=${CLIP8:-"$ROOT/codec/codec2/raw/hts1a.raw"}
 CLIP16=${CLIP16:-"$ROOT/docs/course/audio/hiss_original.flac"}

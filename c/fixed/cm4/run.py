@@ -150,6 +150,14 @@ class M4:
     def u32(self, name):
         return int.from_bytes(self.mu.mem_read(self.sym[name], 4), 'little')
 
+    def allocs(self, since=0):
+        """the sizes of the allocations made since the since-th one, and the count so far"""
+        if 'alloc_n' not in self.sym:
+            return [], 0
+        n = min(self.u32('alloc_n'), 64)
+        raw = bytes(self.mu.mem_read(self.sym['alloc_log'], 4 * n))
+        return [int.from_bytes(raw[4 * i:4 * i + 4], 'little') for i in range(since, n)], n
+
     def paint_stack(self):
         self.mu.mem_write(self.sp0 - STACK, b'\xa5' * STACK)
 
@@ -265,7 +273,7 @@ def lr_run(m4, a, k16):
     def stats(cs):
         srt = sorted(cs)
         return {'mean': mhz40(sum(cs) / len(cs)), 'p99': mhz40(srt[int(0.99 * (len(cs) - 1))]), 'worst': mhz40(srt[-1]),
-                'worst_call': cs.index(srt[-1])}
+                'worst_call': cs.index(srt[-1]), 'worst_from_call_8': mhz40(max(cs[8:] or cs))}
 
     def timed(fn, *args):
         f0 = fl.cyc if fl else 0
@@ -285,6 +293,7 @@ def lr_run(m4, a, k16):
         bits = open(a.dec_bits, 'rb').read()
     m4.paint_stack()
     h0 = m4.u32('heap_used')
+    a0 = m4.allocs()[1]
     enc, _ = m4.call(f'sotto_lr_enc{sfx}_create')
     if not enc:
         out['encoder'] = 'none in this build (sotto_lr_enc%s_create returned NULL)' % sfx
@@ -314,6 +323,7 @@ def lr_run(m4, a, k16):
         out['blocks_40ms'] = n
         phase('encoder', ec, ew, prof, n)
         out['encoder_state_bytes'] = m4.u32('heap_used') - h0
+        out['encoder_blocks'] = m4.allocs(a0)[0]
         out['encoder_stack_bytes'] = m4.stack_used()
         if a.bits:
             open(a.bits, 'wb').write(eb)
@@ -321,9 +331,11 @@ def lr_run(m4, a, k16):
             bits = eb
     m4.paint_stack()
     h0 = m4.u32('heap_used')
+    a0 = m4.allocs()[1]
     dec, _ = m4.call(f'sotto_lr_dec{sfx}_create')
     assert dec, f'sotto_lr_dec{sfx}_create returned NULL (no decoder in this build, or heap too small)'
     out['decoder_state_bytes'] = m4.u32('heap_used') - h0
+    out['decoder_blocks'] = m4.allocs(a0)[0]
     if k16:
         delay = int.from_bytes(m4.mu.mem_read(m4.sym['bench_lr_dec16_delay'], 4), 'little')
         skip = ns // 2 * int.from_bytes(m4.mu.mem_read(m4.sym['bench_lr_dec16_delay'] + 4, 4), 'little')

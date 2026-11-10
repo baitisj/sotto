@@ -16,8 +16,12 @@ int fprintf(FILE *f, const char *fmt, ...) { (void)f; (void)fmt; return 0; }
 static unsigned char heap[512 * 1024] __attribute__((aligned(8)));
 size_t heap_used;
 void *memset(void *d, int c, size_t n) { unsigned char *p = d; while (n--) *p++ = (unsigned char)c; return d; }
+/* every allocation's size, in order (run.py lists each state's blocks, to plan where they go) */
+size_t alloc_log[64];
+size_t alloc_n;
 void *malloc(size_t n) {
   void *p;
+  if (alloc_n < 64) alloc_log[alloc_n++] = n;
   n = (n + 7) & ~(size_t)7;
   if (heap_used + n > sizeof heap) return 0;
   p = heap + heap_used;
