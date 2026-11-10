@@ -428,6 +428,9 @@ static uint32_t hs_refine(const spec_t *f, uint32_t p0, uint32_t span, uint32_t 
 
 /* bit length of x (0 for 0) */
 static int bitlen32(uint32_t x) {
+#if defined(FX_ARM_DSP) && defined(__GNUC__)
+  return x ? 32 - __builtin_clz(x) : 0;                   /* CLZ */
+#else
   int n = 0;
   if (x >> 16) n += 16, x >>= 16;
   if (x >> 8) n += 8, x >>= 8;
@@ -435,6 +438,7 @@ static int bitlen32(uint32_t x) {
   if (x >> 2) n += 2, x >>= 2;
   if (x >> 1) n += 1, x >>= 1;
   return n + (int)x;
+#endif
 }
 /* bit length of a 40-bit x >= 0 */
 static int bitlen40(fx_uacc x) {
