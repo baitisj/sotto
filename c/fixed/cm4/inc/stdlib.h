@@ -4,3 +4,4 @@ void *calloc(size_t n, size_t s);
 void *malloc(size_t n);
 void free(void *p);
 void abort(void);
+static inline int abs(int x) { return x < 0 ? -x : x; }

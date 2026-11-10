@@ -39,10 +39,9 @@
 #endif
 #define NCAND 10
 #define NST (NCAND + 1)
-#define RING 16
+#define RING (LAG + 2)        /* tracker frames: decide_from walks LAG + 1 back from the newest but one */
 #define TAIL_HOLD 30
 #define MIXED 2
-#define MBEST 8
 #define MAXH 80
 #define WO_MIN 26843546u      /* 2 pi / 160, Q32 turns */
 #define WO_HI 268435456u      /* 2 pi / 16 */
@@ -54,11 +53,11 @@
 
 #define HIST MPITCH           /* the analysis buffer */
 #define SRING (LAG + 2)       /* spectra kept: frame t is decided after frame t + LAG + 1 is analysed */
+#define NQW ((2 * NB + 15) / 16)   /* words of 2-bit codes, one a value of sw */
 
 typedef struct {
-  int16_t sw[2 * NB];         /* spectrum, re/im interleaved, 16 bits */
-  int16_t e;                  /* exponent: float spectrum = sw x 2^(e + fx_sw_l2 / 2^16) */
-  uint32_t p[NB];             /* power per bin, normalised to 31 bits, for the pitch searches */
+  const int16_t *sw;          /* spectrum, re/im interleaved, 16 bits */
+  const uint32_t *p;          /* power per bin, normalised to 31 bits, for the pitch searches */
 } spec_t;
 
 typedef struct {
@@ -74,12 +73,17 @@ typedef struct {
 
 struct sotto_enc {
   int16_t hist[HIST];         /* input; the last MPITCH samples are the analysis buffer */
-  spec_t spec[2];             /* spectra of the last two frames, for the tracker */
-  int32_t re[512], im[512];   /* FFT scratch */
-  int32_t sre[SRING][NB], sim[SRING][NB];   /* bins 0..256 of the last SRING frames, for decide() */
-  int16_t sexp[SRING];        /* their exponents (spectrum_fft's return value) */
+  int32_t *re, *im;           /* FFT scratch, 512 values each (sotto_enc_create_scratch) */
+  /* the last SRING frames' spectra: the 16-bit copy (the tracker's and decide()'s harmonic
+     fits) and, for decide()'s harmonic levels, the bins rounded to 16 bits as 2-bit codes
+     against it (spectrum_keep), so the 32-bit bins needn't be kept */
+  int16_t sw[SRING][2 * NB];
+  uint32_t swq[SRING][NQW];
+  int16_t sexp[SRING];        /* exponents (spectrum_fft's return value) */
+  int16_t st16[SRING], ss2[SRING];   /* the shifts of the harmonic levels' bins and of sw */
+  uint32_t pw2[2][NB];        /* bin powers of the last two frames, for the tracker */
   /* NLP */
-  int32_t sq[MPITCH], mem_x, mem_y, fir[48];
+  int32_t sq[MPITCH / 5], mem_x, mem_y, fir[48];   /* sq: the low-passed squares at every 5th sample, for the decimation */
   int16_t sh, blk[4];         /* NLP block floating point: values are true x 2^-sh */
   int16_t prev_bin;
   frame_t ring[RING];
@@ -89,11 +93,14 @@ struct sotto_enc {
   uint32_t wo_e;
   int32_t en_e;
   int16_t idx_e[5], cls_e;
+  int32_t c_e[NC];            /* its shape target, dB Q16 */
   fx_enc_frame_t cur;         /* the frame being built: per-half features for v3.8 */
   int32_t peak;               /* causal loudness reference, dB Q16 (hiss_band._onsets) */
   fx_enc_frame_t q[8];
+  fx_fparams_t qp[8];         /* the queued frames' fields before shape quantization (sotto 1200) */
   int16_t q_head, q_n, flushed;
-};
+  int16_t no_shape;           /* skip the shape search: its bits are 0 (sotto_enc_set_no_shape) */
+};                            /* followed by the scratch when the encoder has its own */
 
 #define R(e, t) (&(e)->ring[(t) % RING])
 
@@ -172,12 +179,6 @@ static int ceil_sh(fx_uacc x, int sh) { return (int)((x + ((fx_uacc)1 << sh) - 1
 
 /* ---------------------------------------------------------------- analysis */
 
-/* power of a bin rounded right by t bits */
-static fx_acc sq2(int32_t re, int32_t im, int t) {
-  int32_t a = t ? fx_rshr32(re, t) : re, b = t ? fx_rshr32(im, t) : im;
-  return fx_sq32(a) + fx_sq32(b);
-}
-
 /* Codec 2's windowed 512-point spectrum of the 320 samples at buf: bins 0..256 in e->re,
    e->im (int32, float spectrum = re x 2^(return value + fx_sw_l2 / 2^16)) */
 static int spectrum_fft(struct sotto_enc *e, const int16_t *buf) {
@@ -190,7 +191,7 @@ static int spectrum_fft(struct sotto_enc *e, const int16_t *buf) {
     uint32_t a = (uint32_t)(x[i] < 0 ? -x[i] : x[i]);
     if (a > mx) mx = a;
   }
-  memset(re, 0, sizeof e->re);
+  memset(re + 139, 0, (373 - 139) * sizeof(int32_t));     /* the rest of re[0..511] is written below */
   int s = 0;                                                  /* x * 2^-s, largest in [2^22, 2^23) */
   if (mx) {
     while ((mx >> s) >= ((uint32_t)1 << 23)) s++;
@@ -210,22 +211,47 @@ static int spectrum_fft(struct sotto_enc *e, const int16_t *buf) {
   return s;
 }
 
-/* the 16-bit copy of a spectrum (bins re, im with exponent s, as spectrum_fft leaves them) in *f */
-static void spectrum_bins(const int32_t *re, const int32_t *im, int s, spec_t *f) {
-  uint32_t m2 = fx_bins_max(re, im, NB);
-  int s2 = 0, t = 0, sp = 0;
+/* the bins rounded right by t16 bits, as decide() takes them for the harmonic levels, against
+   sw, the 16-bit copy rounded right by s2 = t16 or t16 + 1 (or shifted left, t16 = 0): v =
+   2 sw + d (s2 = t16 + 1), sw (s2 = t16) or sw >> -s2 (s2 < 0), with d in -1..1 stored as d + 1,
+   and 3 where sw wrapped to -32768 from 32768 (rounding up from 32767.5; then d is -1, or 0) */
+static inline int32_t sw_base(int32_t sw, int t16, int s2) { return s2 == t16 + 1 ? 2 * sw : s2 < 0 ? sw >> -s2 : sw; }
+static inline int32_t sw_level(int32_t sw, unsigned code, int t16, int s2) {
+  if (code == 3) return sw_base(sw + 65536, t16, s2) - (s2 == t16 + 1);
+  return sw_base(sw, t16, s2) + (int32_t)code - 1;
+}
+
+/* frame r's spectrum (bins re, im as spectrum_fft leaves them, exponent s) as the encoder keeps
+   it: the 16-bit copy in sw[r], the codes of the harmonic levels' bins (sw_level) in swq[r],
+   and the power per bin at 31 bits in *p, from the bins rounded to 19 bits (so a power is
+   < 2^39) */
+static void spectrum_keep(struct sotto_enc *e, const int32_t *re, const int32_t *im, int s, int r, uint32_t *p) {
+  uint32_t m2 = fx_bins_max(re, im, NB), *q = e->swq[r];
+  int16_t *sw = e->sw[r];
+  int s2 = 0, t = 0, sp = 0, t16 = 0, i;
   if (m2) {
     while ((m2 >> s2) > 32767) s2++;
     if (s2 == 0)
       while (s2 > -15 && (m2 << (1 - s2)) <= 32767) s2--;
   }
-  fx_bins_to16(re, im, f->sw, NB, s2);
-  f->e = (int16_t)(s + s2);
-  /* power per bin at 31 bits, from the bins rounded to 19 bits (so a power is < 2^39) */
+  fx_bins_to16(re, im, sw, NB, s2);
+  while ((m2 >> t16) >= ((uint32_t)1 << 16) - 1) t16++;    /* rounding may add one */
+  memset(q, 0, sizeof e->swq[0]);
+  for (i = 0; i < 2 * NB; i++) {
+    int32_t x = i & 1 ? im[i >> 1] : re[i >> 1], v = t16 ? fx_rshr32(x, t16) : x, d = v - sw_base(sw[i], t16, s2);
+    unsigned code = d >= -1 && d <= 1 ? (unsigned)(d + 1) : 3u;
+#ifdef FX_CHECK
+    if (sw_level(sw[i], code, t16, s2) != v) abort();
+#endif
+    q[i >> 4] |= code << (2 * (i & 15));
+  }
+  e->sexp[r] = (int16_t)s;
+  e->st16[r] = (int16_t)t16;
+  e->ss2[r] = (int16_t)s2;
   while ((m2 >> t) >= ((uint32_t)1 << 19) - 1) t++;        /* rounding may add one */
   fx_acc pm = fx_bins_pow_max(re, im, NB, t);
   while ((pm >> sp) >= ((fx_acc)1 << 31)) sp++;
-  fx_bins_pow(re, im, f->p, NB, t, sp, sp ? (uint32_t)1 << (sp - 1) : 0);
+  fx_bins_pow(re, im, p, NB, t, sp, sp ? (uint32_t)1 << (sp - 1) : 0);
 }
 
 /* Codec 2's NLP: the pitch bin (3.125 Hz steps) of the 10 ms just added to the input */
@@ -248,9 +274,14 @@ static void fx_nlp_dft(const int16_t *x, const int16_t *cos512, int32_t *rr, int
   for (k = k0; k < k1; k++) {
     fx_acc sum = 0, dif = 0;
     unsigned i = 0;
-    for (n = 0; n < 64; n++, i = (i + (unsigned)k) & 511u) {
-      sum = fx_smlald(xx[n], cs[i], sum);
-      dif = fx_smlsld(xx[n], cs[i], dif);
+    for (n = 0; n < 64; n += 4) {           /* four samples a pass, so the loop costs less */
+      uint32_t c0 = cs[i], c1 = cs[(i + (unsigned)k) & 511u], c2 = cs[(i + 2u * (unsigned)k) & 511u],
+               c3 = cs[(i + 3u * (unsigned)k) & 511u];
+      sum = fx_smlald(xx[n], c0, sum), dif = fx_smlsld(xx[n], c0, dif);
+      sum = fx_smlald(xx[n + 1], c1, sum), dif = fx_smlsld(xx[n + 1], c1, dif);
+      sum = fx_smlald(xx[n + 2], c2, sum), dif = fx_smlsld(xx[n + 2], c2, dif);
+      sum = fx_smlald(xx[n + 3], c3, sum), dif = fx_smlsld(xx[n + 3], c3, dif);
+      i = (i + 4u * (unsigned)k) & 511u;
     }
     rr[k] = fx_rshr((sum + dif) >> 1, 15), qq[k] = fx_rshr((sum - dif) >> 1, 15);
   }
@@ -307,14 +338,14 @@ static int nlp_bin(struct sotto_enc *e) {
       if (i >= NSAMP - 48) e->fir[i - (NSAMP - 48)] = y + one;   /* the last 48 inputs */
       zh[47 + i] = FX_HI(y + one), zl[47 + i] = FX_LO(y + one);
     }
-    for (i = 0; i < NSAMP; i++) {
+    for (i = 0; i < NSAMP; i += 5) {                          /* only the samples the decimation keeps */
       const int16_t *h = zh + i, *l = zl + i;
       fx_acc a = 0, al = 0;
       for (j = 0; j < 48; j++) a += (fx_acc)h[j] * fx_nlp_fir[j];
       for (j = 0; j < 48; j++) al += (fx_acc)l[j] * fx_nlp_fir[j];
       a = FX_JOIN(a, al);
       FX_ACC_CHECK(a);
-      e->sq[MPITCH - NSAMP + i] = fx_rshr(a, 15);
+      e->sq[(MPITCH - NSAMP + i) / 5] = fx_rshr(a, 15);
     }
   }
   FX_PROF(29, 0);
@@ -325,7 +356,7 @@ static int nlp_bin(struct sotto_enc *e) {
   int32_t xd[64];
   mx = 0;
   for (i = 0; i < 64; i++) {
-    int32_t v = shift(e->sq[5 * i], shx - e->blk[(5 * i) / NSAMP]);
+    int32_t v = shift(e->sq[i], shx - e->blk[(5 * i) / NSAMP]);
     xd[i] = fx_rshr(fx_mul32x16(v, fx_nlp_win[i]), 15);
     mx |= uabs(xd[i]);
   }
@@ -368,7 +399,7 @@ static int nlp_bin(struct sotto_enc *e) {
       cbin = lbin;
   }
   e->prev_bin = (int16_t)cbin;
-  memmove(e->sq, e->sq + NSAMP, (MPITCH - NSAMP) * sizeof(int32_t));
+  memmove(e->sq, e->sq + NSAMP / 5, (MPITCH - NSAMP) / 5 * sizeof(int32_t));
   memmove(e->blk, e->blk + 1, 3 * sizeof(int16_t));
   return cbin;
 }
@@ -396,6 +427,9 @@ static uint32_t hs_refine(const spec_t *f, uint32_t p0, uint32_t span, uint32_t 
 
 /* bit length of x (0 for 0) */
 static int bitlen32(uint32_t x) {
+#if defined(FX_ARM_DSP) && defined(__GNUC__)
+  return x ? 32 - __builtin_clz(x) : 0;                   /* CLZ */
+#else
   int n = 0;
   if (x >> 16) n += 16, x >>= 16;
   if (x >> 8) n += 8, x >>= 8;
@@ -403,6 +437,7 @@ static int bitlen32(uint32_t x) {
   if (x >> 2) n += 2, x >>= 2;
   if (x >> 1) n += 1, x >>= 1;
   return n + (int)x;
+#endif
 }
 /* bit length of a 40-bit x >= 0 */
 static int bitlen40(fx_uacc x) {
@@ -527,6 +562,12 @@ fx_acc fx_hsum(const uint32_t *p, uint32_t acc, uint32_t w, int m);
 #else
 static fx_acc fx_hsum(const uint32_t *p, uint32_t acc, uint32_t w, int m) {
   fx_acc E = 0;
+  for (; m >= 4; m -= 4, acc += 4 * w) {    /* four a pass */
+    E += p[(int)(acc >> 23)];
+    E += p[(int)((acc + w) >> 23)];
+    E += p[(int)((acc + 2 * w) >> 23)];
+    E += p[(int)((acc + 3 * w) >> 23)];
+  }
   for (; m > 0; m--, acc += w) E += p[(int)(acc >> 23)];
   return E;
 }
@@ -597,8 +638,9 @@ static int32_t odd_even_db(const spec_t *f, uint32_t wo) {
 static void frame_costs(struct sotto_enc *e, int32_t t, int has_next) {
   int i, j, c;
   frame_t *f = R(e, t);
-  const spec_t *sp = &e->spec[t & 1];
+  spec_t spt, *sp = &spt;
   static const int dd[3] = {0, -1, 1};
+  spt.sw = e->sw[t % SRING], spt.p = e->pw2[t & 1];
   f->nc = 0;
   for (i = 0; i < 3; i++) {
     int32_t u = t + dd[i];
@@ -686,23 +728,32 @@ static void put_bits(unsigned char *out, int *pos, int v, int nb) {
 #if defined(__TMS320C55X__) && !defined(FX_CB_DOTS_C)
 void fx_cb_dots(const int16_t *r, const int16_t *cb, int n, const int32_t *e2, int32_t *h);
 #elif defined(FX_ARM_DSP) && !defined(FX_CB_DOTS_C)
-/* Cortex-M4: SMLAD, two products a cycle, on value pairs (FX_CBW is even), two vectors at a
-   time so each pair of r is loaded once (n is even); the same 32-bit sums */
+/* Cortex-M4: SMLAD, two products a cycle, on value pairs (FX_CBW is even), four vectors at a
+   time so each pair of r is loaded once for four (n is a multiple of 8), the pair loop written
+   out; the same 32-bit sums */
+typedef char fx_cbw_is_twenty[FX_CBW == 20 ? 1 : -1];
 static void fx_cb_dots(const int16_t *r, const int16_t *cb, int n, const int32_t *e2, int32_t *h) {
-  uint32_t rp[FX_CBW / 2], y0, y1, x;
-  int v, k;
+  uint32_t rp[FX_CBW / 2];
+  int v;
   memcpy(rp, r, sizeof rp);
-  for (v = 0; v < n; v += 2, cb += 2 * FX_CBW) {
-    int32_t a0 = 0, a1 = 0;
-    for (k = 0; k < FX_CBW / 2; k++) {
-      x = rp[k];
-      memcpy(&y0, cb + 2 * k, 4);
-      memcpy(&y1, cb + FX_CBW + 2 * k, 4);
-      a0 = fx_smlad(x, y0, a0);
-      a1 = fx_smlad(x, y1, a1);
-    }
+  for (v = 0; v < n; v += 4, cb += 4 * FX_CBW) {
+    int32_t a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+#define CB_PAIR(k) do { \
+      uint32_t x_ = rp[k], y0_, y1_, y2_, y3_; \
+      memcpy(&y0_, cb + 2 * (k), 4), memcpy(&y1_, cb + FX_CBW + 2 * (k), 4); \
+      memcpy(&y2_, cb + 2 * FX_CBW + 2 * (k), 4), memcpy(&y3_, cb + 3 * FX_CBW + 2 * (k), 4); \
+      a0 = fx_smlad(x_, y0_, a0); \
+      a1 = fx_smlad(x_, y1_, a1); \
+      a2 = fx_smlad(x_, y2_, a2); \
+      a3 = fx_smlad(x_, y3_, a3); \
+    } while (0)
+    CB_PAIR(0); CB_PAIR(1); CB_PAIR(2); CB_PAIR(3); CB_PAIR(4);
+    CB_PAIR(5); CB_PAIR(6); CB_PAIR(7); CB_PAIR(8); CB_PAIR(9);
+#undef CB_PAIR
     h[v] = e2[v] * 32 - a0;
     h[v + 1] = e2[v + 1] * 32 - a1;
+    h[v + 2] = e2[v + 2] * 32 - a2;
+    h[v + 3] = e2[v + 3] * 32 - a3;
   }
 }
 #else
@@ -723,108 +774,140 @@ static int32_t h_limit(fx_acc worst, fx_acc rr) {
   return t > INT32_MAX ? INT32_MAX : t < INT32_MIN ? INT32_MIN : (int32_t)t;
 }
 
-/* M-best multistage search; c in dB Q16; hv: scratch for 512 values */
-static void msvq_search(const int32_t *c, int16_t *idx, int32_t *hv) {
-  int s, p, k, v, i;
+/* One stage of the M-best search: stage s's vectors against residual r (codebook steps Q6,
+   NC values and the 0 pad, |r|^2 = rr) as path p, into the list kd / kp / kc of *pnk <= mb
+   entries (distances in increasing order, first of equals first). hv: scratch for 512 values */
+static void cb_stage(int s, const int16_t *r, fx_acc rr, int p, int mb, fx_acc *kd, int *kp, int *kc, int *pnk,
+                     int32_t *hv) {
+  int n = 1 << fx_cb_bits[s], nk = *pnk, k, v;
+  const int16_t *cb = fx_cb[s];
+  const int32_t *e2 = fx_cb_e2[s];
+  int32_t hthr;
+  (void)hv;
+  FX_ACC_CHECK(rr);
+  /* d = sum (r - 64 y)^2 = rr - 128 r.y + 4096 |y|^2 = rr + 128 h, h = 32 |y|^2 - r.y,
+     exactly. The inner loop is one 16 x 16 multiply-accumulate per value, and h fits in
+     32 bits (r.y < 2^27, 32 |y|^2 < 2^24), so most vectors are rejected with a 32-bit
+     compare against hthr, the largest h that could still enter the list */
+  hthr = nk < mb ? INT32_MAX : h_limit(kd[nk - 1], rr);
+  /* list insertion for vector v with h = 32 |y|^2 - r.y, in increasing v */
+#define CB_CONSIDER(vv, hh) do { \
+    int32_t h_ = (hh); \
+    if (h_ <= hthr) { \
+      fx_acc d = rr + (fx_acc)h_ * 128;                   /* < 2^36 */ \
+      FX_ACC_CHECK(d); \
+      if (nk < mb || d < kd[nk - 1]) { \
+        int i = nk < mb ? nk++ : mb - 1; \
+        while (i > 0 && kd[i - 1] > d) kd[i] = kd[i - 1], kp[i] = kp[i - 1], kc[i] = kc[i - 1], i--; \
+        kd[i] = d, kp[i] = p, kc[i] = (vv); \
+        if (nk == mb) hthr = h_limit(kd[nk - 1], rr); \
+      } \
+    } \
+  } while (0)
+#ifdef FX_CB_UNPACKED
+  /* every vector's h first (on the C55x an assembly loop with one dual multiply-
+     accumulate per value pair), then the list in increasing v, as before */
+  FX_PROF(28, 1);
+  fx_cb_dots(r, cb, n, e2, hv);
+  FX_PROF(28, 0);
+  {   /* the smallest h of each run of 8: a run whose smallest h is above hthr has nothing
+         to add, and hthr only falls, so whole runs are skipped (most of them, once the
+         list is full) and the rest go through in order, as before */
+    int32_t bm[512 / 8];
+    int b;
+    FX_PROF(36, 1);
+    for (b = 0; b < n / 8; b++) {
+      const int32_t *hb = hv + 8 * b;
+      int32_t m = hb[0];
+      for (k = 1; k < 8; k++) m = hb[k] < m ? hb[k] : m;
+      bm[b] = m;
+    }
+    FX_PROF(36, 0);
+    FX_PROF(37, 1);
+    for (b = 0; b < n / 8; b++)
+      if (bm[b] <= hthr)
+        for (v = 8 * b; v < 8 * b + 8; v++) CB_CONSIDER(v, hv[v]);
+    FX_PROF(37, 0);
+  }
+#else
+  for (v = 0; v < n; v++) {
+    const int16_t *y = cb + v * FX_CBW;
+    /* 256 x each value, as a 16-bit word, without unpacking: the high byte with the
+       low one cleared, the low byte shifted up (two operations a word, not five) */
+    fx_acc a = 0;
+    for (k = 0; k < FX_CBW; k++)
+      a += (fx_acc)r[2 * k] * (int16_t)(y[k] & -256) + (fx_acc)r[2 * k + 1] * (int16_t)((uint16_t)y[k] << 8);
+    CB_CONSIDER(v, e2[v] * 32 - (int32_t)(a >> 8));      /* exact: a is a multiple of 256 */
+  }
+#endif
+#undef CB_CONSIDER
+  *pnk = nk;
+}
+
+int fx_cb_best(int s, const int16_t *r, fx_acc rr, int32_t *hv) {
+  fx_acc kd[1];
+  int kp[1], kc[1], nk = 0;
+  cb_stage(s, r, rr, 0, 1, kd, kp, kc, &nk, hv);
+  return kc[0];
+}
+
+int fx_msvq_paths(const int32_t *c, int nst, int16_t path[FX_MBEST][FX_MAXST], int32_t recon[FX_MBEST][FX_NC],
+                  int32_t *hv) {
+  int s, p, k, i;
   int np = 1;
-  int16_t path[MBEST][5];
-  int32_t recon[MBEST][NC];                                  /* dB Q16 */
-  memset(recon, 0, sizeof recon);
-  memset(path, 0, sizeof path);
-  for (s = 0; s < fx_cb_stages; s++) {
-    int n = 1 << fx_cb_bits[s], nk = 0;
+  memset(recon, 0, sizeof(int32_t) * FX_MBEST * FX_NC);
+  memset(path, 0, sizeof(int16_t) * FX_MBEST * FX_MAXST);
+  for (s = 0; s < nst; s++) {
     const int16_t *cb = fx_cb[s];
-    const int32_t *e2 = fx_cb_e2[s];
-    fx_acc kd[MBEST];
-    int kp[MBEST], kc[MBEST];
+    int nk = 0;
+    fx_acc kd[FX_MBEST];
+    int kp[FX_MBEST], kc[FX_MBEST];
     for (p = 0; p < np; p++) {
       int16_t r[NC + 1];                                     /* residual in codebook steps, Q6 */
       fx_acc rr = fx_cb_resid(c, recon[p], r, NC, fx_cb_istep[s]);
-      int32_t hthr;
       r[NC] = 0;                                             /* the padding value */
-      FX_ACC_CHECK(rr);
-      /* d = sum (r - 64 y)^2 = rr - 128 r.y + 4096 |y|^2 = rr + 128 h, h = 32 |y|^2 - r.y,
-         exactly. The inner loop is one 16 x 16 multiply-accumulate per value, and h fits in
-         32 bits (r.y < 2^27, 32 |y|^2 < 2^24), so most vectors are rejected with a 32-bit
-         compare against hthr, the largest h that could still enter the list */
-      hthr = nk < MBEST ? INT32_MAX : h_limit(kd[nk - 1], rr);
-      /* list insertion for vector v with h = 32 |y|^2 - r.y, in increasing v */
-#define CB_CONSIDER(vv, hh) do { \
-        int32_t h_ = (hh); \
-        if (h_ <= hthr) { \
-          fx_acc d = rr + (fx_acc)h_ * 128;                   /* < 2^36 */ \
-          FX_ACC_CHECK(d); \
-          if (nk < MBEST || d < kd[nk - 1]) { \
-            int i = nk < MBEST ? nk++ : MBEST - 1; \
-            while (i > 0 && kd[i - 1] > d) kd[i] = kd[i - 1], kp[i] = kp[i - 1], kc[i] = kc[i - 1], i--; \
-            kd[i] = d, kp[i] = p, kc[i] = (vv); \
-            if (nk == MBEST) hthr = h_limit(kd[nk - 1], rr); \
-          } \
-        } \
-      } while (0)
-#ifdef FX_CB_UNPACKED
-      /* every vector's h first (on the C55x an assembly loop with one dual multiply-
-         accumulate per value pair), then the list in increasing v, as before */
-      FX_PROF(28, 1);
-      fx_cb_dots(r, cb, n, e2, hv);
-      FX_PROF(28, 0);
-      {   /* the smallest h of each run of 8: a run whose smallest h is above hthr has nothing
-             to add, and hthr only falls, so whole runs are skipped (most of them, once the
-             list is full) and the rest go through in order, as before */
-        int32_t bm[512 / 8];
-        int b;
-        FX_PROF(36, 1);
-        for (b = 0; b < n / 8; b++) {
-          const int32_t *hb = hv + 8 * b;
-          int32_t m = hb[0];
-          for (k = 1; k < 8; k++) m = hb[k] < m ? hb[k] : m;
-          bm[b] = m;
-        }
-        FX_PROF(36, 0);
-        FX_PROF(37, 1);
-        for (b = 0; b < n / 8; b++)
-          if (bm[b] <= hthr)
-            for (v = 8 * b; v < 8 * b + 8; v++) CB_CONSIDER(v, hv[v]);
-        FX_PROF(37, 0);
-      }
-#else
-      for (v = 0; v < n; v++) {
-        const int16_t *y = cb + v * FX_CBW;
-        /* 256 x each value, as a 16-bit word, without unpacking: the high byte with the
-           low one cleared, the low byte shifted up (two operations a word, not five) */
-        fx_acc a = 0;
-        for (k = 0; k < FX_CBW; k++)
-          a += (fx_acc)r[2 * k] * (int16_t)(y[k] & -256) + (fx_acc)r[2 * k + 1] * (int16_t)((uint16_t)y[k] << 8);
-        CB_CONSIDER(v, e2[v] * 32 - (int32_t)(a >> 8));      /* exact: a is a multiple of 256 */
-      }
-#endif
-#undef CB_CONSIDER
+      cb_stage(s, r, rr, p, FX_MBEST, kd, kp, kc, &nk, hv);
     }
-    int16_t npath[MBEST][5];
-    int32_t nrec[MBEST][NC];
+    int16_t npath[FX_MBEST][FX_MAXST];
+    int32_t nrec[FX_MBEST][NC];
     /* step = sh 2^15 + sl, so a value times the step is two 16 x 16 products (the C55x
        compiler's 16 x 32 multiply is a library call) */
     int16_t sh = (int16_t)(fx_cb_step[s] >> 15), sl = (int16_t)(fx_cb_step[s] & 0x7FFF);
     for (i = 0; i < nk; i++) {
-      memcpy(npath[i], path[kp[i]], sizeof path[0]);
+      memcpy(npath[i], path[kp[i]], sizeof npath[0]);
       npath[i][s] = (int16_t)kc[i];
       for (k = 0; k < NC; k++) {
         int16_t v = (int16_t)FX_CB_VAL(cb + kc[i] * FX_CBW, k);
         nrec[i][k] = recon[kp[i]][k] + (int32_t)(((fx_acc)v * sh) * 32768 + (fx_acc)v * sl);
       }
     }
-    memcpy(path, npath, sizeof path);
-    memcpy(recon, nrec, sizeof recon);
+    memcpy(path, npath, sizeof npath);
+    memcpy(recon, nrec, sizeof nrec);
     np = nk;
   }
-  int best = 0;
+  return np;
+}
+
+fx_acc fx_shape_err(const int32_t *c, const int32_t *rec) {
+  int k;
+  fx_acc d = 0;
+  for (k = 0; k < NC; k++) {
+    int32_t q = fx_rshr(c[k] - rec[k], 8);
+    d += (fx_acc)q * q;
+  }
+  FX_ACC_CHECK(d);
+  return d;
+}
+
+/* M-best multistage search over every stage; c in dB Q16; hv: scratch for 512 values */
+static void msvq_search(const int32_t *c, int16_t *idx, int32_t *hv) {
+  int p, best = 0;
+  int16_t path[FX_MBEST][FX_MAXST];
+  int32_t recon[FX_MBEST][NC];                               /* dB Q16 */
   fx_acc bd = 0;
+  int np = fx_msvq_paths(c, fx_cb_stages, path, recon, hv);
   for (p = 0; p < np; p++) {
-    fx_acc d = 0;
-    for (k = 0; k < NC; k++) {
-      int32_t q = fx_rshr(c[k] - recon[p][k], 8);
-      d += (fx_acc)q * q;
-    }
+    fx_acc d = fx_shape_err(c, recon[p]);
     if (p == 0 || d < bd) bd = d, best = p;
   }
   memcpy(idx, path[best], fx_cb_stages * sizeof(int16_t));
@@ -846,7 +929,7 @@ static int32_t power_db(int ex, fx_acc p, int xb) {
   return fx_log2_to_db_pow(fx_log2_acc((fx_uacc)p) + 2 * ((int32_t)ex * 65536 + fx_sw_l2) + (int32_t)xb * 65536);
 }
 
-static void emit(struct sotto_enc *e, int cls);
+static void emit(struct sotto_enc *e, int cls, uint32_t wo_o);
 
 static void decide(struct sotto_enc *e, int32_t t, int k) {
   int h, i, l, j;
@@ -854,21 +937,17 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
   frame_t *f = R(e, t);
   uint32_t wo = k ? f->cand[k - 1] : f->wo0;
   int L = n_harm(wo);
-  /* frame t's spectrum, kept from its analysis: the 32-bit bins for the harmonic levels,
-     and the 16-bit copy for the harmonic fits */
+  /* frame t's spectrum, kept from its analysis: the 16-bit copy for the harmonic fits, and
+     the bins rounded to 16 bits (by t16) for the harmonic levels, rebuilt from it */
   spec_t spx, *sp = &spx;
-  const int32_t *re = e->sre[t % SRING], *im = e->sim[t % SRING];
-  int ex = e->sexp[t % SRING];
+  int r = (int)(t % SRING), ex = e->sexp[r], t16 = e->st16[r], s2 = e->ss2[r];
+  int32_t v16[2 * NB];
+  spx.sw = e->sw[r], spx.p = NULL;
   FX_PROF(7, 1);
-  spectrum_bins(re, im, ex, sp);
+  for (i = 0; i < 2 * NB; i++) v16[i] = sw_level(spx.sw[i], (e->swq[r][i >> 4] >> (2 * (i & 15))) & 3u, t16, s2);
   FX_PROF(7, 0);
   /* band powers from the bins rounded to 16 bits: a bin's power is < 2^33, a band (at most
      33 bins) < 2^39, and the total is summed at 1/8 */
-  int t16 = 0;
-  {
-    uint32_t m = fx_bins_max(re, im, NB);
-    while ((m >> t16) >= ((uint32_t)1 << 16) - 1) t16++;  /* rounding may add one */
-  }
   fx_acc A2[MAXH + 1], tot = 0;
   fx_uacc edge = (fx_uacc)wo + ((fx_uacc)1 << 23);          /* (2h - 1) wo + 1/2 bin */
   for (h = 1; h <= L; h++, edge += 2 * (fx_uacc)wo) {
@@ -876,7 +955,7 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
     fx_acc p = 0;
     for (i = am; i < bm; i++) {
       int b = i > 256 ? 512 - i : i;
-      p += sq2(re[b], im[b], t16);
+      p += fx_sq32(v16[2 * b]) + fx_sq32(v16[2 * b + 1]);
     }
     FX_ACC_CHECK(p);
     A2[h] = p;
@@ -947,8 +1026,9 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
       FX_ACC_CHECK(v);
       c[j - 1] = fx_rshr(v / 20, 7);                         /* Q8 x Q15 x 20 -> dB Q16 */
     }
+    memcpy(e->c_e, c, sizeof e->c_e);
     FX_PROF(6, 1);
-    msvq_search(c, e->idx_e, e->re);                     /* e->re is free here */
+    if (!e->no_shape) msvq_search(c, e->idx_e, e->re);   /* e->re is free here */
     FX_PROF(6, 0);
     e->wo_e = wo;
     /* v3.6: energy of the envelope at the harmonics */
@@ -957,18 +1037,28 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
     e->en_e = fx_db_power_sum(lv, L);
     e->cls_e = (int16_t)cls;
   } else {
-    emit(e, cls);
+    emit(e, cls, wo);
   }
 }
 
-static void emit(struct sotto_enc *e, int cls) {
+static int wo_index(uint32_t wo) {
+  int wi = 0;
+  while (wi < 127 && fx_wo_thr[wi] <= wo) wi++;
+  return wi;
+}
+
+/* pack the frame: the even half's parameters and both halves' voicing classes. The low-rate
+   modes' pitch (qp's wi) at an onset edge (unvoiced, then voiced half) is the voiced half's
+   (wo_o), as the float core's (../sotto.c emit) */
+static void emit(struct sotto_enc *e, int cls, uint32_t wo_o) {
   int s;
   int a = e->cls_e, b = cls, code = a == b ? a : (a == 0 || b == 0) ? 3 : 1;
-  fx_enc_frame_t *q = &e->q[(e->q_head + e->q_n++) % 8];
+  int qi = (e->q_head + e->q_n++) % 8;
+  fx_enc_frame_t *q = &e->q[qi];
+  fx_fparams_t *qp = &e->qp[qi];
   unsigned char *out = q->bits;
   *q = e->cur;
-  int pos = 0, wi = 0, ei;
-  while (wi < 127 && fx_wo_thr[wi] <= e->wo_e) wi++;
+  int pos = 0, wi = wo_index(e->wo_e), ei;
   int32_t num = (e->en_e - DB(10)) * 31;                     /* rint((en - 10) / 70 x 31) */
   ei = num <= 0 ? 0 : (int)((num + 8960) / 17920);
   if (ei > 31) ei = 31;
@@ -976,7 +1066,11 @@ static void emit(struct sotto_enc *e, int cls) {
   put_bits(out, &pos, code, 2);
   put_bits(out, &pos, wi, 7);
   put_bits(out, &pos, ei, 5);
-  for (s = 0; s < fx_cb_stages; s++) put_bits(out, &pos, e->idx_e[s], fx_cb_bits[s]);
+  for (s = 0; s < fx_cb_stages; s++) put_bits(out, &pos, e->no_shape ? 0 : e->idx_e[s], fx_cb_bits[s]);
+  qp->code = (int16_t)code;
+  qp->wi = (int16_t)(a == 0 && b != 0 ? wo_index(wo_o) : wi);
+  qp->ei = (int16_t)ei;
+  memcpy(qp->c, e->c_e, sizeof qp->c);
 }
 
 static void decide_from(struct sotto_enc *e, int32_t t, int32_t last) {
@@ -992,18 +1086,23 @@ static void decide_from(struct sotto_enc *e, int32_t t, int32_t last) {
 
 /* ---------------------------------------------------------------- API */
 
-struct sotto_enc *sotto_enc_create(void) {
+struct sotto_enc *sotto_enc_create_scratch(int32_t *scratch) {
   int i;
-  struct sotto_enc *e = calloc(1, sizeof *e);
+  struct sotto_enc *e = calloc(1, sizeof *e + (scratch ? 0 : FX_ENC_SCRATCH * sizeof(int32_t)));
   if (!e) return NULL;
+  e->re = scratch ? scratch : (int32_t *)(void *)(e + 1);
+  e->im = e->re + 512;
   for (i = 0; i < HIST; i++) e->hist[i] = 1;
   e->prev_bin = 16;                                          /* 50 Hz */
   e->peak = INT32_MIN / 2;
   return e;
 }
 
+struct sotto_enc *sotto_enc_create(void) { return sotto_enc_create_scratch(NULL); }
+
 void sotto_enc_destroy(struct sotto_enc *e) { free(e); }
-unsigned sotto_fx_enc_bytes(void) { return (unsigned)sizeof(struct sotto_enc); }
+unsigned sotto_fx_enc_bytes(void) { return (unsigned)(sizeof(struct sotto_enc) + FX_ENC_SCRATCH * sizeof(int32_t)); }
+unsigned sotto_fx_enc_shared_bytes(void) { return (unsigned)sizeof(struct sotto_enc); }
 
 static void analyse_10ms(struct sotto_enc *e, const short *x) {
   int i;
@@ -1011,17 +1110,15 @@ static void analyse_10ms(struct sotto_enc *e, const short *x) {
   for (i = 0; i < NSAMP; i++) e->hist[HIST - NSAMP + i] = x[i];
   int32_t a = e->n_an++;
   frame_t *f = R(e, a);
-  spec_t *sp = &e->spec[a & 1];
+  spec_t spa, *sp = &spa;
   FX_PROF(0, 1);
   int bin = nlp_bin(e);
   FX_PROF(0, 0);
   FX_PROF(1, 1);
   {
     int s = spectrum_fft(e, e->hist + HIST - MPITCH), r = (int)(a % SRING);
-    memcpy(e->sre[r], e->re, NB * sizeof(int32_t));          /* kept for decide() */
-    memcpy(e->sim[r], e->im, NB * sizeof(int32_t));
-    e->sexp[r] = (int16_t)s;
-    spectrum_bins(e->re, e->im, s, sp);
+    spectrum_keep(e, e->re, e->im, s, r, e->pw2[a & 1]);
+    spa.sw = e->sw[r], spa.p = e->pw2[a & 1];
   }
   FX_PROF(1, 0);
   /* Codec 2: Wo = 2 pi / pitch, pitch = 2560 / bin samples; two-stage refinement */
@@ -1048,13 +1145,18 @@ static void analyse_10ms(struct sotto_enc *e, const short *x) {
   }
 }
 
-int sotto_enc_pop_frame(struct sotto_enc *e, fx_enc_frame_t *f) {
+int sotto_enc_pop_frame_p(struct sotto_enc *e, fx_enc_frame_t *f, fx_fparams_t *p) {
   if (!e->q_n) return 0;
-  *f = e->q[e->q_head];
+  if (f) *f = e->q[e->q_head];
+  if (p) *p = e->qp[e->q_head];
   e->q_head = (int16_t)((e->q_head + 1) % 8);
   e->q_n--;
   return 1;
 }
+
+int sotto_enc_pop_frame(struct sotto_enc *e, fx_enc_frame_t *f) { return sotto_enc_pop_frame_p(e, f, NULL); }
+
+void sotto_enc_set_no_shape(struct sotto_enc *e, int on) { e->no_shape = (int16_t)(on != 0); }
 
 static int pop(struct sotto_enc *e, unsigned char *out) {
   fx_enc_frame_t f;
@@ -1082,7 +1184,7 @@ void sotto_enc_flush_core(struct sotto_enc *e) {
     frame_costs(e, n - 1, 0);
     viterbi_step(e, n - 1);
     while (e->n_dec < n) decide_from(e, e->n_dec++, n - 1);
-    if (n % 2) emit(e, e->cls_e);                            /* odd frame count: the last half repeated */
+    if (n % 2) emit(e, e->cls_e, e->wo_e);                    /* odd frame count: the last half repeated */
     e->flushed = 1;
   }
 }

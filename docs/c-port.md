@@ -169,7 +169,7 @@ Python does); a 1 dB histogram would replace it on the DSP, changing a vowel-fra
 decision only when a level sits within the bin.
 
 **sotto 1200 hiss.** *2026-11-06.* The same layer runs under sotto 1200 at 48 bits per
-40 ms (`sotto_lr_enc16` / `sotto_lr_dec16` in `c/sotto_hiss.c`, float only for now): 14 of
+40 ms (`sotto_lr_enc16` / `sotto_lr_dec16` in `c/sotto_hiss.c`; fixed point since 2026-11-10): 14 of
 the 16 test voices bit-exact with `sim/sotto_lr_hiss.py`, the other two one superframe off.
 Details, delay and check in `docs/sotto-1200-hiss.md` ("C port").
 
@@ -301,6 +301,51 @@ API as the float layer, `make fixed` with the default `VARIANT=v3.8`; `-16` on t
   12,000 frames = 120 s, as the Python keeps everything; 3,000 frames would do on the DSP
   and saves 36 KB). All ring sizes are checked at run time under `FX_CHECK`.
 - Measured on the C55x simulator: see "v3.8 on the C55x" below.
+
+**sotto 1200 encoder: done** (`c/fixed/sotto_fx_lr_enc.c`, the same `sotto_lr_enc_*` API as
+`c/sotto_lr.c`; `sotto_enc_fx -1200`). *2026-11-10.* For radios that transmit sotto 1200, such
+as the MD-UV380 (the K6 only receives).
+
+- The v3.7 fixed-point core hands over each 20 ms frame's fields with its shape target
+  (`sotto_enc_pop_frame_p`, the float core's `sotto_enc_frame_t.p`, including the onset edge's
+  pitch) and skips its own 4-stage shape search (`sotto_enc_set_no_shape`), which sotto 1200
+  doesn't use. The 2400 bit/s encoder's bits are unchanged.
+- The coder follows `c/sotto_lr.c` step by step. A's M-best paths over stages 1-2 come from the
+  core's own search, refactored so both use it (`fx_msvq_paths`, the same 16 x 16-bit
+  multiply-adds and SMLAD on the M4); each A frame's paths are kept, since its first pass and
+  its joint search both need them. B's stage-3 codeword is the same search with one survivor,
+  on the residual in steps of 1.5 x the stage's step. The joint choice adds shape errors in
+  dB Q8 squared (at most 2^38.6, inside 40 bits) with the float's frame weights 1 and 0.1 as
+  10 and 1. No division in the coder.
+- Fed the float core's frame fields, the coder gives the float coder's superframes bit for bit
+  (checked on one clip with a test harness). Over the 16 voices (`tools/check_fx.py --lr`,
+  `docs/results/fx_lr_enc_check.json`), the fixed encoder against the float one:
+
+  | | Float encoder | Fixed encoder |
+  |---|---:|---:|
+  | Superframes whose 48 bits match the float encoder's (of 4,487) | | 95.1% |
+  | PESQ, float decoder, clean | 2.596 | 2.586 |
+  | PESQ, float decoder, one superframe in 8 lost | 2.178 | 2.166 |
+  | PESQ, fixed decoder on the fixed bits, clean / one in 8 lost | | 2.587 / 2.167 |
+
+  Per clip the match is 88-98% and the PESQ difference -0.14 to +0.06 (EARS p095 the worst:
+  7 superframes differ). Every differing superframe comes from a frame where the fixed core's
+  fields differ from the float core's (its shape targets differ by 0.004 dB median, and the
+  core's own near-ties, as in the 2400 bit/s check above).
+- `sotto_enc_fx_arm -1200` (`FX_ARM_DSP`) and `sotto_enc_fx_m0 -1200` give the same bits
+  (`tests/test_fx_lr.py`). Stress signals run clean under AddressSanitizer,
+  UndefinedBehaviorSanitizer and `FX_CHECK`.
+- State on x86: 37.5 KB with the core (35.2 KB; the core grew 0.75 KB for the frame fields it
+  now queues), of which the coder is 2.3 KB (1.4 KB the two kept path searches). 2 KB of
+  stack scratch per search. No new tables.
+
+**sotto 1200 hiss (16 kHz) encoder and decoder: done** (`sotto_lr_enc16` / `sotto_lr_dec16` in
+`c/fixed/sotto_fx_hiss.c`; `sotto_enc_fx -16 -1200`, `sotto_dec_fx -16 -1200`). *2026-11-10.*
+The fixed v3.8 front end feeds the fixed sotto 1200 coder, and the full v3.8 decoder layer
+hooks into the fixed sotto 1200 decoder, as in the float port. On five 16 kHz clips 93.9% of
+superframes match the float encoder's and PESQ-WB through the float decoder is 1.664 against
+1.666; details, the PESQ-NB spread and state sizes in `docs/sotto-1200-hiss.md` ("Fixed
+point"). The 2400 bit/s v3.8 bits and samples are unchanged.
 
 ## Fixed point on the C55x: measured
 
@@ -680,6 +725,186 @@ MD-UV380, or any STM32F4 board, would settle the numbers. The software side of t
 the OpenRTX change: swap `codec2_encode`/`codec2_decode` in `audio_codec.c` for
 `sotto_encode`/`sotto_decode`, send 2400 bps in M17's 3200 bps voice payload (800 bps left
 for extra protection), and mark the stream as non-Codec-2 in the LSF type field.
+
+## sotto 1200 at 16 kHz on the Cortex-M4 (UV-380)
+
+*2026-11-10, after the fixed-point sotto 1200 encoders.* Can a TYT MD-UV380 send and receive
+sotto 1200 in real time: at 8 kHz, which is what its audio path runs today, and as sotto 1200
+hiss at 16 kHz? Same method as the two sections above: the fixed-point C built bare metal for
+the M4, run one 40 ms call at a time in the emulator and costed with the M4's timings. No
+radio was used.
+
+**The radio.** The MD-UV380/390 runs an STM32F405VGT6: a Cortex-M4F at 168 MHz with 1 MB of
+flash, 128 KB of SRAM and 64 KB of core-coupled RAM (CCM), plus a 16 MB SPI flash for
+settings and data. Sources:
+
+- MCU: the MD-380 schematic notes list U301 STM32F405VGT6 and U302 W25Q128FVSIG
+  (github.com/W8BSD/md380); a teardown comparison finds the same STM32F405VG in the MD-UV380
+  (hvdnnotebook.blogspot.com/2018/05/teardown-comparison-tyt-md-uv380.html); OpenRTX builds its
+  `mduv3x0` target from its STM32F405 sources with `STM32F405xx` defined (`meson.build`).
+- Clock and flash: OpenRTX's `SystemInit`
+  (`platform/mcu/CMSIS/Device/ST/STM32F4xx/Source/system_stm32f4xx.c`) sets 168 MHz and
+  `FLASH->ACR = FLASH_ACR_ICEN | FLASH_ACR_DCEN | FLASH_ACR_LATENCY_5WS`: five wait states with
+  the ART caches on, but not the prefetch buffer (`PRFTEN`).
+- Memory (`platform/mcu/STM32F4xx/linker_script_MDx.ld`): firmware flash from 0x0800C000,
+  848 KB (1 MB less the bootloader's 48 KB and 128 KB of settings); `.data` and `.bss` in the
+  64 KB CCM; the heap and every thread stack in the 128 KB SRAM, which also holds the 40 KB
+  frame buffer (160 x 128, RGB565). The codec thread's stack is 16 KB
+  (`CODEC2_THREAD_STKSIZE`, from the heap). The SPI flash is a W25Q of 16 MB (`nvmem_MDx.c`).
+- Compiler (`cross_cm4.txt`): GCC (arm-miosix-eabi) with `-mcpu=cortex-m4 -mthumb
+  -mfloat-abi=hard -mfpu=fpv4-sp-d16 -Os -ffunction-sections -fdata-sections`.
+
+All OpenRTX paths are at OpenRTX/OpenRTX commit 20b4088 (2026-11-07).
+
+**What the bench does now.** `LR=1` builds sotto 1200 and links `lr.elf` with nothing else in
+it; `LR16=full` builds v3.8 with sotto 1200 hiss as well and also links `lr16.elf` (`LR16=k6`
+uses the K6's light hiss decoder instead). `run.py --lr` and `--lr16` feed 320 or 640 samples
+a call, time encoder and decoder apart, and write bits and samples as `sotto_enc_fx` and
+`sotto_dec_fx` (`-1200`, `-16 -1200`) do. `FPU=1` builds with the radio's float ABI, and
+`CM4_CC=arm-none-eabi-gcc` with GCC (13.2.1, Ubuntu's `gcc-arm-none-eabi`) instead of clang.
+`--no-prefetch` runs the flash model with the prefetch off, as OpenRTX leaves it.
+`tools/cm4_lr_check.sh` runs all of it against the x86 tools; CI runs it at -O2 and -Os.
+Clips: the 14 s and 15 s LibriSpeech voices of `docs/samples` (198 and 3436), at 8 kHz
+(`docs/samples/*_original.flac`) and 16 kHz (`docs/samples/v38/*_original16.flac`).
+
+Every run's bits and samples equal the x86 build's, for both compilers at -O2 and -Os. The
+code is integer only: with clang, the hard-float build's image is byte for byte the soft-float
+one; GCC uses the FPU for one 8-byte constant copy in `sotto_enc_create_scratch`, which the
+emulator runs as it is. MHz for real time is cycles per 40 ms call x 25. "With flash" adds the
+flash model's wait states to each call before taking the worst.
+
+| sotto 1200, 8 kHz, MHz | Encoder mean / worst | Encoder worst with flash | Decoder mean / worst | Decoder worst with flash |
+|---|---:|---:|---:|---:|
+| GCC -O2, hard float (OpenRTX's compiler and ABI) | 58.2-59.0 / 65.1-65.9 | **68.9-69.7** | 14.5-14.9 / 21.8 | 22.4 |
+| GCC -O2, prefetch off | | 69.6-70.3 | | 22.5 |
+| GCC -Os, hard float | 69.6-70.6 / 78.0-78.8 | 82.0-82.8 | 18.9-19.3 / 27.4 | 28.0 |
+| clang -O2 | 58.8-59.4 / 66.2-67.2 | 71.7-72.6 | 15.0-15.4 / 22.8 | 23.7 |
+| clang -O2, prefetch off | | 82.5-83.7 | | 26.1 |
+| clang -Os | 62.2-62.9 / 69.2-70.1 | 73.2-74.1 | 15.4-15.8 / 22.4 | 23.0 |
+
+| sotto 1200 hiss, 16 kHz, MHz | Encoder mean / worst | Encoder worst with flash | Decoder mean / worst | Decoder worst with flash |
+|---|---:|---:|---:|---:|
+| GCC -O2, hard float (OpenRTX's compiler and ABI) | 92.9-93.8 / 107.9-108.5 | **112.9-113.5** | 33.4-33.7 / 40.4 | 41.7 |
+| GCC -O2, prefetch off | | 114.0-114.6 | | 42.0 |
+| GCC -Os, hard float | 111.3-112.4 / 129.5-130.1 | 135.3-136.0 | 39.8-40.1 / 47.9 | 49.2 |
+| clang -O2 | 92.0-92.7 / 107.5-108.4 | 114.1-115.1 | 32.8-33.1 / 40.3 | 41.6 |
+| clang -O2, prefetch off | | 127.6-128.8 | | 44.8 |
+| clang -Os | 100.7-101.5 / 115.6-116.2 | 121.1-121.8 | 36.6-36.9 / 43.3 | 44.5 |
+
+**What changed since the first run.** The first run (commit 1366c13) measured the encoders as
+they were; these numbers come from the same clips, bench and flash model after eight changes,
+none of which changes a bit or a sample: every mode of the x86 tools (2400 bit/s v3.8 and
+v3.7, sotto 1200 at both rates, the K6's light hiss layers, 600 and 400 bit/s) gives the same
+output on the clips, on every prefix length of them and on synthetic worst cases, and the
+K6's decoder objects are the same size.
+
+| Hard float | 8 kHz before | 8 kHz now | 16 kHz before | 16 kHz now |
+|---|---:|---:|---:|---:|
+| Encoder worst with flash, GCC -O2, MHz | 112.8-114.8 | 68.9-69.7 | 138.8-139.4 | 112.9-113.5 |
+| Encoder worst with flash, GCC -Os, MHz | 137.7-140.1 | 82.0-82.8 | 175.6-176.2 | 135.3-136.0 |
+| Encoder worst with flash, clang -O2, MHz | 95.2-96.6 | 71.7-72.6 | 125.4-126.4 | 114.1-115.1 |
+| Encoder state, bytes | 37,520 | 24,400 | 84,048 | 55,584 |
+| Encoder stack, GCC -O2, bytes | 4,880 | 5,096 | 5,312 | 5,544 |
+| Flash, GCC -O2, bytes | 108,500 | 109,224 | 125,136 | 125,584 |
+
+- **The first superframe, spread out.** sotto 1200's coder searched A(0), A(1) and A(2) and
+  ran A(0)'s joint search in one call, the 8 kHz encoder's worst (call 4). A(0)'s search now
+  runs when frame 0 comes in, A(1)'s with A(0)'s joint search when frame 2 does, and the
+  superframe's call finds them done. The 8 kHz encoder's worst call is now an ordinary one.
+- **The core's spectra in 16 bits.** `decide()` read frame t's 32-bit bins from a ring of 10
+  frames to rebuild a 16-bit copy and the bins rounded for the harmonic levels. The ring now
+  holds the 16-bit copy, which the tracker reads too, and per value a 2-bit code that turns it
+  back into the level bin exactly (`FX_CHECK` checks every value): the core is 24.3 KB
+  instead of 35.2 KB, and `decide()` no longer recomputes the bins.
+- **The NLP low-pass at the kept samples only.** The 48-tap filter ran at all 80 squared
+  samples of a block, but the decimation by 5 keeps 16: about 5.5 MHz and 1 KB.
+- **A smaller v3.8 front end** (45.7 KB to 34.4 KB). The core's FFT scratch is the STFT work
+  area (both are free between calls); the percentile history keeps its frame levels in
+  16 bits (-120 to 69 dB) and the rule ring the harmonic SNR and tilt (under 118 and 50 dB),
+  each checked under `FX_CHECK`; the rule ring keeps only the fields the rules read; the
+  local 16 kHz output ring is 512 samples, the tracker's ring the 10 frames `decide_from`
+  walks, and an unused class ring is gone.
+- **Codebook dots, NLP DFT, resamplers** (`FX_ARM_DSP`). The shape search's SMLAD dots take
+  four codebook vectors a pass, so each pair of the residual is loaded once for four; the NLP
+  DFT takes four samples a pass; the half-band resamplers multiply the 19-bit taps whole with
+  SMLAL, each symmetric pair once (11 products, not 82 half products).
+- **The decimator reads its ring in place** instead of copying 41 samples per output, and
+  the tracker's harmonic sums take four harmonics a pass.
+- **CLZ** for the reciprocal's and the harmonic fit's normalisation (about 1 MHz).
+- **The FFT's butterfly loops in assembly** (two naked Thumb-2 functions in `fx_math.c`, for
+  ARMv7E-M with GCC or clang; `-DFX_FFT_C` builds the C, with the same bits): the compilers'
+  C spilled the butterfly's registers. About 2 MHz at 16 kHz and 1.5 at 8 kHz; with the
+  resamplers, the 16 kHz decoder gains 1.6.
+
+**Where the 16 kHz encoder's time goes now** (GCC -O2, `--profile`, 120 calls; MHz with
+inlining, before in brackets): the shape search 11.5 (16.4), the NLP pitch DFT 9.8 (16.3),
+the pitch-track costs 8.1 (11.3), the FFT 9.3 (11.0), the local decoder (overlap-add,
+minimum phase, synthesis) 13.7 (13.7), then the analysis, `decide()`, the harmonic fit,
+reciprocals and 64-bit division at 3.3 MHz or less each; the decimator (6.3) and the
+bench's byte-loop `memset` (1.6) are under 1.5. The mean call is 92 MHz (116). What is left
+is spread out: the overlap-add and the NLP DFT in assembly might give 1-2 MHz each.
+
+| RAM, bytes | 8 kHz | 16 kHz |
+|---|---:|---:|
+| Encoder state | 24,400 | 55,584 |
+| Decoder state | 1,192 | 27,728 (K6 light layer: 1,872) |
+| Encoder stack, clang -O2 / GCC -O2 | 7,308 / 5,096 | 9,084 / 5,544 |
+| Decoder stack, clang -O2 / GCC -O2 | 2,492 / 2,364 | 3,324 / 3,116 |
+| Static (`.data`, `.bss`) | 2,313 | 4,330 |
+| Flash, GCC -O2 / GCC -Os / clang -O2 | 109,224 / 104,417 / 140,869 | 125,584 / 118,648 / 175,096 |
+
+The 16 kHz encoder's state is four blocks: the v3.8 front end and rules 34,440 bytes (6,000
+of them the percentile history at `FX_PCT_MAX=3000`, 6,144 the STFT feature ring, 5,120 the
+STFT work area that the core's FFT shares, 4,096 the 128-frame rule ring, 4,096 the local
+decoder's predictions, 2,432 the shape targets, 2,048 the input ring, 1,792 the local
+envelopes), the v3.7 core 18,020 (11,600 of it the 16-bit spectra and their codes, 2,056 the
+two frames' bin powers), the sotto 1200 coder 2,276 and the local decoder 836. The 8 kHz
+encoder is the core with its own 4,096-byte FFT scratch (22,116) and the coder (2,276). The
+decoder is three blocks: 26,536, 348 and 836.
+
+**Verdict.**
+
+- **CPU: fits at -O2 and at -Os, both rates.** The worst 40 ms call with the flash wait
+  states is 69-70 MHz at 8 kHz and 113-114 MHz at 16 kHz with GCC -O2, OpenRTX's compiler
+  and float ABI. That leaves about 98 and 54 MHz of the 168 for OpenRTX while transmitting,
+  more than v3.8 at 2400 bit/s leaves. Receiving is easy: the decoders' worst is 22 and
+  42 MHz. At -Os, OpenRTX's default, the encoders need 83 and 136 MHz, so the sotto files no
+  longer need a per-file -O2 (it still buys 23 MHz at 16 kHz). With the prefetch off, as
+  OpenRTX's `SystemInit` leaves it, the GCC -O2 build loses only about 1 MHz (clang's -O2
+  code, longer straight runs, 11-14); setting `PRFTEN` costs nothing. clang's -O2 code is now
+  no faster than GCC's: most of the gain was in loops GCC spilled or did not unroll.
+- **RAM.** On a half-duplex radio only one state is alive: create the encoder on PTT and the
+  decoder after it. Every state now fits the 64 KB CCM whole, if OpenRTX's own `.data` and
+  `.bss` there leave room (its link map, `main.map`, says): the 16 kHz encoder's 55,584 bytes
+  leave 9,952, the 8 kHz encoder needs 24.4 KB and the decoders 27.7 and 1.2 KB. If
+  OpenRTX's CCM use leaves less, split the 16 kHz encoder by block as before: the core, coder
+  and local decoder (21.1 KB) in CCM and the front end (34.4 KB) in SRAM's heap. The codec
+  allocates each block with its own `calloc`, so this is an allocator for the sotto files (a
+  static arena in `.bss`, which OpenRTX's linker script places in CCM, falling back to
+  `malloc`), with no change to the codec and no CPU cost: the CPU reads CCM and SRAM with no
+  wait state, and nothing in the state is a DMA buffer. `FX_PCT_MAX=1000` (10 s of history)
+  would save 4 KB more, at the price of bits that differ from the default build's (only the
+  side channel's percentile sees it), and needs listening first. Stack: up to 5.5 KB with
+  GCC (9.1 KB with clang -O2), within the codec thread's 16 KB, and with GCC within an
+  8 KB stack too.
+- **Flash: fits.** 109-126 KB with GCC -O2, of the firmware's 848 KB.
+
+**Caveats.** As above: no bus contention, a sampled model of the ART accelerator, clang and
+GCC from Ubuntu rather than OpenRTX's arm-miosix-eabi GCC, a byte-loop `memset` and a simple
+64-bit division in the bench's shim. Expect +-15 % against hardware. The worst calls come from
+two clips; a longer corpus may find a slightly worse one. The flash model needs unicorn 2.1.3:
+2.1.4 skipped an instruction of the GCC -Os build under its read hook (`run.py` refuses it).
+The 16 kHz modes also assume a 16 kHz audio path; by the board-port notes, the stock MD-UV380
+records and plays at 8 kHz (through the HR_C6000), so sotto 1200 at 8 kHz is the mode that
+runs on the radio as it is. A DWT cycle-counter run on any STM32F4 board would settle the
+numbers.
+
+**OpenRTX's GCC 9.** Its `arm_acle.h` predates the SMLAD/SMLALD intrinsics (GCC 10 added them),
+so `fx.h` gives GCC before 10 the same three instructions as inline assembly (`FX_ARM_DSP_ASM`;
+`-DFX_ARM_DSP_ASM` picks that path on any compiler, and CI runs the M4 bench with it). Same bits
+and samples; with GCC 13 -O2 the worst calls are 65 and 105 MHz at zero wait states, as with the
+intrinsics. Without the DSP path at all (the plain C fallbacks) the encoders' worst calls would
+be about 95 and 137 MHz, so it is worth keeping.
 
 ## Fixed point: the plan
 

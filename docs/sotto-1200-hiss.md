@@ -3,7 +3,8 @@
 *2026-11-06. Python reference `sim/sotto_lr_hiss.py` (`Sotto1200Hiss`); B-frame tables
 `tools/train_lr_hiss.py`; scores `tools/eval_lr_hiss.py` → `docs/results/lr_hiss.json`;
 listening round 19. Float C port in `c/sotto_hiss.c` (`sotto_lr_enc16` / `sotto_lr_dec16`),
-checked by `tools/check_lr_hiss.py` → `docs/results/lr_hiss_c_check.json`.*
+checked by `tools/check_lr_hiss.py` → `docs/results/lr_hiss_c_check.json`; fixed point in
+`c/fixed/sotto_fx_hiss.c` ("C port" below).*
 
 Jeff asked whether v3.8's hiss band (s, sh, f and t above 4 kHz, `docs/unvoiced-hiss.md`) can
 go into sotto 1200 (`docs/sotto-1200.md`). It can, and it needs no extra bits: the frame stays
@@ -176,14 +177,57 @@ Python with the C's fixed-lag tracker and whisper look-ahead, as for v3.8):
 - **Cost on a PC** (11.5 s of p020): the decoder takes the same time as v3.8's 16 kHz
   decoder, the encoder about 1.5 times v3.8's (sotto 1200's shape search on top).
 
-**Fixed point.** Not done. The fixed-point build links stubs that return NULL (the tools say
-"use the float build"). The C55x would need it to play or send hiss streams on the FTM-300D;
-the MD-UV380's Cortex-M4F can run the float code. The fixed v3.8 layer in
-`c/fixed/sotto_fx_hiss.c` mirrors the float one, so the same hook and `dec_push` change carries
-over, plus B's table in Q format.
+**Fixed point.** *2026-11-10.* Done for the encoder and the decoder, in `c/fixed/` (`make -C c
+fixed`; `sotto_enc_fx -16 -1200`, `sotto_dec_fx -16 -1200`), for the MD-UV380's Cortex-M4.
+Same API, same delay, the same structure as the float port:
+
+- **Encoder** (`sotto_lr_enc16` in `c/fixed/sotto_fx_hiss.c`): the fixed v3.8 front end (with
+  the low-rate onset pitch, `onset_wi`) feeds the fixed sotto 1200 coder
+  (`c/fixed/sotto_fx_lr_enc.c`); the local decoder is the fixed v3.7 core on the frames the
+  fixed sotto 1200 decoder rebuilds (`fx_lr_frames`). The hiss index and B's level are
+  nearest-codeword choices in dB Q8 compared as `nt (base2 + 2 cb) - 2 res`, so the half of
+  the anchors' mean needs no rounding. The local decoder's output goes into the 16 kHz streams
+  frame by frame, so the 2400 bit/s layer's small rings suffice (the same samples). The core
+  skips its own 4-stage shape search. `enc_side`, `enc_residual` and `nearest4` are now shared
+  by both fixed encoders, as in the float layer; v3.8's bits are unchanged.
+- **Decoder** (`sotto_lr_dec16`): the full v3.8 layer (not the K6's light one) on the fixed
+  sotto 1200 decoder, through the same hook as the float (`LR_HISS` is now on in every
+  fixed v3.8 build, dB Q8). The layer takes a 4-band correction per frame (`dec_push`), as the
+  float's does; v3.8's samples are unchanged. The K6 build (`FX_HISS_LIGHT`, `FX_HISS_FB`)
+  keeps its light layer.
+- Checked against the float port (`tools/check_fx.py --lr --v38`), on five 16 kHz clips
+  (LibriSpeech 251 and EARS p047 from the K6 listening set, two 15 s pieces of a 16 kHz
+  read-speech demo recording, and a vowel bench recording resampled from 48 kHz;
+  `docs/results/fx_lr16_check.json`), and on the 16 voices upsampled from 8 kHz, which have
+  nothing above 4 kHz (`docs/results/fx_lr16_up_check.json`):
+
+  | | 16 kHz clips | 16 voices upsampled |
+  |---|---:|---:|
+  | Superframes whose 48 bits match the float encoder's | 93.9% of 1,647 | 86.6% of 4,487 |
+  | Of the rest, differing in A's / B's hiss field (wa / dw) | 47 / 51 | 294 / 375 |
+  | PESQ-NB, float decoder: float bits / fixed bits, clean | 2.768 / 2.725 | 2.586 / 2.592 |
+  | the same, one superframe in 8 lost | 2.311 / 2.308 | 2.164 / 2.158 |
+  | PESQ-WB, float decoder: float bits / fixed bits, clean | 1.666 / 1.664 | 1.592 / 1.598 |
+  | PESQ-NB, fixed decoder on the float bits, clean / 1 in 8 lost | 2.728 / 2.303 | 2.579 / 2.165 |
+  | 4-8 kHz level per 10 ms, fixed vs float decoder, mean / 95th pct. difference | 0.37 / 1.67 dB | 0.79 / 3.17 dB |
+
+  The hiss fields carry most of the differences, as in v3.8's check: the index is a 64-way
+  nearest choice on four band levels, and with an empty 4-8 kHz band (the upsampled voices)
+  those levels sit on rounding noise; v3.8's fixed encoder misses as often there (84-87% of
+  frames on p020 and p070 upsampled). PESQ-NB on the five 16 kHz clips is 0.04 lower with the
+  fixed encoder's bits, but the fixed decoder on the float bits is 0.04 lower too, so that is
+  the spread of single decodes with random phases (one clip, the vowel recording, moves 0.10
+  either way); on the 16 upsampled voices the encoders are within 0.006.
+- `FX_ARM_DSP` and `FX_NARROW_MUL` builds give the same bits and samples
+  (`tests/test_fx_lr.py`). Stress signals, empty input, random bits and 40% loss run clean
+  under AddressSanitizer, UndefinedBehaviorSanitizer and `FX_CHECK` (ring checks included).
+- State on x86: the encoder 73.6 KB with its core, local decoder and coder (55.6 KB with
+  `FX_PCT_MAX=3000`, the Cortex-M4 bench setting), the decoder 27.7 KB with sotto 1200's
+  decoder and its core. Code for the M4 (clang -O2): `sotto_fx_lr_enc.o` 6.2 KB,
+  `sotto_fx_lr.o` 4.2 KB. No new tables (`fx_lr_hiss_bcb` already existed for the K6).
 
 ## Open
 
-- **Fixed-point port** for the C55x (above).
+- **Fixed-point port** on the C55x: the C is integer-only and 40-bit safe, but untimed there.
 - **v3.9's hiss ceiling** (unmerged branch, `docs/hiss-ceiling.md`) rides the same side-channel
   bit, so it should stack on this unchanged once v3.9 merges.
