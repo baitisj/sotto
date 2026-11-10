@@ -3,12 +3,18 @@ Module17, CS7000), from an instruction-level emulator and a static timing model.
 
 Usage: python c/fixed/cm4/run.py BUILD/bench.elf IN.raw|IN.wav [--16k] [--frames N] [--profile]
        [--flash] [--bits OUT.bit] [--pcm OUT.raw] [--json OUT.json]
+       python c/fixed/cm4/run.py BUILD/lr.elf IN8k.raw --lr [--dec-bits IN.bit] [--no-prefetch] [...]
+       python c/fixed/cm4/run.py BUILD/lr16.elf IN16k.raw --lr16 [--dec-bits IN.bit] [--no-prefetch] [...]
 
 Unicorn runs the bare-metal build from tools/cm4_build.sh one sotto_encode / sotto_decode call
 at a time (8 kHz, 160 samples a frame); every executed basic block is costed with the
 Cortex-M4 timings below and reported as MHz for real time (cycles per 20 ms frame x 50).
 --16k runs the v3.8 16 kHz encoder and decoder instead (sotto_encode16 / sotto_decode16, 320
 samples a frame; build with VARIANT=v3.8 sh tools/cm4_build.sh).
+--lr and --lr16 run sotto 1200's encoder and decoder (8 kHz, or 16 kHz with the hiss band; build
+with LR=1, or LR16=k6|full), one 40 ms block a call, and report encoder and decoder apart:
+MHz, flash wait states with --flash (per call, so the worst call includes them), state, stack
+(lr_run's docstring). --lr with a .bit input times the decoder alone, as before.
 --bits writes the encoder's bitstream, which must equal the x86 build's (c/fixed/sotto_enc_fx
 [-16]); --pcm writes the decoder's output as sotto_dec_fx [-16] would (its delay removed).
 
@@ -35,9 +41,11 @@ WS = 5                    # STM32F4 flash wait states at 168 MHz
 ONE_CYCLE_BRANCHES = ('cbz', 'cbnz')
 
 
+NM = 'llvm-nm-18' if subprocess.run(['which', 'llvm-nm-18'], capture_output=True).returncode == 0 else 'nm'
+
+
 def symbols(elf):
-    out = subprocess.run(['llvm-nm-18' if subprocess.run(['which', 'llvm-nm-18'], capture_output=True).returncode == 0 else 'nm', elf],
-                         capture_output=True, text=True, check=True).stdout
+    out = subprocess.run([NM, elf], capture_output=True, text=True, check=True).stdout
     sym = {}
     for line in out.splitlines():
         p = line.split()
@@ -61,6 +69,14 @@ def is_cond_branch(m):
 def insn_cycles(m, op, prevmem):
     """cycles of one instruction (conditional branches: not taken), and whether it is a single load/store"""
     m = m.split('.')[0]
+    if m[0] == 'v':                                      # FPv4-SP (none in today's integer-only builds)
+        if m in ('vldr', 'vstr'):
+            return 2, False
+        if m in ('vpush', 'vpop') or m.startswith('vldm') or m.startswith('vstm'):
+            return 1 + op.count(',') + 1, False
+        if m in ('vdiv', 'vsqrt'):
+            return 14, False
+        return 1, False
     if m in ('ldrd', 'strd'):
         return 3, False
     if m.startswith('ldm') or m.startswith('stm') or m in ('push', 'pop'):
@@ -134,6 +150,9 @@ class M4:
     def u32(self, name):
         return int.from_bytes(self.mu.mem_read(self.sym[name], 4), 'little')
 
+    def paint_stack(self):
+        self.mu.mem_write(self.sp0 - STACK, b'\xa5' * STACK)
+
     def stack_used(self):
         st = bytes(self.mu.mem_read(self.sp0 - STACK, STACK))
         return STACK - (len(st) - len(st.lstrip(b'\xa5')))
@@ -141,8 +160,9 @@ class M4:
 
 class FlashModel:
     """STM32F4 ART accelerator, sampled: extra cycles for instruction and table reads from flash"""
-    def __init__(self, m4):
+    def __init__(self, m4, no_prefetch=False):
         self.lo, self.hi = FLASH, FLASH + len(m4.img)
+        self.prefetch = not no_prefetch
         self.ic, self.dc = collections.OrderedDict(), collections.OrderedDict()
         self.last = None
         self.cyc = 0
@@ -161,7 +181,7 @@ class FlashModel:
 
     def _ifetch(self, uc, addr, size, ud):
         for line in range(addr >> 4, ((addr + size - 1) >> 4) + 1):
-            if self._touch(self.ic, 64, line) and (self.last is None or line != self.last + 1):
+            if self._touch(self.ic, 64, line) and not (self.prefetch and self.last is not None and line == self.last + 1):
                 self.cyc += WS
             self.last = line
 
@@ -209,6 +229,127 @@ def lr_decode(m4, a):
            'decoder_MHz': {'mean': mhz40(sum(dc) / n), 'p99': mhz40(srt[int(0.99 * (n - 1))]), 'worst': mhz40(max(dc))},
            'decoder_ms_per_20ms_at_96MHz': {'mean': ms20(sum(dc) / n), 'worst': ms20(max(dc))},
            'heap_bytes': m4.u32('heap_used'), 'stack_bytes': m4.stack_used(), 'flash_bytes': len(m4.img)}
+    js = json.dumps(out, indent=1)
+    print(js)
+    if a.json:
+        open(a.json, 'w').write(js + '\n')
+
+
+def static_ram(elf):
+    """bytes of .data and .bss the codec keeps (the bench's own heap array left out)"""
+    out = subprocess.run([NM, '-S', elf], capture_output=True, text=True, check=True).stdout
+    tot = 0
+    for line in out.splitlines():
+        p = line.split()
+        if len(p) == 4 and p[2] in 'bBdD' and p[3] != 'heap':
+            tot += int(p[1], 16)
+    return tot
+
+
+def lr_run(m4, a, k16):
+    """sotto 1200, encoder and decoder: --lr at 8 kHz (320 samples a call), --lr16 at 16 kHz
+    (sotto 1200 hiss, 640 samples a call). Every call is 40 ms of audio, so MHz for real time is
+    cycles per call x 25. The decoder takes the encoder's bits, or --dec-bits (while a build's
+    encoder is a stub that returns NULL). Its first SOTTO_LR_DEC_DELAY calls, which only store,
+    are left out of its mean. Encoder and decoder state are the heap each one takes (the
+    encoder's measured after its last call), stack is each one's own high-water mark, and
+    static_ram_bytes is the build's .data and .bss outside the bench heap."""
+    sfx, ns, rate = ('16', 640, 16000) if k16 else ('', 320, 8000)
+    fl = FlashModel(m4, a.no_prefetch) if a.flash or a.no_prefetch else None
+    out = {'mode': 'sotto 1200 hiss, 16 kHz' if k16 else 'sotto 1200, 8 kHz',
+           'elf': os.path.relpath(a.elf), 'input': os.path.basename(a.input)}
+
+    def mhz40(c):
+        return round(c * 25 / 1e6, 2)
+
+    def stats(cs):
+        srt = sorted(cs)
+        return {'mean': mhz40(sum(cs) / len(cs)), 'p99': mhz40(srt[int(0.99 * (len(cs) - 1))]), 'worst': mhz40(srt[-1])}
+
+    def timed(fn, *args):
+        f0 = fl.cyc if fl else 0
+        r, c = m4.call(fn, *args)
+        return r, c, (fl.cyc - f0 if fl else 0)
+
+    def phase(name, cyc, wait, prof, nprof):
+        out[f'{name}_MHz'] = stats(cyc)
+        if fl:
+            out[f'{name}_flash_wait_MHz'] = stats(wait)
+            out[f'{name}_with_flash_MHz'] = stats([c + w for c, w in zip(cyc, wait)])
+        if prof is not None:
+            out[f'{name}_profile_MHz'] = {k: mhz40(v / nprof) for k, v in prof.most_common(20)}
+
+    bits = None
+    if a.dec_bits:
+        bits = open(a.dec_bits, 'rb').read()
+    m4.paint_stack()
+    h0 = m4.u32('heap_used')
+    enc, _ = m4.call(f'sotto_lr_enc{sfx}_create')
+    if not enc:
+        out['encoder'] = 'none in this build (sotto_lr_enc%s_create returned NULL)' % sfx
+        assert bits is not None, 'this build has no encoder: give the decoder --dec-bits'
+    else:
+        pcm = load_pcm(a.input, rate)
+        n = min(len(pcm) // (2 * ns), a.frames)
+        ec, ew, eb = [], [], b''
+        m4.prof = collections.Counter() if a.profile else None
+        for i in range(n):
+            m4.mu.mem_write(IO, pcm[2 * ns * i:2 * ns * (i + 1)])
+            r, c, w = timed(f'sotto_lr_encode{sfx}', enc, IO, IO + 0x1000)
+            ec.append(c)
+            ew.append(w)
+            if r:
+                eb += bytes(m4.mu.mem_read(IO + 0x1000, 6))
+        prof, m4.prof = m4.prof, None
+        if not k16:                                     # as sotto_enc -1200: the tail's whole 10 ms blocks
+            tail = pcm[2 * ns * n:2 * ns * (n + 1)] if n * ns * 2 < len(pcm) and n < a.frames else b''
+            m4.mu.mem_write(IO, tail)
+            m4.call('sotto_lr_encode_part', enc, IO, len(tail) // 160)
+        while True:
+            r, _ = m4.call(f'sotto_lr_enc{sfx}_flush', enc, IO + 0x1000)
+            if not r:
+                break
+            eb += bytes(m4.mu.mem_read(IO + 0x1000, 6))
+        out['blocks_40ms'] = n
+        phase('encoder', ec, ew, prof, n)
+        out['encoder_state_bytes'] = m4.u32('heap_used') - h0
+        out['encoder_stack_bytes'] = m4.stack_used()
+        if a.bits:
+            open(a.bits, 'wb').write(eb)
+        if bits is None:
+            bits = eb
+    m4.paint_stack()
+    h0 = m4.u32('heap_used')
+    dec, _ = m4.call(f'sotto_lr_dec{sfx}_create')
+    assert dec, f'sotto_lr_dec{sfx}_create returned NULL (no decoder in this build, or heap too small)'
+    out['decoder_state_bytes'] = m4.u32('heap_used') - h0
+    if k16:
+        delay = int.from_bytes(m4.mu.mem_read(m4.sym['bench_lr_dec16_delay'], 4), 'little')
+        skip = ns // 2 * int.from_bytes(m4.mu.mem_read(m4.sym['bench_lr_dec16_delay'] + 4, 4), 'little')
+    else:
+        delay, skip = 2, 0                              # SOTTO_LR_DEC_DELAY
+    nsf = min(len(bits) // 6, a.frames)
+    dc, dw, y = [], [], b''
+    m4.prof = collections.Counter() if a.profile else None
+    for i in range(nsf):
+        m4.mu.mem_write(IO + 0x1000, bits[6 * i:6 * i + 6])
+        _, c, w = timed(f'sotto_lr_decode{sfx}', dec, IO + 0x1000, 1, IO + 0x2000)
+        if i >= delay:                                  # as sotto_dec_fx [-16] -1200 writes it
+            y += bytes(m4.mu.mem_read(IO + 0x2000 + 2 * skip, 2 * (ns - skip)))
+            skip = 0
+            dc.append(c)
+            dw.append(w)
+    prof, m4.prof = m4.prof, None
+    while m4.call(f'sotto_lr_dec{sfx}_flush', dec, IO + 0x2000)[0]:
+        y += bytes(m4.mu.mem_read(IO + 0x2000, 2 * ns))
+    out['superframes'] = nsf
+    if dc:
+        phase('decoder', dc, dw, prof, len(dc))
+    out['decoder_stack_bytes'] = m4.stack_used()
+    out['static_ram_bytes'] = static_ram(a.elf)
+    out['flash_bytes'] = len(m4.img)
+    if a.pcm:
+        open(a.pcm, 'wb').write(y)
     js = json.dumps(out, indent=1)
     print(js)
     if a.json:
@@ -264,15 +405,24 @@ def main():
     ap.add_argument('--pcm')
     ap.add_argument('--json')
     ap.add_argument('--lr', action='store_true',
-                    help='sotto 1200: decode-only, input is a .bit file of 6-byte superframes (40 ms); '
-                         'build with LR=1')
+                    help='sotto 1200 at 8 kHz: encoder and decoder from an 8 kHz .raw/.wav (lr.elf from LR=1); '
+                         'a .bit input of 6-byte superframes (40 ms) times the decoder alone')
+    ap.add_argument('--lr16', action='store_true',
+                    help='sotto 1200 hiss at 16 kHz: encoder and decoder from a 16 kHz .raw/.wav '
+                         '(lr16.elf from LR16=k6|full)')
+    ap.add_argument('--dec-bits', help='--lr / --lr16: decode this .bit file instead of the encoder\'s output')
+    ap.add_argument('--no-prefetch', action='store_true',
+                    help='--lr / --lr16: the flash model without the ART prefetch (FLASH_ACR.PRFTEN off, as '
+                         'OpenRTX\'s SystemInit leaves it); implies --flash')
     ap.add_argument('--vlr', type=int, choices=(600, 400),
                     help='sotto 600 / 400: decode-only, input is a .bit file of 6-byte superframes; '
                          'build with VLR=1')
     a = ap.parse_args()
     m4 = M4(a.elf)
-    if a.lr:
+    if a.lr and a.input.endswith('.bit'):
         return lr_decode(m4, a)
+    if a.lr or a.lr16:
+        return lr_run(m4, a, a.lr16)
     if a.vlr:
         return vlr_decode(m4, a)
     fl = FlashModel(m4) if a.flash else None

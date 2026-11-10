@@ -61,3 +61,30 @@ jobs:
             exit 1
           fi
           echo "clean"
+  # sotto 1200 (8 kHz) and sotto 1200 hiss (16 kHz) on the Cortex-M4 bench (TYT MD-UV380/390,
+  # c/fixed/cm4/): the M4 build's bits and samples must equal the x86 build's, and no 40 ms call
+  # may take more than the STM32F405's 168 MHz. The MHz, RAM and flash table goes to the summary.
+  cm4-sotto-1200:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: clang, lld, flac, the emulator and the disassembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            lld \
+            llvm \
+            flac
+          pip install \
+            unicorn \
+            capstone
+      - name: x86 fixed-point tools
+        run: make -C c fixed PYTHON=false
+      - name: M4 bench, -O2
+        run: sh tools/cm4_lr_check.sh -O2
+      - name: M4 bench, -Os (OpenRTX's default)
+        run: CM4_CHECK_DIR=c/fixed/cm4/check-Os sh tools/cm4_lr_check.sh -Os

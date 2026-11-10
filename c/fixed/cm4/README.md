@@ -20,6 +20,18 @@ encoder's MHz by function, and `--flash` adds the STM32F4's flash wait states (s
 `--frames 100`). `sh tools/cm4_build.sh -Os` gives the size-optimised build that OpenRTX
 uses by default.
 
+sotto 1200 (48 bits per 40 ms): `VARIANT=v3.8 LR=1 sh tools/cm4_build.sh` links `lr.elf`, and
+`run.py c/fixed/cm4/build/lr.elf in.raw --lr --bits m4.bit --pcm m4.raw` times its encoder and
+decoder apart, 320 samples a call; compare with `sotto_enc_fx -1200` and `sotto_dec_fx -1200`.
+`LR16=k6` (the K6's hiss layer) or `LR16=full` (v3.8's) also links `lr16.elf` for sotto 1200
+hiss at 16 kHz (`--lr16`, 640 samples a call; `sotto_enc_fx -16 -1200`, and `sotto_dec_fx_k6` or
+`sotto_dec_fx -16 -1200`). While a build's encoder is a stub, `--dec-bits IN.bit` feeds the
+decoder. `--no-prefetch` runs the flash model with the ART prefetch off, as OpenRTX's
+`SystemInit` leaves it. `FPU=1` builds with the radio's float ABI (`-mfpu=fpv4-sp-d16
+-mfloat-abi=hard`); the code is integer only, and the image comes out byte for byte the same.
+`sh tools/cm4_lr_check.sh [-Os]` does all of it against the x86 tools and prints the table (CI's
+`cm4-sotto-1200` job). Results: `docs/c-port.md`, "sotto 1200 on the Cortex-M4 (UV-380)".
+
 Files: `shim.c` (bump allocator, memory functions, 64-bit division), `divmod.s` (the ABI's
 64-bit division entry points), `inc/` (C library header stand-ins), `link.ld`, `run.py`
 (the emulator, the timing model and the flash model, described in its docstring).

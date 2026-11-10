@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: MIT */
 #include <stddef.h>
 #include <stdint.h>
+#ifdef SOTTO_V38
+#include "sotto.h"
+/* run.py --lr16 reads the 16 kHz sotto 1200 decoder's delay from here (it depends on the hiss
+   layer the build chose) */
+const int bench_lr_dec16_delay[2] = {SOTTO_LR_DEC16_DELAY, SOTTO_LR_DEC16_DELAY_FRAMES};
+#endif
 typedef struct FILE FILE;
 FILE *stderr;
 int fprintf(FILE *f, const char *fmt, ...) { (void)f; (void)fmt; return 0; }
