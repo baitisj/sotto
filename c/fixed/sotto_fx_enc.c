@@ -83,7 +83,7 @@ struct sotto_enc {
   int16_t st16[SRING], ss2[SRING];   /* the shifts of the harmonic levels' bins and of sw */
   uint32_t pw2[2][NB];        /* bin powers of the last two frames, for the tracker */
   /* NLP */
-  int32_t sq[MPITCH], mem_x, mem_y, fir[48];
+  int32_t sq[MPITCH / 5], mem_x, mem_y, fir[48];   /* sq: the low-passed squares at every 5th sample, for the decimation */
   int16_t sh, blk[4];         /* NLP block floating point: values are true x 2^-sh */
   int16_t prev_bin;
   frame_t ring[RING];
@@ -333,14 +333,14 @@ static int nlp_bin(struct sotto_enc *e) {
       if (i >= NSAMP - 48) e->fir[i - (NSAMP - 48)] = y + one;   /* the last 48 inputs */
       zh[47 + i] = FX_HI(y + one), zl[47 + i] = FX_LO(y + one);
     }
-    for (i = 0; i < NSAMP; i++) {
+    for (i = 0; i < NSAMP; i += 5) {                          /* only the samples the decimation keeps */
       const int16_t *h = zh + i, *l = zl + i;
       fx_acc a = 0, al = 0;
       for (j = 0; j < 48; j++) a += (fx_acc)h[j] * fx_nlp_fir[j];
       for (j = 0; j < 48; j++) al += (fx_acc)l[j] * fx_nlp_fir[j];
       a = FX_JOIN(a, al);
       FX_ACC_CHECK(a);
-      e->sq[MPITCH - NSAMP + i] = fx_rshr(a, 15);
+      e->sq[(MPITCH - NSAMP + i) / 5] = fx_rshr(a, 15);
     }
   }
   FX_PROF(29, 0);
@@ -351,7 +351,7 @@ static int nlp_bin(struct sotto_enc *e) {
   int32_t xd[64];
   mx = 0;
   for (i = 0; i < 64; i++) {
-    int32_t v = shift(e->sq[5 * i], shx - e->blk[(5 * i) / NSAMP]);
+    int32_t v = shift(e->sq[i], shx - e->blk[(5 * i) / NSAMP]);
     xd[i] = fx_rshr(fx_mul32x16(v, fx_nlp_win[i]), 15);
     mx |= uabs(xd[i]);
   }
@@ -394,7 +394,7 @@ static int nlp_bin(struct sotto_enc *e) {
       cbin = lbin;
   }
   e->prev_bin = (int16_t)cbin;
-  memmove(e->sq, e->sq + NSAMP, (MPITCH - NSAMP) * sizeof(int32_t));
+  memmove(e->sq, e->sq + NSAMP / 5, (MPITCH - NSAMP) / 5 * sizeof(int32_t));
   memmove(e->blk, e->blk + 1, 3 * sizeof(int16_t));
   return cbin;
 }
