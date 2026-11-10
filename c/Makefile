@@ -109,6 +109,21 @@ check-rowgen: fixed/sotto_dec_fx_k6 fixed/sotto_dec_fx_k6_rowgen
 	    cmp $(ROWGEN_CHK)/a.raw $(ROWGEN_CHK)/b.raw || { echo "FX_MP_ROWGEN differs: $$f $$a"; exit 1; }; n=$$((n + 1)); \
 	  done; \
 	done; echo "FX_MP_ROWGEN: $$n decodes, the same bytes"
+# -DFX_SYNTH_STATE (synth's arrays in the decoder's state, not on the stack, as the K6's voice
+# images build it): check-synthstate, the same decodes against the plain build
+fixed/sotto_dec_fx_k6_synthstate: $(K6HISS_SRC) fixed/fx.h fixed/fx_tables.h fixed/fx_internal.h sotto.h sotto_vlr.h \
+	sotto_vlr_tables.h sotto_lr_dec.inc sotto_vlr_dec.inc
+	$(CC) -O2 -std=c99 -ffp-contract=off -I. $(FXFLAGS) $(K6HISS) -DFX_SYNTH_STATE -o $@ $(K6HISS_SRC)
+SYNTH_CHK = synthstate.chk
+check-synthstate: fixed/sotto_dec_fx_k6 fixed/sotto_dec_fx_k6_synthstate
+	@mkdir -p $(SYNTH_CHK); n=0; for f in ../docs/samples/rates/*.bit; do \
+	  r=$$(echo $$f | sed 's/.*__\([0-9]*\)\.bit$$/\1/'); \
+	  case $$r in 2400) modes="x -16";; 1200) modes="-1200 -16_-1200";; *) modes="-16_-$$r";; esac; \
+	  for m in $$modes; do a=$$(echo $$m | sed 's/^x$$//; s/_/ /'); \
+	    fixed/sotto_dec_fx_k6 $$a $$f $(SYNTH_CHK)/a.raw && fixed/sotto_dec_fx_k6_synthstate $$a $$f $(SYNTH_CHK)/b.raw || exit 1; \
+	    cmp $(SYNTH_CHK)/a.raw $(SYNTH_CHK)/b.raw || { echo "FX_SYNTH_STATE differs: $$f $$a"; exit 1; }; n=$$((n + 1)); \
+	  done; \
+	done; echo "FX_SYNTH_STATE: $$n decodes, the same bytes"
 fixed/sotto_dec_fx: sotto_dec.o $(FX_DEC_OBJS) $(FX_OBJS)
 	$(CC) -o $@ $^
 fixed/sotto_enc_fx: sotto_enc.o $(FX_ENC_OBJS) $(FX_OBJS)
@@ -204,6 +219,8 @@ clean:
 	rm -f fixed/sotto_dec_fx_m0 fixed/sotto_enc_fx_m0 fixed/sotto_vlr_dec_fx fixed/sotto_dec_fx_k6
 	rm -f fixed/sotto_dec_fx_k6_rowgen
 	rm -rf rowgen.chk
+	rm -f fixed/sotto_dec_fx_k6_synthstate
+	rm -rf synthstate.chk
 	rm -rf fixed/arm fixed/m0
 
 .PHONY: all fixed check install clean tables check-tables
