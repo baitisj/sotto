@@ -899,6 +899,13 @@ records and plays at 8 kHz (through the HR_C6000), so sotto 1200 at 8 kHz is the
 runs on the radio as it is. A DWT cycle-counter run on any STM32F4 board would settle the
 numbers.
 
+**OpenRTX's GCC 9.** Its `arm_acle.h` predates the SMLAD/SMLALD intrinsics (GCC 10 added them),
+so `fx.h` gives GCC before 10 the same three instructions as inline assembly (`FX_ARM_DSP_ASM`;
+`-DFX_ARM_DSP_ASM` picks that path on any compiler, and CI runs the M4 bench with it). Same bits
+and samples; with GCC 13 -O2 the worst calls are 65 and 105 MHz at zero wait states, as with the
+intrinsics. Without the DSP path at all (the plain C fallbacks) the encoders' worst calls would
+be about 95 and 137 MHz, so it is worth keeping.
+
 ## Fixed point: the plan
 
 The C55x has no floating-point unit. Software float would be far too slow for the analysis

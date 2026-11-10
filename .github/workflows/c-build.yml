@@ -88,3 +88,5 @@ jobs:
         run: sh tools/cm4_lr_check.sh -O2
       - name: M4 bench, -Os (OpenRTX's default)
         run: CM4_CHECK_DIR=c/fixed/cm4/check-Os sh tools/cm4_lr_check.sh -Os
+      - name: M4 bench, -O2 with SMLAD/SMLALD as inline assembly (the path GCC before 10 takes)
+        run: CM4_CHECK_DIR=c/fixed/cm4/check-asm sh tools/cm4_lr_check.sh -O2 -DFX_ARM_DSP_ASM

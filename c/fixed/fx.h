@@ -105,7 +105,30 @@ extern void (*volatile fx_yield)(void);
 #ifndef FX_CB_UNPACKED
 #define FX_CB_UNPACKED
 #endif
-#ifdef __ARM_FEATURE_DSP
+/* GCC before 10 (OpenRTX's arm-miosix-eabi GCC 9) has no SMLAD/SMLALD intrinsics in arm_acle.h,
+   so it takes the same instructions as inline assembly; -DFX_ARM_DSP_ASM picks that path on any
+   GCC or clang (to test it) */
+#if defined(__ARM_FEATURE_DSP) && defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 10 \
+    && !defined(FX_ARM_DSP_ASM)
+#define FX_ARM_DSP_ASM
+#endif
+#if defined(__ARM_FEATURE_DSP) && defined(FX_ARM_DSP_ASM)
+static inline int32_t fx_smlad(uint32_t x, uint32_t y, int32_t a) {
+  int32_t r;
+  __asm__("smlad %0, %1, %2, %3" : "=r"(r) : "r"(x), "r"(y), "r"(a));
+  return r;
+}
+static inline fx_acc fx_smlald(uint32_t x, uint32_t y, fx_acc a) {
+  uint32_t lo = (uint32_t)a, hi = (uint32_t)((uint64_t)a >> 32);
+  __asm__("smlald %0, %1, %2, %3" : "+r"(lo), "+r"(hi) : "r"(x), "r"(y));
+  return (fx_acc)(((uint64_t)hi << 32) | lo);
+}
+static inline fx_acc fx_smlsld(uint32_t x, uint32_t y, fx_acc a) {
+  uint32_t lo = (uint32_t)a, hi = (uint32_t)((uint64_t)a >> 32);
+  __asm__("smlsld %0, %1, %2, %3" : "+r"(lo), "+r"(hi) : "r"(x), "r"(y));
+  return (fx_acc)(((uint64_t)hi << 32) | lo);
+}
+#elif defined(__ARM_FEATURE_DSP)
 #include <arm_acle.h>
 #define fx_smlad(x, y, a) ((int32_t)__smlad((x), (y), (a)))
 #define fx_smlald(x, y, a) ((fx_acc)__smlald((x), (y), (a)))
