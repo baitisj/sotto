@@ -28,7 +28,9 @@ hiss at 16 kHz (`--lr16`, 640 samples a call; `sotto_enc_fx -16 -1200`, and `sot
 `sotto_dec_fx -16 -1200`). While a build's encoder is a stub, `--dec-bits IN.bit` feeds the
 decoder. `--no-prefetch` runs the flash model with the ART prefetch off, as OpenRTX's
 `SystemInit` leaves it. `FPU=1` builds with the radio's float ABI (`-mfpu=fpv4-sp-d16
--mfloat-abi=hard`); the code is integer only, and the image comes out byte for byte the same.
+-mfloat-abi=hard`); the code is integer only, and clang's image comes out byte for byte the same.
+`CM4_CC=arm-none-eabi-gcc` compiles with GCC (OpenRTX's compiler; tested with 13.2.1 from Ubuntu's
+`gcc-arm-none-eabi`), still linked by lld.
 `sh tools/cm4_lr_check.sh [-Os]` does all of it against the x86 tools and prints the table (CI's
 `cm4-sotto-1200` job). Results: `docs/c-port.md`, "sotto 1200 on the Cortex-M4 (UV-380)".
 

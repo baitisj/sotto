@@ -69,9 +69,20 @@ esac
 [ -z "$LR16" ] || SYMS="$SYMS $LR16_SYMS"
 FLOAT="-mfloat-abi=soft"
 [ -z "$FPU" ] || FLOAT="-mfpu=fpv4-sp-d16 -mfloat-abi=hard"
-RES=$("$CC" -print-resource-dir)
-CFLAGS="--target=thumbv7em-none-eabi -mcpu=cortex-m4 -mthumb $FLOAT -munaligned-access -nostdinc
-  -isystem $ROOT/c/fixed/cm4/inc -isystem $RES/include -ffunction-sections -fdata-sections -std=c99
+# CM4_CC=arm-none-eabi-gcc builds the codec with GCC (OpenRTX's compiler) instead; lld still links,
+# with GCC's libgcc for its helper calls
+case "$CC" in
+  *gcc*)
+    TARGET=""
+    RES=$("$CC" -print-file-name=include)
+    LIBGCC=$("$CC" -mcpu=cortex-m4 -mthumb $FLOAT -print-libgcc-file-name) ;;
+  *)
+    TARGET="--target=thumbv7em-none-eabi"
+    RES=$("$CC" -print-resource-dir)/include
+    LIBGCC="" ;;
+esac
+CFLAGS="$TARGET -mcpu=cortex-m4 -mthumb $FLOAT -munaligned-access -nostdinc
+  -isystem $ROOT/c/fixed/cm4/inc -isystem $RES -ffunction-sections -fdata-sections -std=c99
   -Wall -Wno-unused-function $VFLAGS -I$ROOT/c -O2 $*"
 mkdir -p "$OUT"
 OBJS=""
@@ -84,8 +95,8 @@ for f in $EXTRA; do
   OBJS="$OBJS $OUT/$f.o"
 done
 $CC $CFLAGS -ffreestanding -fno-builtin -c "$ROOT/c/fixed/cm4/shim.c" -o "$OUT/shim.o"
-$CC --target=thumbv7em-none-eabi -mcpu=cortex-m4 $FLOAT -c "$ROOT/c/fixed/cm4/divmod.s" -o "$OUT/divmod.o"
-LIBS="$OUT/shim.o $OUT/divmod.o"
+${CM4_AS:-clang} --target=thumbv7em-none-eabi -mcpu=cortex-m4 $FLOAT -c "$ROOT/c/fixed/cm4/divmod.s" -o "$OUT/divmod.o"
+LIBS="$OUT/shim.o $OUT/divmod.o $LIBGCC"
 LDF="-T $ROOT/c/fixed/cm4/link.ld --gc-sections -u heap_used"
 # shellcheck disable=SC2086
 $LD $LDF -e sotto_encode -u sotto_enc_create -u sotto_enc_flush \
