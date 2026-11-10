@@ -53,11 +53,11 @@
 
 #define HIST MPITCH           /* the analysis buffer */
 #define SRING (LAG + 2)       /* spectra kept: frame t is decided after frame t + LAG + 1 is analysed */
+#define NQW ((2 * NB + 15) / 16)   /* words of 2-bit codes, one a value of sw */
 
 typedef struct {
-  int16_t sw[2 * NB];         /* spectrum, re/im interleaved, 16 bits */
-  int16_t e;                  /* exponent: float spectrum = sw x 2^(e + fx_sw_l2 / 2^16) */
-  uint32_t p[NB];             /* power per bin, normalised to 31 bits, for the pitch searches */
+  const int16_t *sw;          /* spectrum, re/im interleaved, 16 bits */
+  const uint32_t *p;          /* power per bin, normalised to 31 bits, for the pitch searches */
 } spec_t;
 
 typedef struct {
@@ -73,10 +73,15 @@ typedef struct {
 
 struct sotto_enc {
   int16_t hist[HIST];         /* input; the last MPITCH samples are the analysis buffer */
-  spec_t spec[2];             /* spectra of the last two frames, for the tracker */
   int32_t re[512], im[512];   /* FFT scratch */
-  int32_t sre[SRING][NB], sim[SRING][NB];   /* bins 0..256 of the last SRING frames, for decide() */
-  int16_t sexp[SRING];        /* their exponents (spectrum_fft's return value) */
+  /* the last SRING frames' spectra: the 16-bit copy (the tracker's and decide()'s harmonic
+     fits) and, for decide()'s harmonic levels, the bins rounded to 16 bits as 2-bit codes
+     against it (spectrum_keep), so the 32-bit bins needn't be kept */
+  int16_t sw[SRING][2 * NB];
+  uint32_t swq[SRING][NQW];
+  int16_t sexp[SRING];        /* exponents (spectrum_fft's return value) */
+  int16_t st16[SRING], ss2[SRING];   /* the shifts of the harmonic levels' bins and of sw */
+  uint32_t pw2[2][NB];        /* bin powers of the last two frames, for the tracker */
   /* NLP */
   int32_t sq[MPITCH], mem_x, mem_y, fir[48];
   int16_t sh, blk[4];         /* NLP block floating point: values are true x 2^-sh */
@@ -174,12 +179,6 @@ static int ceil_sh(fx_uacc x, int sh) { return (int)((x + ((fx_uacc)1 << sh) - 1
 
 /* ---------------------------------------------------------------- analysis */
 
-/* power of a bin rounded right by t bits */
-static fx_acc sq2(int32_t re, int32_t im, int t) {
-  int32_t a = t ? fx_rshr32(re, t) : re, b = t ? fx_rshr32(im, t) : im;
-  return fx_sq32(a) + fx_sq32(b);
-}
-
 /* Codec 2's windowed 512-point spectrum of the 320 samples at buf: bins 0..256 in e->re,
    e->im (int32, float spectrum = re x 2^(return value + fx_sw_l2 / 2^16)) */
 static int spectrum_fft(struct sotto_enc *e, const int16_t *buf) {
@@ -212,22 +211,47 @@ static int spectrum_fft(struct sotto_enc *e, const int16_t *buf) {
   return s;
 }
 
-/* the 16-bit copy of a spectrum (bins re, im with exponent s, as spectrum_fft leaves them) in *f */
-static void spectrum_bins(const int32_t *re, const int32_t *im, int s, spec_t *f) {
-  uint32_t m2 = fx_bins_max(re, im, NB);
-  int s2 = 0, t = 0, sp = 0;
+/* the bins rounded right by t16 bits, as decide() takes them for the harmonic levels, against
+   sw, the 16-bit copy rounded right by s2 = t16 or t16 + 1 (or shifted left, t16 = 0): v =
+   2 sw + d (s2 = t16 + 1), sw (s2 = t16) or sw >> -s2 (s2 < 0), with d in -1..1 stored as d + 1,
+   and 3 where sw wrapped to -32768 from 32768 (rounding up from 32767.5; then d is -1, or 0) */
+static inline int32_t sw_base(int32_t sw, int t16, int s2) { return s2 == t16 + 1 ? 2 * sw : s2 < 0 ? sw >> -s2 : sw; }
+static inline int32_t sw_level(int32_t sw, unsigned code, int t16, int s2) {
+  if (code == 3) return sw_base(sw + 65536, t16, s2) - (s2 == t16 + 1);
+  return sw_base(sw, t16, s2) + (int32_t)code - 1;
+}
+
+/* frame r's spectrum (bins re, im as spectrum_fft leaves them, exponent s) as the encoder keeps
+   it: the 16-bit copy in sw[r], the codes of the harmonic levels' bins (sw_level) in swq[r],
+   and the power per bin at 31 bits in *p, from the bins rounded to 19 bits (so a power is
+   < 2^39) */
+static void spectrum_keep(struct sotto_enc *e, const int32_t *re, const int32_t *im, int s, int r, uint32_t *p) {
+  uint32_t m2 = fx_bins_max(re, im, NB), *q = e->swq[r];
+  int16_t *sw = e->sw[r];
+  int s2 = 0, t = 0, sp = 0, t16 = 0, i;
   if (m2) {
     while ((m2 >> s2) > 32767) s2++;
     if (s2 == 0)
       while (s2 > -15 && (m2 << (1 - s2)) <= 32767) s2--;
   }
-  fx_bins_to16(re, im, f->sw, NB, s2);
-  f->e = (int16_t)(s + s2);
-  /* power per bin at 31 bits, from the bins rounded to 19 bits (so a power is < 2^39) */
+  fx_bins_to16(re, im, sw, NB, s2);
+  while ((m2 >> t16) >= ((uint32_t)1 << 16) - 1) t16++;    /* rounding may add one */
+  memset(q, 0, sizeof e->swq[0]);
+  for (i = 0; i < 2 * NB; i++) {
+    int32_t x = i & 1 ? im[i >> 1] : re[i >> 1], v = t16 ? fx_rshr32(x, t16) : x, d = v - sw_base(sw[i], t16, s2);
+    unsigned code = d >= -1 && d <= 1 ? (unsigned)(d + 1) : 3u;
+#ifdef FX_CHECK
+    if (sw_level(sw[i], code, t16, s2) != v) abort();
+#endif
+    q[i >> 4] |= code << (2 * (i & 15));
+  }
+  e->sexp[r] = (int16_t)s;
+  e->st16[r] = (int16_t)t16;
+  e->ss2[r] = (int16_t)s2;
   while ((m2 >> t) >= ((uint32_t)1 << 19) - 1) t++;        /* rounding may add one */
   fx_acc pm = fx_bins_pow_max(re, im, NB, t);
   while ((pm >> sp) >= ((fx_acc)1 << 31)) sp++;
-  fx_bins_pow(re, im, f->p, NB, t, sp, sp ? (uint32_t)1 << (sp - 1) : 0);
+  fx_bins_pow(re, im, p, NB, t, sp, sp ? (uint32_t)1 << (sp - 1) : 0);
 }
 
 /* Codec 2's NLP: the pitch bin (3.125 Hz steps) of the 10 ms just added to the input */
@@ -599,8 +623,9 @@ static int32_t odd_even_db(const spec_t *f, uint32_t wo) {
 static void frame_costs(struct sotto_enc *e, int32_t t, int has_next) {
   int i, j, c;
   frame_t *f = R(e, t);
-  const spec_t *sp = &e->spec[t & 1];
+  spec_t spt, *sp = &spt;
   static const int dd[3] = {0, -1, 1};
+  spt.sw = e->sw[t % SRING], spt.p = e->pw2[t & 1];
   f->nc = 0;
   for (i = 0; i < 3; i++) {
     int32_t u = t + dd[i];
@@ -888,21 +913,17 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
   frame_t *f = R(e, t);
   uint32_t wo = k ? f->cand[k - 1] : f->wo0;
   int L = n_harm(wo);
-  /* frame t's spectrum, kept from its analysis: the 32-bit bins for the harmonic levels,
-     and the 16-bit copy for the harmonic fits */
+  /* frame t's spectrum, kept from its analysis: the 16-bit copy for the harmonic fits, and
+     the bins rounded to 16 bits (by t16) for the harmonic levels, rebuilt from it */
   spec_t spx, *sp = &spx;
-  const int32_t *re = e->sre[t % SRING], *im = e->sim[t % SRING];
-  int ex = e->sexp[t % SRING];
+  int r = (int)(t % SRING), ex = e->sexp[r], t16 = e->st16[r], s2 = e->ss2[r];
+  int32_t v16[2 * NB];
+  spx.sw = e->sw[r], spx.p = NULL;
   FX_PROF(7, 1);
-  spectrum_bins(re, im, ex, sp);
+  for (i = 0; i < 2 * NB; i++) v16[i] = sw_level(spx.sw[i], (e->swq[r][i >> 4] >> (2 * (i & 15))) & 3u, t16, s2);
   FX_PROF(7, 0);
   /* band powers from the bins rounded to 16 bits: a bin's power is < 2^33, a band (at most
      33 bins) < 2^39, and the total is summed at 1/8 */
-  int t16 = 0;
-  {
-    uint32_t m = fx_bins_max(re, im, NB);
-    while ((m >> t16) >= ((uint32_t)1 << 16) - 1) t16++;  /* rounding may add one */
-  }
   fx_acc A2[MAXH + 1], tot = 0;
   fx_uacc edge = (fx_uacc)wo + ((fx_uacc)1 << 23);          /* (2h - 1) wo + 1/2 bin */
   for (h = 1; h <= L; h++, edge += 2 * (fx_uacc)wo) {
@@ -910,7 +931,7 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
     fx_acc p = 0;
     for (i = am; i < bm; i++) {
       int b = i > 256 ? 512 - i : i;
-      p += sq2(re[b], im[b], t16);
+      p += fx_sq32(v16[2 * b]) + fx_sq32(v16[2 * b + 1]);
     }
     FX_ACC_CHECK(p);
     A2[h] = p;
@@ -1060,17 +1081,15 @@ static void analyse_10ms(struct sotto_enc *e, const short *x) {
   for (i = 0; i < NSAMP; i++) e->hist[HIST - NSAMP + i] = x[i];
   int32_t a = e->n_an++;
   frame_t *f = R(e, a);
-  spec_t *sp = &e->spec[a & 1];
+  spec_t spa, *sp = &spa;
   FX_PROF(0, 1);
   int bin = nlp_bin(e);
   FX_PROF(0, 0);
   FX_PROF(1, 1);
   {
     int s = spectrum_fft(e, e->hist + HIST - MPITCH), r = (int)(a % SRING);
-    memcpy(e->sre[r], e->re, NB * sizeof(int32_t));          /* kept for decide() */
-    memcpy(e->sim[r], e->im, NB * sizeof(int32_t));
-    e->sexp[r] = (int16_t)s;
-    spectrum_bins(e->re, e->im, s, sp);
+    spectrum_keep(e, e->re, e->im, s, r, e->pw2[a & 1]);
+    spa.sw = e->sw[r], spa.p = e->pw2[a & 1];
   }
   FX_PROF(1, 0);
   /* Codec 2: Wo = 2 pi / pitch, pitch = 2560 / bin samples; two-stage refinement */
