@@ -72,6 +72,7 @@ typedef struct {                   /* sotto 1200's coder, fed 20 ms frames */
   fx_fparams_t fr[LR_Q];           /* frames not yet coded (ring) */
   int32_t nin, ncoded;             /* frames received, frames coded (always even) */
   int16_t flushed, have_prev;
+  int16_t first;                   /* prevA holds A(0) after its joint search with A(1) (first_ahead) */
   lr_aframe_t prevA;               /* A(n-1), final, for the joint search of A(n) */
   lr_paths_t pc[2];                /* the A frames' searches, by (t / 2) % 2: each is needed twice */
   unsigned char out[LR_OUTQ][SOTTO_BYTES_PER_FRAME];
@@ -230,7 +231,7 @@ static void drain(lr_coder_t *c) {
     has1 = c->nin >= t + 4, has2 = c->nin >= t + 5;
     b = FR(c, t + 1);
     if (has1) a_first(c, t + 2, &n1);
-    if (c->have_prev) a = c->prevA;
+    if (c->have_prev || (c->first && has1)) a = c->prevA;
     else {                                       /* the first superframe */
       a_first(c, t, &a);
       a_joint(c, t, &a, NULL, NULL, b, has1 ? &n1 : NULL);
@@ -248,9 +249,29 @@ static void drain(lr_coder_t *c) {
   }
 }
 
+/* The first superframe needs A(0), A(1) and A(2)'s searches and A(0)'s joint search, where a
+   later one needs one of each: do A(0)'s search when frame 0 comes in, and A(1)'s search and
+   A(0)'s joint search (with A(1) as its next, as drain() does whenever B(1) is in) when frame
+   2 does, so that no call carries more than a later superframe's work. The same results:
+   drain() finds the searches (a_paths keys on the frame) and takes the joint path unless the
+   input ends before B(1). */
+static void first_ahead(lr_coder_t *c) {
+  int32_t t = c->nin - 1;
+  if (c->have_prev || c->first) return;
+  if (t == 0) a_paths(c, 0, FR(c, 0));
+  else if (t == 2) {
+    lr_aframe_t n1;
+    a_first(c, 2, &n1);
+    a_first(c, 0, &c->prevA);
+    a_joint(c, 0, &c->prevA, NULL, NULL, FR(c, 1), &n1);
+    c->first = 1;
+  }
+}
+
 static void coder_push(lr_coder_t *c, const fx_fparams_t *p) {
   *FR(c, c->nin++) = *p;
   drain(c);
+  first_ahead(c);
 }
 
 static void coder_end(lr_coder_t *c) {
