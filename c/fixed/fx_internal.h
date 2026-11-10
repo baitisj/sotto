@@ -84,4 +84,15 @@ typedef void (*fx_vlr_hiss_hook_t)(void *ctx, int g, int code, int run, int avai
                                    int flushed);
 void sotto_vlr_dec_set_hook(struct sotto_vlr_dec *d, fx_vlr_hiss_hook_t hook, void *ctx);
 const struct sotto_dec *sotto_vlr_dec_core(const struct sotto_vlr_dec *d);
+/* sotto 1200 hiss's encoder (sotto_fx_hiss.c, VARIANT=v3.8): sotto 1200's coder without its
+   core (sotto_fx_lr_enc.c), fed the 20 ms frames after v3.8's voicing rules, and the frames
+   sotto 1200's decoder rebuilds from superframe sf and the next (NULL: sf is the last), as
+   ../sotto_internal.h's float ones */
+struct sotto_lr_enc;
+struct sotto_lr_enc *sotto_lr_enc_create_frames(void);
+void sotto_lr_enc_push(struct sotto_lr_enc *e, const fx_fparams_t *p);
+void sotto_lr_enc_end(struct sotto_lr_enc *e);
+int sotto_lr_enc_pop(struct sotto_lr_enc *e, unsigned char out[SOTTO_BYTES_PER_FRAME]);
+unsigned sotto_fx_lr_coder_bytes(void);
+void fx_lr_frames(const unsigned char *sf, const unsigned char *next, fx_fparams_t *a, fx_fparams_t *b);
 #endif

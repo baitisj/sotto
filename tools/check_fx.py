@@ -18,7 +18,9 @@ hiss band has the same phase sequence in both, so it compares sample for sample 
 sotto 1200 (--lr; 8 kHz clips, or 16 kHz clips with --v38 for sotto 1200 hiss): both encoders
 in their sotto 1200 mode (superframes identical, fields that differ), then PESQ of the float
 decoder on the float encoder's bits and on the fixed encoder's bits, clean and with one
-superframe in --every (default 8) lost; and of the fixed decoder on the fixed encoder's bits.
+superframe in --every (default 8) lost; and of the fixed decoder on the float encoder's bits
+(fxdec) and on the fixed encoder's bits (fxenc_fxdec). At 16 kHz also the 4-8 kHz level
+difference per 10 ms between the two decoders on the float bits (mean and 95th percentile).
 At 16 kHz PESQ-NB is scored on the output resampled to 8 kHz, and PESQ-WB on the 16 kHz output.
 Build first: make -C c && make -C c fixed.
 """
@@ -93,9 +95,22 @@ def main_lr(clips, k16, every, seconds, out):
         x8 = resample_poly(xq, 1, 2) if k16 else xq
         for tag, good in (("clean", None), (f"loss1in{every}", np.arange(len(bf)) % every != 3 % every)):
             outs = {"float": run_dec(f"{fl}/sotto_dec", bf, good, k16, True),
-                    "fxenc": run_dec(f"{fl}/sotto_dec", bx, good, k16, True),
-                    "fxenc_fxdec": run_dec(f"{fx}/sotto_dec_fx", bx, good[:len(bx)] if good is not None else None,
-                                           k16, True)}
+                    "fxenc": run_dec(f"{fl}/sotto_dec", bx, good, k16, True)}
+            try:
+                outs["fxdec"] = run_dec(f"{fx}/sotto_dec_fx", bf, good, k16, True)
+                outs["fxenc_fxdec"] = run_dec(f"{fx}/sotto_dec_fx", bx, good[:len(bx)] if good is not None else None,
+                                              k16, True)
+            except subprocess.CalledProcessError:     # a build without that decoder
+                pass
+            if k16 and "fxdec" in outs:               # the decoders on the same bits: 4-8 kHz level per 10 ms
+                import hiss_band as hb
+                yf, yx = outs["float"], outs["fxdec"]
+                n = min(len(yf), len(yx))
+                hf = hb.bands_db(np.abs(hb.stft(yf[:n])) ** 2, [(4000, 8000)])[:, 0]
+                hx = hb.bands_db(np.abs(hb.stft(yx[:n])) ** 2, [(4000, 8000)])[:, 0]
+                d = np.abs(hf - hx)[hf > -60]
+                if len(d):
+                    r[f"dec_hiss_level_diff_db_{tag}"] = [round(float(d.mean()), 2), round(float(np.percentile(d, 95)), 2)]
             for k, y in outs.items():
                 y8 = resample_poly(y, 1, 2) if k16 else y
                 r[f"pesq_{k}_{tag}"] = round(float(ar.score(x8, y8, ar.CODEC_DELAY)[0]), 3)
@@ -114,6 +129,8 @@ def main_lr(clips, k16, every, seconds, out):
         m = {"superframes": fr, "enc_bit_exact": round(sum(r["enc_bit_exact"] * r["superframes"][0] for r in rows) / fr, 4),
              "field_mismatch": {k: sum(r["field_mismatch"][k] for r in rows) for k, _, _ in FIELDS_LR}}
         m.update({k: round(float(np.mean([r[k] for r in rows])), 3) for k in rows[0] if k.startswith("pesq")})
+        m.update({k: [round(float(np.mean([r[k][i] for r in rows])), 2) for i in range(2)]
+                  for k in rows[0] if k.startswith("dec_hiss")})
         print("mean", json.dumps(m))
     if out:
         json.dump(rows, open(out, "w"), indent=1)

@@ -66,3 +66,72 @@ def test_fixed_lr_encoder_code_paths_are_bit_exact(variant):
     x16 = _ve9qrp(3.0)[:3 * 8000 - 240]
     b = check_fx.run_enc(os.path.join(FX, "sotto_enc_fx"), x16, lr=True)
     assert np.array_equal(b, check_fx.run_enc(exe, x16, lr=True))
+
+
+# ---- 16 kHz: sotto 1200 hiss (VARIANT=v3.8) ----
+need_lr16 = pytest.mark.skipif(not (_works(os.path.join(C, "sotto_enc"), "-16", "-1200")
+                                    and _works(os.path.join(FX, "sotto_enc_fx"), "-16", "-1200")
+                                    and _works(os.path.join(FX, "sotto_dec_fx"), "-16", "-1200")),
+                               reason="needs the VARIANT=v3.8 build (make -C c all fixed)")
+
+
+def _speech16(seconds):
+    """ve9qrp at 16 kHz with hiss above 4.5 kHz, as tests/test_vocoder.py's ARM check"""
+    from scipy import signal
+    x = _ve9qrp(seconds).astype(float)
+    hiss = signal.sosfilt(signal.butter(6, 4500, "highpass", fs=16000, output="sos"),
+                          np.random.default_rng(1).standard_normal(2 * len(x)))
+    y = signal.resample_poly(x, 2, 1) + 1500 * hiss
+    return np.clip(y, -32767, 32767).astype(np.int16)[:len(y) // 640 * 640]
+
+
+@need_lr16
+def test_fixed_lr16_encoder_matches_float():
+    import check_fx
+    from scipy.signal import resample_poly
+    x16 = _speech16(6.0)
+    bf = check_fx.run_enc(os.path.join(C, "sotto_enc"), x16, k16=True, lr=True)
+    bx = check_fx.run_enc(os.path.join(FX, "sotto_enc_fx"), x16, k16=True, lr=True)
+    assert bx.shape == bf.shape
+    assert np.mean(np.all(bf == bx, 1)) > 0.8
+    x8 = resample_poly(x16 / 32768.0, 1, 2)
+    pf = _score(x8, resample_poly(check_fx.run_dec(os.path.join(C, "sotto_dec"), bf, k16=True, lr=True), 1, 2))
+    px = _score(x8, resample_poly(check_fx.run_dec(os.path.join(C, "sotto_dec"), bx, k16=True, lr=True), 1, 2))
+    assert px > pf - 0.15
+
+
+@need_lr16
+def test_fixed_lr16_decoder_follows_float():
+    """The full v3.8 layer on the fixed sotto 1200 decoder, against the float one on the same
+    bits with losses: the same length, the 4-8 kHz band at the same level (its noise has
+    random phase, so levels, not samples) and the same PESQ."""
+    import check_fx
+    import hiss_band as hb
+    from scipy.signal import resample_poly
+    x16 = _speech16(4.0)
+    b = check_fx.run_enc(os.path.join(C, "sotto_enc"), x16, k16=True, lr=True)
+    good = np.arange(len(b)) % 8 != 3
+    yf = check_fx.run_dec(os.path.join(C, "sotto_dec"), b, good, k16=True, lr=True)
+    yx = check_fx.run_dec(os.path.join(FX, "sotto_dec_fx"), b, good, k16=True, lr=True)
+    assert len(yx) == len(yf)
+    hf = hb.bands_db(np.abs(hb.stft(yf)) ** 2, [(4000, 8000)])[:, 0]
+    hx = hb.bands_db(np.abs(hb.stft(yx)) ** 2, [(4000, 8000)])[:, 0]
+    d = np.abs(hf - hx)[hf > -60]
+    assert np.mean(d) < 1.5
+    x8 = resample_poly(x16 / 32768.0, 1, 2)
+    assert _score(x8, resample_poly(yx, 1, 2)) > _score(x8, resample_poly(yf, 1, 2)) - 0.15
+
+
+@need_lr16
+@pytest.mark.parametrize("variant", ["arm", "m0"])
+def test_fixed_lr16_code_paths_are_bit_exact(variant):
+    import check_fx
+    enc, dec = os.path.join(FX, f"sotto_enc_fx_{variant}"), os.path.join(FX, f"sotto_dec_fx_{variant}")
+    if not (os.path.exists(enc) and os.path.exists(dec)):
+        pytest.skip(f"{variant} build missing")
+    x16 = _speech16(3.0)
+    b = check_fx.run_enc(os.path.join(FX, "sotto_enc_fx"), x16, k16=True, lr=True)
+    assert np.array_equal(b, check_fx.run_enc(enc, x16, k16=True, lr=True))
+    good = np.arange(len(b)) % 8 != 3
+    assert np.array_equal(check_fx.run_dec(os.path.join(FX, "sotto_dec_fx"), b, good, k16=True, lr=True),
+                          check_fx.run_dec(dec, b, good, k16=True, lr=True))

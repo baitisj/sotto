@@ -291,6 +291,19 @@ void sotto_lr_enc_destroy(struct sotto_lr_enc *e) {
   free(e);
 }
 
+/* sotto 1200 hiss (sotto_lr_enc16 in sotto_fx_hiss.c): the same coder without its core, fed
+   the 20 ms frames after v3.8's voicing rules */
+struct sotto_lr_enc *sotto_lr_enc_create_frames(void) {
+  struct sotto_lr_enc *e = calloc(1, sizeof *e);
+  if (e) coder_init(&e->lr);
+  return e;
+}
+
+void sotto_lr_enc_push(struct sotto_lr_enc *e, const fx_fparams_t *p) { coder_push(&e->lr, p); }
+void sotto_lr_enc_end(struct sotto_lr_enc *e) { coder_end(&e->lr); }
+int sotto_lr_enc_pop(struct sotto_lr_enc *e, unsigned char out[SOTTO_BYTES_PER_FRAME]) { return coder_pop(&e->lr, out); }
+unsigned sotto_fx_lr_coder_bytes(void) { return (unsigned)sizeof(struct sotto_lr_enc); }
+
 /* the state's size with its core, bytes */
 unsigned sotto_fx_lr_enc_bytes(void) { return (unsigned)sizeof(struct sotto_lr_enc) + sotto_fx_enc_bytes(); }
 
@@ -330,13 +343,14 @@ int sotto_vlr_enc_pop(struct sotto_vlr_enc *e, unsigned char out[SOTTO_BYTES_PER
 int sotto_vlr_enc_flush(struct sotto_vlr_enc *e, unsigned char out[SOTTO_BYTES_PER_FRAME]) { (void)e, (void)out; return 0; }
 
 #ifdef SOTTO_V38
-/* no fixed-point sotto 1200 hiss */
+#if defined(FX_HISS_FB) && defined(FX_HISS_NO_ENC)  /* the K6's decoder-only images: no sotto 1200 hiss encoder */
 struct sotto_lr_enc16 *sotto_lr_enc16_create(void) { return NULL; }
 void sotto_lr_enc16_destroy(struct sotto_lr_enc16 *e) { (void)e; }
 int sotto_lr_encode16(struct sotto_lr_enc16 *e, const short speech[SOTTO_LR_SAMPLES_PER_FRAME_16K],
                       unsigned char out[SOTTO_BYTES_PER_FRAME]) { (void)e, (void)speech, (void)out; return 0; }
 int sotto_lr_enc16_flush(struct sotto_lr_enc16 *e, unsigned char out[SOTTO_BYTES_PER_FRAME]) { (void)e, (void)out; return 0; }
-#ifndef FX_HISS_FB                  /* with it, sotto_fx_hiss.c has the K6 hiss decoders */
+#endif
+#if defined(FX_HISS_LIGHT) && !defined(FX_HISS_FB)   /* sotto_fx_hiss.c has the full layer's (default) or the K6's */
 struct sotto_lr_dec16 *sotto_lr_dec16_create(void) { return NULL; }
 void sotto_lr_dec16_destroy(struct sotto_lr_dec16 *d) { (void)d; }
 void sotto_lr_decode16(struct sotto_lr_dec16 *d, const unsigned char in[SOTTO_BYTES_PER_FRAME], int good,
