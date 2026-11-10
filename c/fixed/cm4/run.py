@@ -27,9 +27,10 @@ It ignores wait states and bus stalls, so treat it as +-15 %. --flash adds a sam
 of the STM32F4's flash at 168 MHz (5 wait states, ART accelerator: 64 x 16-byte instruction
 lines with next-line prefetch, 8 x 16-byte data lines): the extra MHz when the tables stay
 in flash instead of RAM.
-Needs: pip install unicorn capstone.  SPDX-License-Identifier: MIT
+Needs: pip install unicorn==2.1.3 capstone (2.1.4 skipped an instruction under --flash).  SPDX-License-Identifier: MIT
 """
 import argparse, bisect, collections, json, os, subprocess, sys, tempfile, wave
+import unicorn
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_MODE_MCLASS, UC_HOOK_BLOCK, UC_HOOK_MEM_READ
 from unicorn.arm_const import (UC_CPU_ARM_CORTEX_M4, UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2,
                                UC_ARM_REG_R3, UC_ARM_REG_SP, UC_ARM_REG_LR)
@@ -169,6 +170,10 @@ class M4:
 class FlashModel:
     """STM32F4 ART accelerator, sampled: extra cycles for instruction and table reads from flash"""
     def __init__(self, m4, no_prefetch=False):
+        if unicorn.__version__.startswith('2.1.4'):
+            # with this read hook, unicorn 2.1.4 skipped an instruction of GCC -Os code (a movs
+            # before a call to memset) and the run went wrong; 2.1.3 runs it right
+            sys.exit('--flash needs unicorn other than 2.1.4: pip install unicorn==2.1.3')
         self.lo, self.hi = FLASH, FLASH + len(m4.img)
         self.prefetch = not no_prefetch
         self.ic, self.dc = collections.OrderedDict(), collections.OrderedDict()

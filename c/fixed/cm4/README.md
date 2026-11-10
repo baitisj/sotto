@@ -6,7 +6,7 @@ instruction emulator, every executed instruction costed with the Cortex-M4's pub
 timings.
 
 ```sh
-pip install unicorn capstone             # the emulator and the disassembler
+pip install unicorn==2.1.3 capstone      # the emulator (2.1.4 breaks --flash) and the disassembler
 sh tools/cm4_build.sh                    # c/fixed/cm4/build/bench.elf (clang + lld, -O2)
 python c/fixed/cm4/run.py c/fixed/cm4/build/bench.elf in.raw --bits m4.bit
 make -C c fixed && c/fixed/sotto_enc_fx in.raw x86.bit && cmp m4.bit x86.bit
