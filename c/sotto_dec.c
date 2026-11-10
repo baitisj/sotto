@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     long n = 0;
     while (fread(b, 1, sizeof b, in) == sizeof b) {
       int good = 1, c;
-      if (gf && (c = fgetc(gf)) != EOF) good = c != 0;
+      if (gf && (c = fgetc(gf)) != EOF) good = c == 2 ? 2 : c != 0;   /* 2: only voicing, pitch, energy */
       if (half) {
         sotto_lr_decode_half(d, b, good, 0, y);
         sotto_lr_decode_half(d, NULL, 0, 1, y + SOTTO_SAMPLES_PER_FRAME);

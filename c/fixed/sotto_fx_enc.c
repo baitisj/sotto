@@ -31,7 +31,10 @@
 #define NB 257                 /* stored bins 0..256 of the 512-point spectrum */
 #define K FX_K
 #define NC FX_NC
-#define LAG 8
+#ifndef FX_LAG
+#define FX_LAG 8               /* the pitch tracker's decision lag, 10 ms frames (lower: less delay) */
+#endif
+#define LAG FX_LAG
 #ifdef SOTTO_PITCH_THIRD
 #define N_MU 4                /* v3.7: also a third of frame t's own estimate */
 #else

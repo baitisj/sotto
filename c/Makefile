@@ -124,6 +124,44 @@ check-synthstate: fixed/sotto_dec_fx_k6 fixed/sotto_dec_fx_k6_synthstate
 	    cmp $(SYNTH_CHK)/a.raw $(SYNTH_CHK)/b.raw || { echo "FX_SYNTH_STATE differs: $$f $$a"; exit 1; }; n=$$((n + 1)); \
 	  done; \
 	done; echo "FX_SYNTH_STATE: $$n decodes, the same bytes"
+# the low-delay sotto 1200 builds (docs/sotto-1200.md, "Lower delay"): an encoder with
+# -DFX_LAG=4 -DLR_AHEAD=0 (80 ms sooner) and a decoder with -DLR_INTERP=0
+# -DSOTTO_LR_DEC_DELAY=1 (40 ms sooner). check-lowdelay builds both and checks that they give
+# as many superframes and samples as the default builds
+LOWDELAY_SRC = \
+	fixed/sotto_fx_hiss.c \
+	fixed/sotto_fx_dec.c \
+	fixed/sotto_fx_enc.c \
+	fixed/sotto_fx_lr.c \
+	fixed/sotto_fx_lr_enc.c \
+	fixed/sotto_fx_vlr.c \
+	sotto_vlr_tables.c \
+	fixed/fx_math.c \
+	fixed/fx_tables.c
+LOWDELAY_DEPS = \
+	fixed/fx.h \
+	fixed/fx_tables.h \
+	fixed/fx_internal.h \
+	sotto.h \
+	sotto_vlr.h \
+	sotto_lr_dec.inc
+fixed/sotto_enc_fx_lowdelay: sotto_enc.c $(LOWDELAY_SRC) $(LOWDELAY_DEPS)
+	$(CC) -O2 -std=c99 -ffp-contract=off -I. $(CFLAGS_VARIANT) $(FXFLAGS) -DFX_LAG=4 -DLR_AHEAD=0 -o $@ \
+	  sotto_enc.c $(LOWDELAY_SRC)
+fixed/sotto_dec_fx_lowdelay: sotto_dec.c $(LOWDELAY_SRC) $(LOWDELAY_DEPS)
+	$(CC) -O2 -std=c99 -ffp-contract=off -I. $(CFLAGS_VARIANT) $(FXFLAGS) -DLR_INTERP=0 -DSOTTO_LR_DEC_DELAY=1 -o $@ \
+	  sotto_dec.c $(LOWDELAY_SRC)
+LD_CHK = lowdelay.chk
+LD_RAW = ../codec/codec2/raw/ve9qrp_10s.raw
+check-lowdelay: fixed/sotto_enc_fx fixed/sotto_dec_fx fixed/sotto_enc_fx_lowdelay fixed/sotto_dec_fx_lowdelay
+	@mkdir -p $(LD_CHK)
+	fixed/sotto_enc_fx -1200 $(LD_RAW) $(LD_CHK)/a.bit
+	fixed/sotto_enc_fx_lowdelay -1200 $(LD_RAW) $(LD_CHK)/b.bit
+	test $$(wc -c < $(LD_CHK)/a.bit) -eq $$(wc -c < $(LD_CHK)/b.bit)
+	fixed/sotto_dec_fx -1200 $(LD_CHK)/a.bit $(LD_CHK)/a.raw
+	fixed/sotto_dec_fx_lowdelay -1200 $(LD_CHK)/a.bit $(LD_CHK)/b.raw
+	test $$(wc -c < $(LD_CHK)/a.raw) -eq $$(wc -c < $(LD_CHK)/b.raw)
+	@echo "low-delay builds: as many superframes and samples as the default builds"
 fixed/sotto_dec_fx: sotto_dec.o $(FX_DEC_OBJS) $(FX_OBJS)
 	$(CC) -o $@ $^
 fixed/sotto_enc_fx: sotto_enc.o $(FX_ENC_OBJS) $(FX_OBJS)
