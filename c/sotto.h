@@ -139,12 +139,15 @@ SOTTO_API extern int sotto_hiss_mute;
  * Encoder: feed 320 samples (40 ms) per call; superframes come out after the core's look-ahead
  * plus 2 superframes (its shape search looks 80 ms further ahead). sotto_lr_encode_part feeds a
  * last n80 x 80 samples before the flush; call sotto_lr_enc_flush until it returns 0.
- * Decoder: one call per received superframe (good = 0 to conceal one that failed its CRC);
- * each returns 320 samples SOTTO_LR_DEC_DELAY superframes behind (the first calls return
+ * Decoder: one call per received superframe (good = 0 to conceal one that failed its CRC;
+ * good = 2 on a link with unequal error protection when only the voicing, pitch and energy bits
+ * are trusted: the shape fields are then the last good superframe's); each returns 320 samples SOTTO_LR_DEC_DELAY superframes behind (the first calls return
  * silence), so that a lost superframe between two good ones can be rebuilt from both; call sotto_lr_dec_flush until it returns 0 for the last ones. */
 #define SOTTO_LR_SAMPLES_PER_FRAME 320
 #define SOTTO_LR_BITS_PER_FRAME 48
-#define SOTTO_LR_DEC_DELAY 2     /* superframes */
+#ifndef SOTTO_LR_DEC_DELAY
+#define SOTTO_LR_DEC_DELAY 2     /* superframes; 1 in an 8 kHz build with -DLR_INTERP=0 -DSOTTO_LR_DEC_DELAY=1 */
+#endif
 
 struct sotto_lr_enc;
 struct sotto_lr_dec;

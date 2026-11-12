@@ -18,6 +18,7 @@ jobs:
           make -C c check
           make -C c check-rowgen PYTHON=false
           make -C c check-synthstate PYTHON=false
+          make -C c check-lowdelay PYTHON=false
   tables:
     runs-on: ubuntu-latest
     steps:

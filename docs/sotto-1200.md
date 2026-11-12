@@ -141,6 +141,40 @@ Over the air: `python -m modem.k6 tx msg.sot tx.wav --phy F --payload XL --codec
 sotto 1200 frames with magic 0xA9 (`modem/pager.py` `MAGIC_1200`, `profile("XL", "1200")`);
 `rx --codec 1200` decodes them.
 
+## Lower delay, and links with unequal protection
+
+From Andrew Rodland's parallel fixed-point encoder (sotto PR #180), ported onto the fixed-point
+encoder on main. The defaults are unchanged and give the same bits as before.
+
+- **Decoder `good = 2`.** For a link that protects the voicing, pitch and energy bits better
+  than the shapes: the superframe's voicing, pitch and energy are used and its shape fields
+  (bits 14-31 and 40-47) are the last good superframe's. `good = 0` still conceals and `1`
+  decodes everything. Float and fixed decoders, and `sotto_dec -1200` with a good file whose
+  byte is 2 (`tests/test_fx_lr.py::test_good_2_keeps_the_last_good_shape`).
+- **Lower-delay builds** for push-to-talk, fixed-point encoder and the 8 kHz decoder only.
+  The delays are to the first superframe out after the start of speech (a 40 ms call each):
+
+  | Build | First superframe out | PESQ-NB clean | 1 in 8 lost |
+  |---|---:|---:|---:|
+  | Default | after 200 ms of input | 2.838 | 2.295 |
+  | Encoder `-DFX_LAG=4` (pitch tracker decides 40 ms behind instead of 80) | 160 ms | 2.799 | 2.275 |
+  | Encoder `-DFX_LAG=4 -DLR_AHEAD=0` (A(n+1)'s joint search leaves out B(n+1) and A(n+2)) | 120 ms | 2.774 | 2.272 |
+  | Decoder `-DLR_INTERP=0 -DSOTTO_LR_DEC_DELAY=1` (1 superframe behind instead of 2) | 40 ms less | 2.838 | 1.896 |
+
+  PESQ from the default fixed decoder (the last row: the low-delay decoder on the default
+  encoder's bits), on the three `docs/samples/*__original.flac` voices. The low-delay decoder
+  gives up rebuilding a lone lost superframe from both neighbours, which is what the 1-in-8
+  column measures; on a link that loses superframes in pairs or not at all it costs nothing.
+  `make -C c check-lowdelay` builds both and checks their superframe and sample counts.
+  Not for the 16 kHz layer, whose rules assume the default delays.
+- On the same three voices the fixed encoder on main matches the float encoder on 97.1 % of
+  superframes (PR #180's: 97.3 %), PESQ 2.848 against the float's 2.839 through the float
+  decoder.
+- PR #180 also timed its encoder on an AT32F403A (Cortex-M4F, 240 MHz, DWT cycles): v3.7 encode
+  88.4 MHz mean / 97.3 worst per 20 ms, where the Cortex-M4 model in `c/fixed/cm4` gave about
+  78-80 / 85-86 for a similar v3.7 build. So the model may read 10-15 % low; the UV-380
+  numbers in `docs/c-port.md` still fit with that margin.
+
 ## Listening round 18
 
 Blind A/B, original in every pair (`tools/listening/render_ab18.py`, key

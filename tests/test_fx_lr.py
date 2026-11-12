@@ -135,3 +135,39 @@ def test_fixed_lr16_code_paths_are_bit_exact(variant):
     good = np.arange(len(b)) % 8 != 3
     assert np.array_equal(check_fx.run_dec(os.path.join(FX, "sotto_dec_fx"), b, good, k16=True, lr=True),
                           check_fx.run_dec(dec, b, good, k16=True, lr=True))
+
+
+@need_lr
+@pytest.mark.parametrize("dec", [os.path.join(C, "sotto_dec"), os.path.join(FX, "sotto_dec_fx")])
+def test_good_2_keeps_the_last_good_shape(dec, tmp_path):
+    """good = 2 (a link with unequal error protection): the superframe's voicing, pitch and
+    energy are used, its shape fields (bits 14-31 and 40-47) are the last good superframe's.
+    So garbled shapes under good = 2 decode exactly as the same superframes with the shapes
+    copied forward by hand."""
+    x = _ve9qrp(4)
+    (tmp_path / "x.raw").write_bytes(x.astype("<i2").tobytes())
+    subprocess.run([os.path.join(C, "sotto_enc"), "-1200", tmp_path / "x.raw", tmp_path / "x.bit"], check=True)
+    b = np.unpackbits(np.frombuffer((tmp_path / "x.bit").read_bytes(), np.uint8)).reshape(-1, 48)
+    shape = np.zeros(48, bool)
+    shape[14:32] = shape[40:48] = True
+    rng = np.random.default_rng(2)
+    good = np.where(np.arange(len(b)) % 3 == 1, 2, 1).astype(np.uint8)
+    good[7] = 0                                           # a lost one in between still conceals
+    garbled, by_hand = b.copy(), b.copy()
+    last = b[0]
+    for i in range(len(b)):
+        if good[i] == 2:
+            garbled[i, shape] = rng.integers(0, 2, shape.sum())
+            by_hand[i, shape] = last[shape]
+        if good[i]:
+            last = by_hand[i]
+
+    def decode(bits, g):
+        (tmp_path / "in.bit").write_bytes(np.packbits(bits.astype(np.uint8), axis=1).tobytes())
+        (tmp_path / "g.u8").write_bytes(g.tobytes())
+        subprocess.run([dec, "-1200", tmp_path / "in.bit", tmp_path / "y.raw", tmp_path / "g.u8"], check=True)
+        return (tmp_path / "y.raw").read_bytes()
+
+    y2 = decode(garbled, good)
+    assert y2 == decode(by_hand, np.minimum(good, 1))
+    assert y2 != decode(garbled, np.minimum(good, 1))     # the garbled shapes do matter

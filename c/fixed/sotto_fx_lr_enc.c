@@ -159,7 +159,8 @@ static void a_first(lr_coder_t *c, int32_t t, lr_aframe_t *a) {
 }
 
 /* Sotto1200._joint for anchor a (frame t): prev = A(s-1) final (or NULL), b0 = B(s-1),
-   b1 = B(s), next = A(s+1) first pass (or NULL at the end) */
+   b1 = B(s), next = A(s+1) first pass (or NULL at the end); b1 = NULL leaves out B(s)'s term
+   (LR_AHEAD = 0) */
 static void a_joint(lr_coder_t *c, int32_t t, lr_aframe_t *a, const lr_aframe_t *prev, const fx_fparams_t *b0,
                     const fx_fparams_t *b1, const lr_aframe_t *next) {
   const lr_paths_t *q = a_paths(c, t, &a->p);
@@ -169,7 +170,7 @@ static void a_joint(lr_coder_t *c, int32_t t, lr_aframe_t *a, const lr_aframe_t 
   for (i = 0; i < q->np; i++) {
     fx_acc e = fx_shape_err(a->p.c, q->rec[i]) * wgt(a->p.ei);
     if (prev) e += b_best(b0->c, prev->rec, q->rec[i], &sb) * wgt(b0->ei);
-    e += b_best(b1->c, q->rec[i], next ? next->rec : q->rec[i], &sb) * wgt(b1->ei);   /* LR_JOINT = 1 */
+    if (b1) e += b_best(b1->c, q->rec[i], next ? next->rec : q->rec[i], &sb) * wgt(b1->ei);   /* LR_JOINT = 1 */
     FX_ACC_CHECK(e);
     if (i == 0 || e < bd) bd = e, best = i;
   }
@@ -218,27 +219,33 @@ static void code_superframe(lr_coder_t *c, const lr_aframe_t *a, const fx_fparam
 }
 
 /* code every superframe whose look-ahead is in: superframe n needs A(n+1) final, which
-   needs frames up to A(n+2) (its joint search looks at A(n+2)'s first pass) */
+   needs frames up to A(n+2) (its joint search looks at A(n+2)'s first pass). With
+   -DLR_AHEAD=0 (a lower-delay build, not the float encoder's bits) A(n+1)'s joint search leaves
+   out B(n+1) and A(n+2), so superframe n is coded once A(n+1) is in: 80 ms sooner, PESQ about
+   -0.02 (with FX_LAG=4, docs/sotto-1200.md) */
+#ifndef LR_AHEAD
+#define LR_AHEAD 1
+#endif
 static void drain(lr_coder_t *c) {
   for (;;) {
     int32_t t = c->ncoded;
     int has1, has2;
     const fx_fparams_t *b;
     lr_aframe_t a, n1, n2;
-    if (!c->flushed && c->nin < t + 5) return;   /* A(n), B(n), A(n+1), B(n+1), A(n+2) */
+    if (!c->flushed && c->nin < t + (LR_AHEAD ? 5 : 3)) return;   /* A(n), B(n), A(n+1), B(n+1), A(n+2) */
     if (c->nin == t + 1) *FR(c, t + 1) = *FR(c, t), c->nin = t + 2;   /* odd count: B = A */
     if (c->nin < t + 2) return;
-    has1 = c->nin >= t + 4, has2 = c->nin >= t + 5;
+    has1 = c->nin >= t + (LR_AHEAD ? 4 : 3), has2 = LR_AHEAD && c->nin >= t + 5;
     b = FR(c, t + 1);
     if (has1) a_first(c, t + 2, &n1);
     if (c->have_prev || (c->first && has1)) a = c->prevA;
     else {                                       /* the first superframe */
       a_first(c, t, &a);
-      a_joint(c, t, &a, NULL, NULL, b, has1 ? &n1 : NULL);
+      if (LR_AHEAD) a_joint(c, t, &a, NULL, NULL, b, has1 ? &n1 : NULL);
     }
     if (has1) {
       if (has2) a_first(c, t + 4, &n2);
-      a_joint(c, t + 2, &n1, &a, b, FR(c, t + 3), has2 ? &n2 : NULL);
+      a_joint(c, t + 2, &n1, &a, b, LR_AHEAD ? FR(c, t + 3) : NULL, has2 ? &n2 : NULL);
       code_superframe(c, &a, b, &n1);
       c->prevA = n1;
       c->have_prev = 1;
@@ -257,7 +264,7 @@ static void drain(lr_coder_t *c) {
    input ends before B(1). */
 static void first_ahead(lr_coder_t *c) {
   int32_t t = c->nin - 1;
-  if (c->have_prev || c->first) return;
+  if (!LR_AHEAD || c->have_prev || c->first) return;   /* LR_AHEAD = 0 has no such first call */
   if (t == 0) a_paths(c, 0, FR(c, 0));
   else if (t == 2) {
     lr_aframe_t n1;
