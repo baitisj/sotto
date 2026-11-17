@@ -201,7 +201,7 @@
     S.pcm = new Float32Array(c.n * 320);
     S.spec = null; S.dirty = false;
     S.started = true; S.running = true; S.paused = false;
-    if (!keepPlay) stopPlay();
+    if (!keepPlay) { stopPlay(); S.playPos = 0; }
     S.wantStart = $("auto").checked;
     sendBuffer();
     $("pause").disabled = false; $("pause").textContent = "Pause";
@@ -234,7 +234,7 @@
     }
     if (S.B >= st.totalBits && S.next >= st.n) S.running = false;
     // play as soon as it can
-    if (S.wantStart && S.ctx && !S.paused) {
+    if (S.wantStart && S.node && !S.paused) {
       const ready = S.order === "streamed"
         ? (S.lastAny >= 0 && (st.totalBits - S.B) / rate() <= S.clip.n * 0.02)
         : L >= st.ends[0];
@@ -344,20 +344,28 @@
       return true;
     }
   });`;
-  async function ensureAudio() {
-    if (S.ctx) { if (S.ctx.state !== "running") await S.ctx.resume(); return; }
-    const ctx = new AudioContext();
+  // Audio never holds up the machine: ensureAudio resolves within 1.5 s whatever the browser's
+  // audio does (a context whose resume() never settles used to leave Restart doing nothing).
+  let audioP = null;
+  function ensureAudio() {
+    if (S.ctx && S.ctx.state !== "running") S.ctx.resume().catch(() => {});
+    if (!audioP) audioP = setupAudio().catch(e => { audioP = null; msg(`No audio here (${e.message}); the rest still runs.`); });
+    return Promise.race([audioP, new Promise(r => setTimeout(r, 1500))]);
+  }
+  async function setupAudio() {
+    const ctx = new AudioContext();       // created and resumed inside the click, before any await
+    S.ctx = ctx;
+    ctx.resume().catch(() => {});
     const url = URL.createObjectURL(new Blob([WORKLET], { type: "text/javascript" }));
     await ctx.audioWorklet.addModule(url); URL.revokeObjectURL(url);
     const node = new AudioWorkletNode(ctx, "prog-player", { numberOfInputs: 0, outputChannelCount: [1] });
     node.connect(ctx.destination);
     node.port.onmessage = e => {
-      if ("pos" in e.data) S.playPos = e.data.pos;
+      if ("pos" in e.data && S.playing) S.playPos = e.data.pos;   // a late report after Stop or Restart is dropped
       if (e.data.ended) { S.playing = false; S.playPos = 0; $("play").textContent = "Play"; }
     };
     node.port.postMessage({ loop: $("loop").checked, buf: S.pcm || new Float32Array(320) });
-    S.ctx = ctx; S.node = node;
-    await ctx.resume();
+    S.node = node;
   }
   function startPlay(pos) {
     if (!S.node) return;
@@ -490,7 +498,9 @@
     // the resistor: beige body, colour bands for R
     const bh = 22;
     g.fillStyle = "#d8c49a"; g.strokeStyle = "#8c7a52"; g.lineWidth = 1;
-    g.beginPath(); g.roundRect(rx0, y - bh / 2, rw, bh, 9); g.fill(); g.stroke();
+    g.beginPath();
+    if (g.roundRect) g.roundRect(rx0, y - bh / 2, rw, bh, 9); else g.rect(rx0, y - bh / 2, rw, bh);
+    g.fill(); g.stroke();
     const bc = bands(S.R), bw = Math.max(5, rw * 0.06);
     [0.22, 0.34, 0.46, 0.8].forEach((p, i) => { g.fillStyle = bc[i]; g.fillRect(rx0 + rw * p - bw / 2, y - bh / 2, bw, bh); });
     g.fillStyle = css("--muted"); g.font = "11px system-ui, sans-serif"; g.textAlign = "center";
@@ -506,7 +516,8 @@
     $("dec-fill").style.height = `${100 * share}%`;
     let lostN = 0; if (S.packets) for (const v of S.cell) lostN += v === 2;
     const playS = Math.max(0, S.playPos / 16000);
-    $("dec-t").innerHTML = `${(100 * share).toFixed(0)}% of the bits<br>${S.playing ? `playing ${playS.toFixed(1)} s` : "not playing"}`;
+    const waiting = S.wantStart ? (st.order === "streamed" ? "plays once it won't run dry" : "plays once scan 1 is in") : "not playing";
+    $("dec-t").innerHTML = `${(100 * share).toFixed(0)}% of the bits<br>${S.playing ? `playing ${playS.toFixed(1)} s` : waiting}`;
     let what = "";
     if (st.order === "progressive") {
       let k = st.ends.findIndex(e => L < e); if (k < 0) k = st.ends.length;
@@ -538,12 +549,15 @@
 
   // ---------------------------------------------------------------- main loop
   let lastT = performance.now();
+  let warned = false;
   function frame(now) {
+    requestAnimationFrame(frame);       // first, so one failing step can't stop the machine
     const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
-    advance(dt, now);
-    if (S.dirty && (now - S.lastDec > Math.max(150, 4 * S.decMs) || !S.running)) decodeNow(now);
-    draw(now); drawPipe(dt); readout();
-    requestAnimationFrame(frame);
+    for (const step of [() => advance(dt, now),
+                        () => { if (S.dirty && (now - S.lastDec > Math.max(150, 4 * S.decMs) || !S.running)) decodeNow(now); },
+                        () => draw(now), () => drawPipe(dt), readout]) {
+      try { step(); } catch (e) { if (!warned) { warned = true; console.error(e); msg(`Something failed in this browser (${e.message}).`); } }
+    }
   }
 
   // ---------------------------------------------------------------- loading clips
@@ -587,7 +601,7 @@
     const c = id === "mine" ? cache.mine : await loadCanned(id);
     if (!c) return;
     setClip(c);
-    if (start) { await ensureAudio(); restart(); }
+    if (start) { restart(); ensureAudio(); }
   }
 
   // ---------------------------------------------------------------- recording
@@ -649,7 +663,7 @@
   $("pk").addEventListener("change", e => { S.packets = e.target.checked; $("loss").disabled = !S.packets; if (S.started) restart(); });
   $("loss").addEventListener("input", e => { S.loss = +e.target.value; $("loss-v").textContent = `${S.loss}%`; });
   $("loss").addEventListener("change", () => { if (S.started && S.packets) restart(); });
-  $("go").addEventListener("click", async () => { await ensureAudio(); restart(); });
+  $("go").addEventListener("click", () => { restart(); ensureAudio(); });
   $("pause").addEventListener("click", () => {
     if (!S.started) return;
     S.paused = !S.paused;
