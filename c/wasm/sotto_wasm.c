@@ -16,6 +16,11 @@
 #include <stdlib.h>
 #include "sotto.h"
 #include "sotto_vlr.h"
+#ifndef SOTTO_WASM_VLR
+#ifndef SOTTO_FX
+#include "sotto_prog.h"
+#endif
+#endif
 
 #define EXPORT(name) __attribute__((export_name(#name)))
 
@@ -80,6 +85,43 @@ EXPORT(sotto_wasm_decode16) int sotto_wasm_decode16(const unsigned char *bits, c
   sotto_dec16_destroy(d);
   return w;
 }
+
+#ifndef SOTTO_FX
+/* Progressive sotto 2400 (docs/sotto-progressive.md, c/sotto_prog.h): a clip of which only
+ * some fields have arrived. bits: n frames of 6 bytes; known: n bytes, bit k set when field k
+ * of the frame (c w e s0 s1 s2 s3) arrived; out: sotto_wasm_out_len16(n) samples. Missing
+ * fields are filled from the clip around them, then the 16 kHz decoder plays the frames; with
+ * every field known, the samples are sotto_wasm_decode16's. Returns the samples written. */
+EXPORT(sotto_wasm_decode16_prog) int sotto_wasm_decode16_prog(const unsigned char *bits, const unsigned char *known,
+                                                              int n, short *out) {
+  c2_next = 1;
+  struct sotto_dec16 *d = sotto_dec16_create();
+  sotto_fparams_t *p = malloc((size_t)(n > 0 ? n : 1) * sizeof *p);
+  unsigned char *rows = malloc((size_t)(n > 0 ? n : 1) * (SOTTO_BYTES_PER_FRAME + 1));
+  if (!d || !p || !rows) {
+    sotto_dec16_destroy(d);
+    free(p);
+    free(rows);
+    return -1;
+  }
+  unsigned char *sgood = rows + SOTTO_BYTES_PER_FRAME * n;
+  sotto_prog_fill2400(bits, known, n, p, rows, sgood);
+  short y[SOTTO_SAMPLES_PER_FRAME_16K];
+  int w = 0;
+  for (int i = 0; i < n; i++) {
+    sotto_decode16_params(d, p + i, rows + SOTTO_BYTES_PER_FRAME * i, sgood[i], y);
+    if (i >= SOTTO_DEC16_DELAY_FRAMES)
+      for (int k = 0; k < SOTTO_SAMPLES_PER_FRAME_16K; k++) out[w++] = y[k];
+  }
+  while (w + SOTTO_SAMPLES_PER_FRAME_16K <= n * SOTTO_SAMPLES_PER_FRAME_16K && sotto_dec16_flush(d, y))
+    for (int k = 0; k < SOTTO_SAMPLES_PER_FRAME_16K; k++) out[w++] = y[k];
+  sotto_dec16_destroy(d);
+  free(p);
+  free(rows);
+  return w;
+}
+
+#endif
 
 /* Frames sotto_wasm_encode16 may write for n samples (it writes ceil(n / 320)). */
 EXPORT(sotto_wasm_max_frames16) int sotto_wasm_max_frames16(int n) { return n / SOTTO_SAMPLES_PER_FRAME_16K + 2; }

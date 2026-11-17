@@ -124,6 +124,20 @@ export async function loadSotto(source, vlrSource) {
     // speech: Int16Array at 16 kHz (speech near -26 dBFS uses the energy field best; see
     // levelTo). Returns Uint8Array of 6-byte frames, the same bytes as `sotto_enc -16`.
     encode16: speech => runEncode(x, speech, x.sotto_wasm_max_frames16, x.sotto_wasm_encode16),
+    // Progressive sotto 2400 (docs/sotto-progressive.md): frames of which only some fields have
+    // arrived. known: Uint8Array, one byte per frame, bit k set when field k arrived (c w e s0 s1
+    // s2 s3: voicing, pitch, energy, the four shape stages). Missing fields are filled from the
+    // clip around them; with every field known this is decode16. Returns Int16Array at 16 kHz.
+    decode16Prog: (frames, known) => {
+      const n = Math.floor(frames.length / 6);
+      return withBlocks(x, [6 * n, n, 2 * x.sotto_wasm_out_len16(n)], (pb, pk, po) => {
+        new Uint8Array(x.memory.buffer, pb, 6 * n).set(frames.subarray(0, 6 * n));
+        new Uint8Array(x.memory.buffer, pk, n).set(known.subarray(0, n));
+        const w = x.sotto_wasm_decode16_prog(pb, pk, n, po);
+        if (w < 0) throw new Error("sotto: decoder allocation failed");
+        return new Int16Array(x.memory.buffer, po, w).slice();
+      });
+    },
     // frames: Uint8Array of 6-byte frames; good: optional Uint8Array, one byte per frame,
     // 0 where the frame failed its CRC. Returns Int16Array speech aligned with the encoder input.
     decode16: (frames, good) => runDecode(x, frames, good, x.sotto_wasm_out_len16, x.sotto_wasm_decode16),

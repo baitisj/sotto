@@ -27,6 +27,7 @@
 #include "sotto.h"
 #include "sotto_hiss_tables.h"
 #include "sotto_internal.h"
+#include "sotto_prog.h"
 
 #define FS16 16000
 #define N16 SOTTO_SAMPLES_PER_FRAME_16K     /* 320 */
@@ -510,6 +511,20 @@ void sotto_decode16(struct sotto_dec16 *d, const unsigned char in[SOTTO_BYTES_PE
   for (int b = 0; b < 4; b++) res[b] = sotto_hiss_cb6[index6(info->b2) * 4 + b];
   int code = frame_code(info->b2);
   dec_push(d, y8, info, code, res, info->run, frame_bit(in, 8), code == 0, good, speech);
+}
+
+/* a frame whose fields are already known (progressive sotto, sotto_prog.h): the core takes
+   them as they are, and the hiss layer reads its index, class and side-channel bit from the
+   row it is given; sgood = 0 keeps the side channel from trusting a filled pitch field */
+void sotto_decode16_params(struct sotto_dec16 *d, const sotto_fparams_t *p, const unsigned char row[6], int sgood,
+                           short speech[SOTTO_SAMPLES_PER_FRAME_16K]) {
+  short y8[SOTTO_SAMPLES_PER_FRAME];
+  sotto_dec_frame(d->core, p, 0, y8);
+  const sotto_dec_info_t *info = sotto_dec_info(d->core);
+  double res[4];
+  for (int b = 0; b < 4; b++) res[b] = sotto_hiss_cb6[index6(row) * 4 + b];
+  int code = frame_code(row);
+  dec_push(d, y8, info, code, res, 0, frame_bit(row, 8), code == 0, sgood, speech);
 }
 
 /* the end of the stream: returns 1 and 320 samples while output remains */
