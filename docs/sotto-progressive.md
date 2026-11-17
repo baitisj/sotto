@@ -191,8 +191,18 @@ runs the v3.7 decoder core that every mode already shares (`sotto_dec_frame` in 
   (`sim/data/prog_prior.npz`, 76 bytes as int8; trained by `tools/prog_race.py --train-prior` on
   the six Codec 2 reference clips, none of them in the test set).
 
+With the 4-8 kHz hiss band (section 10), three more rules:
+
+- **A filled unvoiced (UU) frame copies the hiss index of the nearest UU frame that has one.**
+  A UU frame's pitch bits carry a hiss index, and two indices are never averaged.
+- **A sotto 1200 B frame whose hiss code hasn't arrived** gets the mean of its UU anchors' hiss,
+  as a rebuilt superframe does today.
+- **A frame whose pitch field hasn't arrived carries no side-channel bit.** The speaker-shape
+  messages treat it as lost.
+
 Then the normal decoder runs. When every field is known this is the streamed decode exactly
-(checked in all four modes: identical samples, `tests/test_prog.py`).
+(checked in all four modes, and with the hiss band for 2400 and 1200: identical samples,
+`tests/test_prog.py`).
 
 ## 5. Signalling
 
@@ -363,13 +373,78 @@ get both, but it is a new codec with new tables (and the K6 flash has no room fo
 
 ## 9. Next steps
 
-**Hiss band.** The 4-8 kHz hiss layer (v3.8) travels in the same order: its hiss index is in unvoiced frames' pitch bits, so it arrives with the first scans, and the clip header has a hiss flag. Not done: a fill rule for a missing hiss index (copy the nearer neighbour's, never average two) and a check of the speaker side channel, scored with the 16 kHz decoder. Everything above is the 8 kHz core.
-
 1. A blind listening round: the SI scans against sotto 600 / 1200 at the same share, and the 10%
    loss pairs, to check by ear what PESQ says.
 2. `modem.k6 tx --order progressive` and `rx` in blowfang (Python, host only), with the
    packet loss runs above repeated through `tools/k6_pcmhash.py`.
 3. The C fill layer in `c/` and `c/fixed/`, then the K6 receiver (module first) and the UV-380.
+
+## 10. The 4-8 kHz hiss band (v3.8 and sotto 1200 hiss)
+
+*Added 2026-11-17 at Jeff's request. `tools/prog_race.py --hiss DIR`, results
+`docs/results/prog_hiss.json`.*
+
+The hiss layer uses the same 48-bit frames (sotto 2400 = v3.8, sotto 1200 hiss), so the same
+scan order, signalling (the clip header's hiss flag) and receiver apply. The hiss index rides in
+unvoiced frames' pitch bits and so arrives with the first scans. Section 4's three hiss rules
+fill what is missing, and the 16 kHz decoders run unchanged on the result.
+
+Test set: the 9 of the 16 held-out voices available at 16 kHz (`/mnt/project-files/vocoder/
+samples-clean16/`: 8 EARS clips, the same cuts as `samples-clean`, plus librispeech_251_m).
+Scores: wideband PESQ on the 16 kHz output, narrowband PESQ and ESTOI on its 0-4 kHz part, and
+the hiss error on fricative frames as `tools/eval_lr_hiss.py` measures it (rms over the four
+1 kHz bands of output minus input dB).
+
+**Scans.** The hiss sharpens along with the rest:
+
+| sotto 2400 (v3.8), SI | Share | PESQ-WB | PESQ-NB | ESTOI | Hiss error rms / bias |
+|---:|---:|---:|---:|---:|---:|
+| scan 1 | 24.0% | 1.29 | 1.99 | 0.654 | 9.2 / -4.7 dB |
+| scan 3 | 47.9% | 1.42 | 2.24 | 0.704 | 5.9 / -2.5 dB |
+| scan 5 | 66.7% | 1.56 | 2.59 | 0.770 | 4.8 / -1.3 dB |
+| scan 7 (complete) | 100% | 1.67 | 2.83 | 0.820 | 4.5 / -0.8 dB |
+
+| sotto 1200 hiss, SI | Share | PESQ-WB | PESQ-NB | ESTOI | Hiss error rms / bias |
+|---:|---:|---:|---:|---:|---:|
+| scan 1 | 24.0% | 1.14 | 1.55 | 0.512 | 14.2 / -9.7 dB |
+| scan 2 | 47.9% | 1.32 | 2.01 | 0.660 | 8.8 / -5.1 dB |
+| scan 4 | 83.3% | 1.47 | 2.38 | 0.737 | 4.9 / -1.6 dB |
+| scan 5 (complete) | 100% | 1.54 | 2.55 | 0.768 | 4.7 / -1.2 dB |
+
+Early scans have the hiss index but play the band too quiet (negative bias). The decoder
+predicts the hiss level from the decoded 0-4 kHz envelope, and an envelope with only its first
+shape stage comes out duller. A sotto 1200 B frame also waits for its hiss code until scan 3.
+Both settle as the shape stages arrive.
+
+**Packet loss**, the same set-up as section 2, at the same air time:
+
+| | Loss | Streamed + parity | Progressive, clip + front parity | Progressive, group + front parity |
+|---|---|---:|---:|---:|
+| 2400 | 10% | 1.59 / 2.67 / 5.1 dB | **1.63 / 2.79 / 4.6 dB** | 1.63 / 2.76 / 4.7 dB |
+| 2400 | 20% | 1.48 / 2.39 / 7.0 dB | **1.53 / 2.61 / 5.3 dB** | 1.49 / 2.46 / 6.3 dB |
+| 1200 | 10% | 1.46 / 2.40 / 5.9 dB | **1.51 / 2.49 / 4.9 dB** | 1.47 / 2.41 / 5.8 dB |
+| 1200 | 20% | 1.33 / 2.03 / 13.1 dB | **1.39 / 2.24 / 6.9 dB** | 1.34 / 2.12 / 6.8 dB |
+
+(PESQ-WB / PESQ-NB / hiss error rms.) The hiss band gains most: at 20% loss in sotto 1200 the
+streamed order's hiss is 13 dB off on fricatives, the progressive order's 7 dB. A lost streamed
+packet takes whole frames, and concealment fades their hiss. A lost progressive packet mostly
+takes refinements, and every frame keeps its own hiss index.
+
+**Playing while receiving** (F/1800, start once scan 1 is in, as section 6):
+
+| | Start | Progressive order | Just in time | Complete clip |
+|---|---:|---:|---:|---:|
+| 2400 (v3.8) | 3.5-4.7 s | 1.42 / 2.29 / 6.3 dB | **1.60 / 2.70 / 4.7 dB** | 1.67 / 2.83 / 4.5 dB |
+| 1200 hiss | 1.8-2.4 s | 1.36 / 2.09 / 7.9 dB | **1.54 / 2.51 / 4.7 dB** | 1.54 / 2.55 / 4.7 dB |
+
+As at 8 kHz, just in time plays sotto 1200 hiss at full quality from about 2 s. sotto 2400 plays
+close to full quality from 4.7 s for a 12 s clip, where the streamed order can't start before
+7.8 s. (The start is earlier for the shorter EARS clips, since it scales with the clip.)
+
+What the hiss band adds to a receiver: nothing beyond section 4's rules. The 16 kHz decoders
+(`c/sotto_hiss.c`, which serves both modes) take the same per-frame fields as the 8 kHz ones. The K6
+plays plain 8 kHz, so for it a hiss stream is just sotto 2400 or 1200 (its UU frames' noise
+spaced by the hiss index), as today.
 
 ## Use
 
@@ -380,6 +455,8 @@ python tools/prog_race.py --heard               # playing while receiving, progr
 python tools/prog_race.py --heard --demo CLIP.flac --out build/prog-heard
 python tools/prog_race.py --demo CLIP.flac --mode 2400 --script SI --out build/prog-demo
 python tools/prog_race.py --train-prior         # sim/data/prog_prior.npz
+python tools/prog_race.py --hiss /mnt/project-files/vocoder/samples-clean16 --json docs/results/prog_hiss.json
+python tools/prog_race.py --hiss x --demo CLIP16.wav --out build/prog-hiss-demo
 ```
 
 The race caches each clip's encoded bits in `build/prog-cache/` (`PROG_CACHE` to move it).

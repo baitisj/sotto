@@ -278,6 +278,139 @@ def heard_demo(path, mode, link, out):
                  subtype="PCM_16")
 
 
+# ---------------------------------------------------------------- the hiss band (16 kHz)
+def bits16_for(mode, path, x16):
+    os.makedirs(CACHE, exist_ok=True)
+    f = os.path.join(CACHE, f"h{mode}__{os.path.splitext(os.path.basename(path))[0]}.npy")
+    if os.path.exists(f):
+        return np.load(f)
+    b = sp.encode16(mode, x16)
+    np.save(f, b)
+    return b
+
+
+def load16(path):
+    x, fs = sf.read(path)
+    assert fs == 16000
+    return x[:len(x) // 640 * 640]
+
+
+def score16(x, y):
+    import eval_lr_hiss as ev
+    return ev.score(x, y)
+
+
+def heard16(mode, b, seq, ratio, t0, n16, chunk_s=0.2):
+    """heard() with the hiss band: each chunk of output is the 16 kHz decode of what had
+    arrived by the time the chunk plays."""
+    ns = len(b)
+    dur = 0.02 * FPS[mode]
+    w = dict(sp.layout(mode))
+    cum = np.cumsum([w[k] for _, k in seq])
+    total = cum[-1]
+    air = ratio * ns * dur
+    per = max(1, int(round(chunk_s / dur)))
+    y = np.zeros(n16)
+    for s0 in range(0, ns, per):
+        got = min(total, (t0 + s0 * dur) / air * total)
+        k = int(np.searchsorted(cum, got, side="right"))
+        yk = sp.decode16(mode, b, sp.known_items(mode, ns, seq[:k]), n16=n16)
+        a, e = int(s0 * dur * 16000), min(n16, int((s0 + per) * dur * 16000))
+        y[a:e] = yk[a:e]
+    return y
+
+
+def hiss_job(args):
+    mode, path = args
+    x = load16(path)
+    n = len(x)
+    b = bits16_for(mode, path, x)
+    ns = len(b)
+    scr = sp.SCRIPTS[mode]["SI"]
+    _, ends = sp.order(mode, ns, scr)
+    out = {"scans": [], "loss": {}, "heard": {}}
+    for k in range(1, len(scr) + 1):
+        y = sp.decode16(mode, b, sp.known_after(mode, ns, scr, k), n16=n)
+        out["scans"].append(dict(scan=k, share=ends[k - 1] / (ns * 48), **score16(x, y)))
+    full, _ = sp.hiss_codec(mode)
+    rng = np.random.default_rng(sum(map(ord, os.path.basename(path))))
+    draws = rng.random(8192)
+    for rate in (0.1, 0.2):
+        lost = lambda k, r=rate: draws[k] < r
+        y = full.decode_audio16(b, streamed_good(ns, lost, parity=True), n16=n)
+        out["loss"][f"{rate}/streamed+par"] = score16(x, y)
+        for name, block in (("prog-clip+par", None), ("prog-group+par", 160)):
+            rb, kn = sp.lost_packets(mode, b, scr, block=block, lost=lost, parity="front")
+            out["loss"][f"{rate}/{name}"] = score16(x, sp.decode16(mode, rb, kn, n16=n))
+    r = LINKS[(mode, "F1800")]
+    clip_s = ns * 0.02 * FPS[mode]
+    t0 = ends[0] / (ns * 48) * r * clip_s
+    per = max(1, int(round(0.2 / (0.02 * FPS[mode]))))
+    for tag, seq in (("progressive", sp.order(mode, ns, scr)[0]),
+                     ("justintime", sp.jit_order(mode, ns, scr, 1, r, lag=per))):
+        out["heard"][tag] = dict(start_s=t0, **score16(x, heard16(mode, b, seq, r, t0, n)))
+    return mode, os.path.basename(path), out
+
+
+def hiss_demo(path, out):
+    """16 kHz demos with the hiss band: a tour of the SI scans (sotto 2400 = v3.8 and sotto
+    1200 hiss), and what a receiver plays while it receives at F/1800, progressive against
+    just in time."""
+    os.makedirs(out, exist_ok=True)
+    x = load16(path)
+    n = len(x)
+    name = os.path.splitext(os.path.basename(path))[0]
+    sf.write(os.path.join(out, f"{name}__original16k.wav"), x, 16000, subtype="PCM_16")
+    for mode in ("2400", "1200"):
+        b = bits16_for(mode, path, x)
+        ns = len(b)
+        scr = sp.SCRIPTS[mode]["SI"]
+        _, ends = sp.order(mode, ns, scr)
+        tour = []
+        for k in range(1, len(scr) + 1):
+            tour += [np.clip(sp.decode16(mode, b, sp.known_after(mode, ns, scr, k), n16=n), -1, 1), np.zeros(8000)]
+        sf.write(os.path.join(out, f"{name}__{mode}hiss_SI_tour.wav"), np.concatenate(tour), 16000, subtype="PCM_16")
+        r = LINKS[(mode, "F1800")]
+        t0 = ends[0] / (ns * 48) * r * ns * 0.02 * FPS[mode]
+        per = max(1, int(round(0.2 / (0.02 * FPS[mode]))))
+        for tag, seq in (("progressive", sp.order(mode, ns, scr)[0]),
+                         ("justintime", sp.jit_order(mode, ns, scr, 1, r, lag=per))):
+            y = np.clip(heard16(mode, b, seq, r, t0, n), -1, 1)
+            sf.write(os.path.join(out, f"{name}__{mode}hiss_F1800_asheard_{tag}_start{t0:.1f}s.wav"), y, 16000,
+                     subtype="PCM_16")
+
+
+def hiss_race(clips16, out):
+    clips = sorted(glob.glob(os.path.join(clips16, "*.wav")))
+    jobs = [(m, p) for m in ("2400", "1200") for p in clips]
+    with Pool(4) as pool:
+        r = pool.map(hiss_job, jobs)
+    res = {}
+    for mode, clip, d in r:
+        res.setdefault(mode, {})[clip] = d
+    keys = ("pesq_wb", "pesq_nb", "estoi", "hiss_rms_db", "hiss_bias_db")
+    mean = lambda rows: {k: round(float(np.mean([q[k] for q in rows])), 3) for k in keys}
+    summary = {}
+    for mode, per in res.items():
+        d0 = list(per.values())[0]
+        sm = {"scans": [], "loss": {}, "heard": {}}
+        for i, sc in enumerate(d0["scans"]):
+            m = mean([d["scans"][i] for d in per.values()])
+            sm["scans"].append(dict(scan=sc["scan"], share=round(sc["share"], 3), **m))
+            print(f"{mode} scan {sc['scan']} {sc['share'] * 100:5.1f}%  WB {m['pesq_wb']:.3f}  NB {m['pesq_nb']:.3f}  "
+                  f"ESTOI {m['estoi']:.3f}  hiss rms {m['hiss_rms_db']:.1f} dB bias {m['hiss_bias_db']:+.1f}")
+        for part in ("loss", "heard"):
+            for k in d0[part]:
+                m = mean([d[part][k] for d in per.values()])
+                sm[part][k] = m
+                print(f"{mode} {part} {k:22s} WB {m['pesq_wb']:.3f}  NB {m['pesq_nb']:.3f}  ESTOI {m['estoi']:.3f}  "
+                      f"hiss rms {m['hiss_rms_db']:.1f} dB")
+        summary[mode] = sm
+    if out:
+        with open(out, "w") as f:
+            json.dump(dict(clips=[os.path.basename(c) for c in clips], summary=summary, per_clip=res), f, indent=1)
+
+
 def demo(path, mode, script, out):
     """One WAV per scan (what the receiver can play once that scan is in), plus a 'tour' WAV
     that plays them in order with a short gap."""
@@ -318,6 +451,7 @@ if __name__ == "__main__":
     ap.add_argument("--prior-samples", default=PRIOR_SAMPLES)
     ap.add_argument("--loss", help="comma list: every8, rate0.1, ... (packet loss conditions)")
     ap.add_argument("--heard", action="store_true", help="playback while receiving")
+    ap.add_argument("--hiss", metavar="CLIPS16", help="16 kHz clips: the hiss band through every test")
     ap.add_argument("--demo")
     ap.add_argument("--mode", default="2400")
     ap.add_argument("--script", default="PI")
@@ -325,6 +459,10 @@ if __name__ == "__main__":
     a = ap.parse_args()
     if a.train_prior:
         train_prior(a.prior_samples)
+    elif a.hiss and a.demo:
+        hiss_demo(a.demo, a.out)
+    elif a.hiss:
+        hiss_race(a.hiss, a.json)
     elif a.heard and a.demo:
         for m, l in LINKS:
             heard_demo(a.demo, m, l, a.out)

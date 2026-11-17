@@ -116,3 +116,23 @@ def test_jit_order(mode, ratio):
             break
         last = s
         assert cum[i] <= base_bits + s * 48 / ratio + 1e-9
+
+
+@pytest.mark.parametrize("mode", ["2400", "1200"])
+def test_hiss_complete_block_decodes_as_streamed(mode):
+    """With the 4-8 kHz hiss band too, a complete block's 16 kHz output is the streamed
+    decoder's (v3.8, sotto 1200 hiss), sample for sample."""
+    b = random_superframes(60, seed=7)
+    n16 = 60 * 320 * (2 if mode == "1200" else 1)
+    want = sp.decode16(mode, b, n16=n16)
+    got = sp.decode16(mode, b, sp.known_after(mode, len(b), sp.SCRIPTS[mode]["SI"], 99), n16=n16)
+    assert np.array_equal(want, got)
+
+
+def test_hiss_fill_copies_the_nearest_uu_index():
+    code = np.array([0, 0, 1, 0, 0])
+    wi = np.array([10, 99, 60, 99, 40])
+    have = np.array([True, False, True, False, True])
+    c, w, _ = sp._fill_vpe(code, wi, np.zeros(5, int), have, hiss=True)
+    assert c[1] == 0 and w[1] == 10            # UU: the nearest UU frame's index, copied
+    assert c[3] == 1 and w[3] == 60            # voiced (nearer neighbour wins a tie by coming first): its pitch

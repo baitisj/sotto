@@ -335,12 +335,16 @@ def _fill_time(vals, have):
     return out, True
 
 
-def _fill_vpe(code, wi, ei, have):
+def _fill_vpe(code, wi, ei, have, hiss=False):
     """Voicing / pitch / energy for frames that lack them: from the neighbours with them,
     sotto 1200's B rule (halfway pitch when both voiced, the voiced one's otherwise, energy
-    halfway, voicing of the earlier neighbour with an edge read as mixed)."""
+    halfway, voicing of the nearer neighbour with an edge read as mixed). hiss: an unvoiced
+    (UU) frame's pitch field is a hiss index (v3.8), so a filled UU frame copies the index of
+    the nearest UU frame that has one; two indices are never averaged."""
     n = len(code)
     idx = np.where(have)[0]
+    uu = idx[code[idx] == 0]
+    code0, wi0 = code.copy(), wi.copy()
     code, wi, ei = code.copy(), wi.copy(), ei.copy()
     if len(idx) == 0:
         return code * 0, wi, ei * 0
@@ -361,18 +365,20 @@ def _fill_vpe(code, wi, ei, have):
         ei[f] = (ei[a] + ei[b] + 1) >> 1
         c = code[a] if (f - a) <= (b - f) else code[b]
         code[f] = 2 if c == 3 else c
+        if hiss and code[f] == 0 and len(uu):
+            wi[f] = wi0[uu[np.argmin(np.abs(uu - f))]]
     return code, wi, ei
 
 
 # ---------------------------------------------------------------- partial decoders
-def partial_frames(mode, bits, known, prior=None):
+def partial_frames(mode, bits, known, prior=None, hiss=False):
     """Per 20 ms frame parameters (code, wi, ei, shape) from the superframes `bits` with only
     the fields marked in `known` (dict field -> bool per superframe) trusted."""
     prior = load_prior() if prior is None else prior
     if mode == "2400":
-        return _partial_2400(bits, known, prior)
+        return _partial_2400(bits, known, prior, hiss)
     if mode == "1200":
-        return _partial_1200(bits, known, prior)
+        return _partial_1200(bits, known, prior, hiss)
     return _partial_vlr(mode, bits, known, prior)
 
 
@@ -390,7 +396,7 @@ def _shape_out(code, c, have, prior):
     return out
 
 
-def _partial_2400(bits, known, prior):
+def _partial_2400(bits, known, prior, hiss=False):
     vq = codec("2400").vq
     F = [unpack("2400", b) for b in np.asarray(bits)]
     n = len(F)
@@ -398,7 +404,7 @@ def _partial_2400(bits, known, prior):
     code = np.array([f["c"] for f in F])
     wi = np.array([f["w"] for f in F])
     ei = np.array([f["e"] for f in F])
-    code, wi, ei = _fill_vpe(code, wi, ei, hv)
+    code, wi, ei = _fill_vpe(code, wi, ei, hv, hiss)
     c = np.zeros((n, vl.K - 1))
     hs = known["s0"].copy()
     for f in range(n):
@@ -409,7 +415,7 @@ def _partial_2400(bits, known, prior):
     return [dict(code=int(code[f]), wi=int(wi[f]), ei=int(ei[f]), shape=sh[f]) for f in range(n)]
 
 
-def _partial_1200(bits, known, prior):
+def _partial_1200(bits, known, prior, hiss=False):
     v = codec("1200")
     F = [v.unpack(b) for b in np.asarray(bits)]
     ns = len(F)
@@ -417,7 +423,7 @@ def _partial_1200(bits, known, prior):
     wa = np.array([f["wa7"] for f in F])
     ea = np.array([f["ea"] for f in F])
     ha = known["ca"] & known["wa"] & known["ea"]
-    ca, wa, ea = _fill_vpe(ca, wa, ea, ha)
+    ca, wa, ea = _fill_vpe(ca, wa, ea, ha, hiss)
     c = np.zeros((ns, vl.K - 1))
     hs = known["sa0"].copy()
     for s in range(ns):
@@ -491,3 +497,94 @@ def decode_audio(mode, bits, known=None, prior=None):
 
 def encode(mode, x):
     return codec(mode).encode(x)
+
+
+# ---------------------------------------------------------------- the 4-8 kHz hiss layer (v3.8)
+_HISS = {}
+
+
+def hiss_codec(mode):
+    """The 16 kHz references with the hiss band (cached): v3.8 for 2400, sotto 1200 hiss for
+    1200, both with v3.8's candidate settings, plus a partial-decoding subclass of each."""
+    if mode not in _HISS:
+        import hiss_band as hb
+        import sotto_lr_hiss as lh
+
+        class V38P(hb.SottoV38):
+            def _hiss_model(self, bits, good):
+                return self._pm
+
+            def _read_pc(self, bits, good):
+                return hb.SottoV38._read_pc(self, bits, self._sg)
+
+        class LRHP(lh.Sotto1200Hiss):
+            def _hiss_model(self, rows, good):
+                return self._pm
+
+        if mode == "2400":
+            _HISS[mode] = (hb.SottoV38(**lh.V38), V38P(**lh.V38))
+        else:
+            _HISS[mode] = (lh.Sotto1200Hiss(), LRHP())
+    return _HISS[mode]
+
+
+def encode16(mode, x16):
+    return hiss_codec(mode)[0].encode(x16)
+
+
+def decode16(mode, bits, known=None, n16=None, seed=0, prior=None):
+    """16 kHz audio with the hiss band from superframes with the known mask (None: the
+    streamed decoder). Fill rules for the hiss fields (docs/sotto-progressive.md section 4):
+    a filled UU frame copies the nearest UU frame's hiss index; a sotto 1200 B frame whose
+    hiss code is missing gets its anchors' mean; a frame whose pitch field is missing
+    carries no side-channel bit (it counts as lost to the speaker-shape messages)."""
+    full, part = hiss_codec(mode)
+    bits = np.asarray(bits)
+    if known is None:
+        return full.decode_audio16(bits, n16=n16, seed=seed)
+    fp = partial_frames(mode, bits, known, prior, hiss=True)
+    # the v3.7 core synthesis with v3.8's 50 Hz unvoiced spacing (sotto 1200 hiss's _synth)
+    part._pm = hiss_codec("1200")[1]._synth(fp)
+    code = np.array([q["code"] for q in fp])
+    if mode == "2400":
+        rows = bits.copy()
+        for g, q in enumerate(fp):
+            rows[g, 0], rows[g, 1] = q["code"] >> 1, q["code"] & 1
+            rows[g, 2:9] = [(q["wi"] >> (6 - b)) & 1 for b in range(7)]
+        part._sg = known["c"] & known["w"] & known["e"]
+        return hb_decode16(part, rows, n16, seed)
+    ns = len(bits)
+    v = part
+    F = [v._fields(b) for b in bits]
+    ka = known["ca"] & known["wa"] & known["ea"]
+    kb = known["cb"] & known["dw"] & known["de"]
+    res, side, sg = np.zeros((2 * ns, 4)), np.zeros(2 * ns, int), np.zeros(2 * ns, bool)
+    for s in range(ns):
+        g = 2 * s
+        sg[g] = ka[s]
+        if code[g] == 0:
+            wa = fp[g]["wi"] if not ka[s] else F[s]["wa"]
+            res[g] = v.cb[wa >> 1]
+            side[g] = wa & 1
+    isq = lambda g: res[g] if 0 <= g < 2 * ns and code[g] == 0 else None
+    for s in range(ns):
+        g = 2 * s + 1
+        sg[g] = kb[s]
+        if code[g] != 0:
+            continue
+        base = v._b_base(isq(g - 1), isq(g + 1))
+        if kb[s]:
+            dw = F[s]["dw"]
+            res[g] = base + v.bcb[dw >> 1 if v.B_SIDE else dw]
+            side[g] = dw & 1 if v.B_SIDE else 0
+        else:
+            res[g] = base
+    v._res = res
+    v._side_good = sg
+    rows = v._rows(code, side)
+    return hb_decode16(v, rows, n16, seed)
+
+
+def hb_decode16(v, rows, n16, seed):
+    import hiss_band as hb
+    return hb.SottoV38.decode_audio16(v, rows, np.ones(len(rows), bool), n16=n16, seed=seed)
