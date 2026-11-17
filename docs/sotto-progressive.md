@@ -378,6 +378,9 @@ get both, but it is a new codec with new tables (and the K6 flash has no room fo
 2. `modem.k6 tx --order progressive` and `rx` in blowfang (Python, host only), with the
    packet loss runs above repeated through `tools/k6_pcmhash.py`.
 3. The C fill layer in `c/` and `c/fixed/`, then the K6 receiver (module first) and the UV-380.
+   The float fill for sotto 2400 is in: `c/sotto_prog.c` (the same frame fields as the Python,
+   `tests/test_prog_web.py`), behind the browser demo `docs/progressive.html`. Still to do: 1200,
+   600 / 400, and the fixed-point version.
 
 ## 10. The 4-8 kHz hiss band (v3.8 and sotto 1200 hiss)
 

@@ -26,7 +26,10 @@ CFLAGS_VARIANT = -DSOTTO_V36 -DSOTTO_PITCH_THIRD -DSOTTO_V38
 ifdef RULE_LAG
 CFLAGS_VARIANT += -DSOTTO_RULE_LAG=$(RULE_LAG)
 endif
-HISS_OBJS = sotto_hiss.o sotto_hiss_tables.o
+HISS_OBJS = \
+	sotto_hiss.o \
+	sotto_hiss_tables.o \
+	sotto_prog.o
 else ifeq ($(VARIANT),v3.7)
 CODEBOOK ?= sim/data/shape_msvq_9988.npz
 CBROUND = --round 8
@@ -207,7 +210,8 @@ check-tables:
 
 sotto.o: sotto.c sotto.h sotto_codebook.h sotto_internal.h
 sotto_lr.o: sotto_lr.c sotto.h sotto_codebook.h sotto_internal.h sotto_lr_tables.h sotto_lr_dec.inc sotto_hiss_tables.h
-sotto_hiss.o: sotto_hiss.c sotto.h sotto_internal.h sotto_hiss_tables.h
+sotto_hiss.o: sotto_hiss.c sotto.h sotto_internal.h sotto_hiss_tables.h sotto_prog.h
+sotto_prog.o: sotto_prog.c sotto_prog.h sotto.h sotto_internal.h sotto_codebook.h
 sotto_hiss_tables.o: sotto_hiss_tables.c sotto_hiss_tables.h
 sotto_vlr.o: sotto_vlr.c sotto.h sotto_internal.h sotto_vlr.h sotto_vlr_tables.h
 sotto_vlr_tables.o: sotto_vlr_tables.c sotto_vlr_tables.h

@@ -70,6 +70,13 @@ CRC. It returns 16 kHz 16-bit samples aligned with the encoder input, the same s
 `c/sotto_dec -16 IN.bit OUT.raw GOOD`. The module needs no files: the three WASI imports it
 links (stdio) are stubbed out in the loader.
 
+`decode16Prog(frames, known)` (`sotto_wasm_decode16_prog`, used by `docs/progressive.html`):
+progressive sotto 2400 (`docs/sotto-progressive.md`), a clip of which only some fields have
+arrived. `known` has one byte per frame, bit k set when field k (voicing, pitch, energy, shape
+stages 1-4) is in. `c/sotto_prog.c` fills the missing fields from the clip around them (the same
+fields as `sim/sotto_prog.partial_frames`, checked by `tests/test_prog_web.py`), then the 16 kHz
+decoder plays them. With every field known it returns `decode16`'s samples exactly.
+
 `wavBlob(pcm, rate)` wraps samples as a 16-bit WAV for an `<audio>` element or a download.
 
 The page's bitstreams and scores come from `tools/render_page_v38.py` (v3.8 over the radio

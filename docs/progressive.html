@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sotto: progressive delivery</title>
+<meta name="description" content="Watch and hear a sotto 2400 clip arrive in scans, like a progressive JPEG: squeeze the link with a resistor, pause it, and the decoder plays whatever has arrived.">
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1d1d1b; --muted: #66645e; --line: #e2dfd7; --card: #ffffff;
+    --accent: #2f6f5e; --accent-soft: #e5f0ec; --warn: #9a4b2f; --empty: #eeebe4; --flash: #f2b705;
+    --lost: #c4452f; --spec0: #10101c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151614; --fg: #ecebe6; --muted: #a3a29b; --line: #2e302c; --card: #1d1f1c;
+            --accent: #7fc4ac; --accent-soft: #1f2e29; --warn: #e0a080; --empty: #252723; --flash: #ffd84d;
+            --lost: #e5664f; --spec0: #10101c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.2rem; margin: 32px 0 8px; }
+  p { margin: 8px 0; }
+  .lede { color: var(--muted); font-size: 1.08rem; margin-bottom: 16px; }
+  .note { color: var(--muted); font-size: 0.92rem; }
+  a { color: var(--accent); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 14px 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 6px 0; }
+  .controls label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.95rem; }
+  button, select, .filebtn { font: inherit; font-size: 0.95rem; padding: 6px 13px; border-radius: 8px; cursor: pointer;
+           border: 1px solid var(--accent); background: var(--card); color: var(--accent); }
+  select { color: var(--fg); border-color: var(--line); max-width: calc(100vw - 100px); }
+  button.primary { background: var(--accent); color: var(--card); }
+  button:disabled, .filebtn.off { opacity: 0.5; cursor: default; pointer-events: none; }
+  button:focus-visible, select:focus-visible, input:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .filebtn { position: relative; }
+  .filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .seg { display: inline-flex; border: 1px solid var(--accent); border-radius: 8px; overflow: hidden; }
+  .seg label { padding: 6px 12px; cursor: pointer; color: var(--accent); gap: 0; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg label:has(input:checked) { background: var(--accent); color: var(--card); }
+  .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -3px; }
+  .rec-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); margin-right: 6px; vertical-align: 1px; }
+  /* the machine: source -> resistor -> decoder */
+  .machine { display: grid; grid-template-columns: 150px 1fr 150px; gap: 0; align-items: center; margin: 4px 0 10px; }
+  .box { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 0.85rem; line-height: 1.35;
+         background: var(--bg); position: relative; overflow: hidden; min-height: 86px; }
+  .box b { display: block; font-size: 0.9rem; }
+  .box .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent-soft); z-index: 0; transition: height 0.1s linear; }
+  .box > * { position: relative; z-index: 1; }
+  .box span { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #pipe { width: 100%; height: 86px; display: block; }
+  .rbox { padding: 0 8px; }
+  .rbox input[type=range] { width: 100%; margin: 2px 0 0; accent-color: var(--accent); }
+  #rlabel { text-align: center; font-size: 0.92rem; font-variant-numeric: tabular-nums; min-height: 1.4em; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 4px; }
+  .presets button { font-size: 0.82rem; padding: 3px 9px; }
+  #view { width: 100%; display: block; cursor: crosshair; touch-action: none; }
+  #readout { font-size: 0.92rem; font-variant-numeric: tabular-nums; color: var(--muted); min-height: 2.8em; margin-top: 6px; }
+  #readout b { color: var(--fg); font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.85rem; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+  #msg { color: var(--muted); font-size: 0.92rem; }
+  input[type=range].small { width: 120px; accent-color: var(--accent); }
+  @media (max-width: 640px) {
+    .machine { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .rbox { grid-column: 1 / -1; grid-row: 2; }
+    h1 { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Progressive sotto</h1>
+  <p class="lede">A sotto 2400 clip does not have to arrive in time order. Sent in <em>scans</em>, like a progressive JPEG, the receiver has a rough copy of the whole clip after a quarter of the bits, and it sharpens as the rest comes in. Squeeze the link with the resistor, pause it, and listen: the decoder plays whatever has arrived at each moment.</p>
+  <p class="note">Same 48-bit frames as a streamed clip, only sent in another order, so a complete clip decodes to exactly the streamed audio. Design and scores: <a href="https://github.com/baitisj/sotto/blob/main/docs/sotto-progressive.md">docs/sotto-progressive.md</a>. Decoding runs here in the browser (the C decoder built to WebAssembly). <a href="index.html">Back to the main page</a>.</p>
+
+  <div class="panel">
+    <div class="controls">
+      <label>Clip <select id="src">
+        <option value="librispeech_3536_f">Female voice (LibriSpeech 3536, 12 s)</option>
+        <option value="librispeech_251_m">Male voice (LibriSpeech 251, 12 s)</option>
+        <option value="mine" disabled>Your recording</option>
+      </select></label>
+      <button id="rec" disabled>Record</button>
+      <span class="filebtn" id="sot-lbl">Open .sot<input type="file" id="sot" accept=".sot,application/octet-stream"></span>
+      <button id="orig" disabled>Hear the original</button>
+      <span id="msg">Loading the decoder…</span>
+    </div>
+    <div class="controls">
+      <span class="seg" role="radiogroup" aria-label="Delivery order">
+        <label><input type="radio" name="order" value="streamed">Streamed</label>
+        <label><input type="radio" name="order" value="progressive" checked>Progressive</label>
+        <label><input type="radio" name="order" value="jit">Just in time</label>
+      </span>
+      <label title="Cut the stream into K6 XL packets of 944 bits, which land whole or not at all"><input type="checkbox" id="pk"> XL packets</label>
+      <label id="loss-lbl" title="Packets lost at random">loss <input type="range" class="small" id="loss" min="0" max="40" step="5" value="0" disabled> <span id="loss-v">0%</span></label>
+    </div>
+
+    <div class="machine">
+      <div class="box" id="hopper"><div class="fill" id="hopper-fill" style="height:100%"></div>
+        <b>Sender</b><span id="hopper-t">–</span></div>
+      <div class="rbox">
+        <canvas id="pipe" aria-hidden="true"></canvas>
+        <input type="range" id="res" min="0" max="56" step="1" value="21" aria-label="Resistor: link throughput">
+        <div id="rlabel"></div>
+        <div class="presets">
+          <button data-r="3300" title="sotto 2400 over the K6's F/1800 XL packets: 1.65 s of air time per second of speech">K6 F/1800</button>
+          <button data-r="2500" title="The K6's chip FSK at 2400 baud: about 1.24 s of air per second">K6 D/2400</button>
+          <button data-r="2000" title="As fast as it plays">Real time</button>
+          <button data-r="22000" title="A trickle">Trickle</button>
+        </div>
+      </div>
+      <div class="box" id="decbox"><div class="fill" id="dec-fill" style="height:0%"></div>
+        <b>Decoder</b><span id="dec-t">–</span></div>
+    </div>
+
+    <div class="controls">
+      <button id="go" class="primary" disabled>Start</button>
+      <button id="pause" disabled>Pause</button>
+      <button id="play" disabled>Play</button>
+      <label><input type="checkbox" id="loop" checked> Loop</label>
+      <label title="Progressive and just in time: start once the first scan is in. Streamed: start once it won't run dry at this speed."><input type="checkbox" id="auto" checked> Play as soon as it can</label>
+    </div>
+
+    <canvas id="view" height="430" aria-label="The clip's frames filling in, and the spectrogram of what the decoder plays"></canvas>
+    <div id="readout"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <h2>What you are looking at</h2>
+  <p>Each column of the grid is one 20 ms frame of the clip; each row is one of its fields: voicing (2 bits), pitch (7), energy (5) and the four stages of the spectral shape (9, 9, 8, 8). A cell lights up when all of its bits have arrived, and flashes as it lands. Below it is the spectrogram of what the decoder makes of the frames so far, redrawn as data arrives, and the original's spectrogram for comparison. The white line is the playhead; click the grid to move it.</p>
+  <ul>
+    <li><b>Streamed</b> fills the grid from left to right, one whole frame at a time. On a link slower than real time it can't start playing until most of the clip is in, or it runs dry.</li>
+    <li><b>Progressive</b> (script SI) first sends voicing, pitch, energy and the first shape stage of every other frame, which is 24% of the bits and already intelligible, then the odd frames, then the finer shape stages. Inside each scan the frames go in a golden-ratio stride, so a lost packet takes frames spread all over the clip, and every gap has neighbours to fill from.</li>
+    <li><b>Just in time</b> sends the first scan, then gives each frame the rest of its fields while they can still land before that frame plays, at the speed the resistor was set to when you pressed Start. What doesn't fit comes after, so the copy you keep ends up complete.</li>
+  </ul>
+  <p>Missing fields are filled the way <code>docs/sotto-progressive.md</code> section 4 says: voicing, pitch and energy from the nearest frames that have them, the sum of whichever shape stages have arrived, a shape interpolated in time when a frame has none, and a prior shape per voicing class before any shape has arrived. The 4-8 kHz hiss band rides along: an unvoiced frame's hiss index is in its pitch bits.</p>
+  <p class="note">The resistor sets the link's payload rate: 4.8 MΩ·bit/s divided by R, so 2 kΩ is real time for sotto 2400 (2400 bit/s). The K6 F/1800 preset is the K6's XL packets with their preambles (1.65 s of air per second of speech). Only sotto 2400 is here so far; sotto 1200 (where just in time plays at full quality from about 2 s) needs its fill rules in C first. Recordings are cut to 20 s.</p>
+</main>
+
+<script type="module">
+  import { loadSotto, levelTo, wavBlob } from "./sotto.js";
+  import { FIELDS, FRAME_BITS, SCRIPT_SI, buildStream, copyField } from "./sotto-prog.js";
+
+  const $ = id => document.getElementById(id);
+  const msg = t => { $("msg").textContent = t; };
+  const fmt = n => n.toLocaleString("en-US");
+  const NF = FIELDS.length, PACKET_BITS = 944, K_RATE = 4.8e6, MAX_REC = 20, GAP_S = 0.6;
+  // mean PESQ-NB / ESTOI of 16 voices after each SI scan (docs/sotto-progressive.md section 1)
+  const SCAN_PESQ = [1.97, 2.14, 2.29, 2.45, 2.65, 2.80, 2.94];
+
+  // ---------------------------------------------------------------- state
+  const S = {
+    sotto: null, clip: null,          // { id, name, frames, n, orig: Float32Array|null, origUrl }
+    order: "progressive", R: 3300, packets: false, loss: 0,
+    stream: null, B: 0, next: 0, running: false, paused: false, started: false,
+    rx: null, known: null, cell: null, tcell: null, lastAny: -1, lostPk: null,
+    dirty: false, lastDec: 0, decMs: 30, pcm: null, spec: null, origSpec: null,
+    ctx: null, node: null, playing: false, playPos: 0, wantStart: false, loop: true,
+  };
+  const rate = () => K_RATE / S.R;
+
+  // ---------------------------------------------------------------- resistor
+  const LOGR0 = Math.log10(470);
+  const round2 = r => { const e = Math.floor(Math.log10(r)) - 1; return Math.round(r / 10 ** e) * 10 ** e; };
+  const rFromSlider = i => round2(10 ** (LOGR0 + i / 24));
+  const sliderFromR = r => Math.max(0, Math.min(56, Math.round((Math.log10(r) - LOGR0) * 24)));
+  const fmtR = r => r < 1000 ? `${r} Ω` : r < 1e6 ? `${+(r / 1000).toPrecision(2)} kΩ` : `${+(r / 1e6).toPrecision(2)} MΩ`;
+  const BAND = ["#1b1b1b", "#7a4a1e", "#d0312d", "#ef7d22", "#f4d03f", "#2e9a4e", "#2f6fd6", "#8e44ad", "#8a8a8a", "#f5f5f5"];
+  function bands(r) {
+    const e = Math.floor(Math.log10(r)) - 1, m = Math.round(r / 10 ** e);
+    return [BAND[Math.floor(m / 10)], BAND[m % 10], BAND[e], "#c9a227"];
+  }
+  function setR(r) {
+    S.R = r;
+    const x = rate(), rt = x / 2400;
+    const air = 2400 / x;
+    $("rlabel").innerHTML = `R = <b>${fmtR(r)}</b> · ${fmt(Math.round(x))} bit/s · ` +
+      (rt >= 1 ? `${rt.toFixed(rt < 10 ? 2 : 1)}× real time` : `${air.toFixed(2)} s of air per second of speech`);
+    for (const b of document.querySelectorAll(".presets button")) b.classList.toggle("primary", +b.dataset.r === r);
+  }
+
+  // ---------------------------------------------------------------- the clip and the stream
+  function restart(keepPlay = false) {
+    const c = S.clip;
+    if (!c) return;
+    S.stream = buildStream(c.n, S.order, 2400 / rate());
+    S.B = 0; S.next = 0; S.lastAny = -1;
+    S.rx = new Uint8Array(6 * c.n);
+    S.known = new Uint8Array(c.n);
+    S.cell = new Uint8Array(c.n * NF);            // 0 empty, 1 arrived, 2 lost
+    S.tcell = new Float64Array(c.n * NF).fill(-1e9);
+    const npk = Math.ceil(S.stream.totalBits / PACKET_BITS);
+    S.lostPk = new Uint8Array(npk);
+    let seed = (Math.random() * 2 ** 31) | 0;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x80000000);
+    if (S.packets && S.loss > 0) for (let k = 0; k < npk; k++) S.lostPk[k] = rnd() < S.loss / 100 ? 1 : 0;
+    S.pcm = new Float32Array(c.n * 320);
+    S.spec = null; S.dirty = false;
+    S.started = true; S.running = true; S.paused = false;
+    if (!keepPlay) stopPlay();
+    S.wantStart = $("auto").checked;
+    sendBuffer();
+    $("pause").disabled = false; $("pause").textContent = "Pause";
+    $("go").textContent = "Restart";
+  }
+
+  // bits that have landed at the receiver (whole packets only, in packet mode)
+  function landed() {
+    const T = S.stream.totalBits;
+    if (!S.packets) return Math.min(S.B, T);
+    return S.B >= T ? T : Math.floor(S.B / PACKET_BITS) * PACKET_BITS;
+  }
+
+  function advance(dt, now) {
+    const st = S.stream;
+    if (!st || !S.running) return;
+    if (!S.paused) S.B = Math.min(st.totalBits, S.B + rate() * dt);
+    const L = landed();
+    while (S.next < st.n && st.end[S.next] <= L) {
+      const i = S.next++, s = st.sf[i], f = st.f[i];
+      let lost = false;
+      if (S.packets) for (let k = Math.floor(st.start[i] / PACKET_BITS); k <= Math.floor((st.end[i] - 1) / PACKET_BITS); k++) lost ||= S.lostPk[k] === 1;
+      S.tcell[s * NF + f] = now;
+      if (lost) { S.cell[s * NF + f] = 2; continue; }
+      copyField(S.clip.frames, S.rx, s, f);
+      S.known[s] |= 1 << f;
+      S.cell[s * NF + f] = 1;
+      if (s > S.lastAny) S.lastAny = s;
+      S.dirty = true;
+    }
+    if (S.B >= st.totalBits && S.next >= st.n) S.running = false;
+    // play as soon as it can
+    if (S.wantStart && S.ctx && !S.paused) {
+      const ready = S.order === "streamed"
+        ? (S.lastAny >= 0 && (st.totalBits - S.B) / rate() <= S.clip.n * 0.02)
+        : L >= st.ends[0];
+      if (ready) { S.wantStart = false; startPlay(0); }
+    }
+  }
+
+  // ---------------------------------------------------------------- decoding
+  function decodeNow(now) {
+    const c = S.clip, n = S.lastAny + 1;
+    const out = new Float32Array(c.n * 320);
+    if (n > 0) {
+      const t = performance.now();
+      const pcm = S.sotto.decode16Prog(S.rx.subarray(0, 6 * n), S.known.subarray(0, n));
+      S.decMs = 0.7 * S.decMs + 0.3 * (performance.now() - t);
+      for (let i = 0; i < pcm.length && i < out.length; i++) out[i] = pcm[i] / 32768;
+    }
+    S.pcm = out; S.dirty = false; S.lastDec = now;
+    S.spec = spectrogram(out);
+    sendBuffer();
+  }
+  function sendBuffer() {
+    if (S.node) S.node.port.postMessage({ buf: S.pcm });
+  }
+
+  // 256-point STFT every 10 ms, 0-8 kHz, drawn into a canvas of (frames x 128)
+  const FFTN = 256, HOP = 160, HANN = Float32Array.from({ length: FFTN }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / FFTN));
+  function fft(re, im) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+      let b = n >> 1; for (; j & b; b >>= 1) j ^= b; j ^= b;
+      if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const a = -2 * Math.PI / len, wr = Math.cos(a), wi = Math.sin(a);
+      for (let i = 0; i < n; i += len) {
+        let cr = 1, ci = 0;
+        for (let k = 0; k < len / 2; k++) {
+          const p = i + k, q = p + len / 2, tr = re[q] * cr - im[q] * ci, ti = re[q] * ci + im[q] * cr;
+          re[q] = re[p] - tr; im[q] = im[p] - ti; re[p] += tr; im[p] += ti;
+          const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+        }
+      }
+    }
+  }
+  const RAMP = [[0, [16, 16, 28, 255]], [0.25, [40, 30, 90, 255]], [0.5, [33, 120, 130, 255]], [0.75, [120, 195, 100, 255]], [1, [250, 230, 80, 255]]];
+  function ramp(v) {
+    v = Math.max(0, Math.min(1, v));
+    for (let k = 1; k < RAMP.length; k++) if (v <= RAMP[k][0]) {
+      const [a, ca] = RAMP[k - 1], [b, cb] = RAMP[k], t = (v - a) / (b - a);
+      return ca.map((x, j) => x + (cb[j] - x) * t);
+    }
+    return RAMP[RAMP.length - 1][1];
+  }
+  const LUT = Array.from({ length: 256 }, (_, i) => ramp(i / 255));
+  function spectrogram(x) {
+    const cols = Math.max(1, Math.floor(x.length / HOP)), H = FFTN / 2;
+    const cv = document.createElement("canvas"); cv.width = cols; cv.height = H;
+    const g = cv.getContext("2d"), img = g.createImageData(cols, H);
+    const re = new Float32Array(FFTN), im = new Float32Array(FFTN);
+    for (let c = 0; c < cols; c++) {
+      const o = c * HOP - (FFTN - HOP) / 2;
+      for (let i = 0; i < FFTN; i++) { const j = o + i; re[i] = j >= 0 && j < x.length ? x[j] * HANN[i] : 0; im[i] = 0; }
+      fft(re, im);
+      for (let k = 0; k < H; k++) {
+        const db = 10 * Math.log10((re[k] * re[k] + im[k] * im[k]) / 4096 + 1e-14);   // 0 dB: a full-scale sine
+        const v = (db + 100) / 80;                      // -100 .. -20 dB
+        const col = LUT[Math.max(0, Math.min(255, Math.round(v * 255)))], p = 4 * ((H - 1 - k) * cols + c);
+        img.data[p] = col[0]; img.data[p + 1] = col[1]; img.data[p + 2] = col[2]; img.data[p + 3] = col[3];
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return cv;
+  }
+
+  // ---------------------------------------------------------------- audio out
+  const WORKLET = `
+  registerProcessor("prog-player", class extends AudioWorkletProcessor {
+    constructor() {
+      super();
+      this.buf = null; this.old = null; this.x = 0; this.pos = 0; this.playing = false; this.loop = true;
+      this.step = 16000 / sampleRate; this.gap = ${GAP_S} * 16000; this.k = 0;
+      this.port.onmessage = e => {
+        const m = e.data;
+        if (m.buf) { this.old = this.buf; this.buf = m.buf; this.x = this.old ? 1 : 0; }
+        if ("loop" in m) this.loop = m.loop;
+        if ("pos" in m) { this.pos = m.pos; this.old = null; this.x = 0; }
+        if ("play" in m) this.playing = m.play;
+      };
+    }
+    at(b, p) { const j = Math.floor(p); return j >= 0 && j + 1 < b.length ? b[j] + (b[j + 1] - b[j]) * (p - j) : 0; }
+    process(inputs, outputs) {
+      const out = outputs[0][0], b = this.buf;
+      if (!this.playing || !b) { out.fill(0); return true; }
+      const fade = 1 / (0.015 * sampleRate);
+      for (let i = 0; i < out.length; i++) {
+        let v = this.at(b, this.pos);
+        if (this.x > 0) { v = v * (1 - this.x) + this.at(this.old, this.pos) * this.x; this.x = Math.max(0, this.x - fade); }
+        out[i] = v;
+        this.pos += this.step;
+        if (this.pos >= b.length) {
+          if (this.loop) this.pos = -this.gap;
+          else { this.playing = false; out.fill(0, i + 1); this.port.postMessage({ ended: true, pos: 0 }); break; }
+        }
+      }
+      if (++this.k % 6 === 0) this.port.postMessage({ pos: this.pos });
+      return true;
+    }
+  });`;
+  async function ensureAudio() {
+    if (S.ctx) { if (S.ctx.state !== "running") await S.ctx.resume(); return; }
+    const ctx = new AudioContext();
+    const url = URL.createObjectURL(new Blob([WORKLET], { type: "text/javascript" }));
+    await ctx.audioWorklet.addModule(url); URL.revokeObjectURL(url);
+    const node = new AudioWorkletNode(ctx, "prog-player", { numberOfInputs: 0, outputChannelCount: [1] });
+    node.connect(ctx.destination);
+    node.port.onmessage = e => {
+      if ("pos" in e.data) S.playPos = e.data.pos;
+      if (e.data.ended) { S.playing = false; S.playPos = 0; $("play").textContent = "Play"; }
+    };
+    node.port.postMessage({ loop: $("loop").checked, buf: S.pcm || new Float32Array(320) });
+    S.ctx = ctx; S.node = node;
+    await ctx.resume();
+  }
+  function startPlay(pos) {
+    if (!S.node) return;
+    $("orig-audio").pause();
+    S.node.port.postMessage({ buf: S.pcm, pos, play: true });
+    S.playing = true; S.playPos = pos;
+    $("play").textContent = "Stop";
+  }
+  function stopPlay() {
+    if (S.node) S.node.port.postMessage({ play: false });
+    S.playing = false; S.wantStart = false;
+    $("play").textContent = "Play";
+  }
+
+  // ---------------------------------------------------------------- drawing
+  const view = $("view"), pipe = $("pipe");
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const FCOL = ["#b5562f", "#d17a3d", "#e3a25d", "#1f5d4d", "#3a8a72", "#67ad96", "#9fd0bf"];
+  let flowPhase = 0;
+  function layout() {
+    const W = view.clientWidth, left = Math.min(74, Math.max(54, W * 0.08));
+    const scanY = 4, scanH = 16, gridY = 30, rowPx = W < 560 ? 2 : 2.6, gridH = FRAME_BITS * rowPx;
+    const specY = gridY + gridH + 10, specH = W < 560 ? 90 : 120, origY = specY + specH + 6, origH = W < 560 ? 44 : 60;
+    return { W, left, right: W - 8, scanY, scanH, gridY, gridH, rowPx, specY, specH, origY, origH, H: origY + origH + 18 };
+  }
+  function sizeCanvas(cv, w, h) {
+    const d = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d)) {
+      cv.width = Math.round(w * d); cv.height = Math.round(h * d); cv.style.height = h + "px";
+    }
+    const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0); return g;
+  }
+  function draw(now) {
+    const Lo = layout(), g = sizeCanvas(view, Lo.W, Lo.H);
+    const fg = css("--fg"), muted = css("--muted"), line = css("--line"), empty = css("--empty"), flash = css("--flash"), lost = css("--lost");
+    g.clearRect(0, 0, Lo.W, Lo.H);
+    g.font = "11px system-ui, sans-serif"; g.textBaseline = "middle";
+    const c = S.clip;
+    if (!c) return;
+    const gw = Lo.right - Lo.left, fx = s => Lo.left + gw * s / c.n;
+    const st = S.stream;
+    // scan bar: the stream in sending order, scan boundaries, what has landed, lost packets
+    g.fillStyle = empty; g.fillRect(Lo.left, Lo.scanY, gw, Lo.scanH);
+    if (st) {
+      const T = st.totalBits, bx = b => Lo.left + gw * b / T, L = landed();
+      g.fillStyle = css("--accent"); g.globalAlpha = 0.35; g.fillRect(Lo.left, Lo.scanY, bx(S.B) - Lo.left, Lo.scanH);
+      g.globalAlpha = 0.85; g.fillRect(Lo.left, Lo.scanY, bx(L) - Lo.left, Lo.scanH); g.globalAlpha = 1;
+      if (S.packets) {
+        g.fillStyle = lost;
+        for (let k = 0; k < S.lostPk.length; k++) if (S.lostPk[k] && (k + 1) * PACKET_BITS <= Math.max(L, S.B))
+          g.fillRect(bx(k * PACKET_BITS), Lo.scanY, Math.max(1, bx((k + 1) * PACKET_BITS) - bx(k * PACKET_BITS)), Lo.scanH);
+      }
+      g.strokeStyle = css("--bg"); g.lineWidth = 2;
+      const ends = st.order === "streamed" ? [] : st.ends.slice(0, -1);
+      for (const e of ends) { g.beginPath(); g.moveTo(bx(e), Lo.scanY); g.lineTo(bx(e), Lo.scanY + Lo.scanH); g.stroke(); }
+      g.fillStyle = fg; g.textAlign = "center";
+      const labels = st.order === "progressive" ? st.ends.map((e, i) => [i ? st.ends[i - 1] : 0, e, String(i + 1)])
+        : st.order === "jit" ? [[0, st.ends[0], "scan 1"], [st.ends[0], st.ends[1], "the rest, in time"], [st.ends[1], st.ends[2], "late"]]
+        : [[0, T, "frames in time order"]];
+      for (const [a, b, t] of labels) if (bx(b) - bx(a) > g.measureText(t).width + 4) g.fillText(t, (bx(a) + bx(b)) / 2, Lo.scanY + Lo.scanH / 2 + 1);
+    }
+    g.textAlign = "right"; g.fillStyle = muted;
+    g.fillText("stream", Lo.left - 6, Lo.scanY + Lo.scanH / 2);
+    // the slot grid
+    let y = Lo.gridY;
+    for (let f = 0; f < NF; f++) {
+      const h = FIELDS[f].bits * Lo.rowPx;
+      g.fillStyle = muted; g.textAlign = "right";
+      if (h >= 11) g.fillText(FIELDS[f].name, Lo.left - 6, y + h / 2);
+      g.fillStyle = empty; g.fillRect(Lo.left, y, gw, h - 1);
+      for (let s = 0; s < c.n; s++) {
+        const k = s * NF + f, st2 = S.cell ? S.cell[k] : 0;
+        if (!st2) continue;
+        const x0 = fx(s), x1 = fx(s + 1);
+        g.fillStyle = st2 === 2 ? lost : FCOL[f];
+        g.fillRect(x0, y, Math.max(0.6, x1 - x0), h - 1);
+        const age = now - S.tcell[k];
+        if (age < 450) { g.globalAlpha = 1 - age / 450; g.fillStyle = flash; g.fillRect(x0 - 1, y - 1, x1 - x0 + 2, h + 1); g.globalAlpha = 1; }
+      }
+      y += h;
+    }
+    // spectrograms
+    g.imageSmoothingEnabled = true;
+    g.fillStyle = css("--spec0"); g.fillRect(Lo.left, Lo.specY, gw, Lo.specH); g.fillRect(Lo.left, Lo.origY, gw, Lo.origH);
+    if (S.spec) g.drawImage(S.spec, Lo.left, Lo.specY, gw, Lo.specH);
+    if (S.origSpec) g.drawImage(S.origSpec, Lo.left, Lo.origY, gw, Lo.origH);
+    g.strokeStyle = line; g.lineWidth = 1;
+    g.strokeRect(Lo.left + 0.5, Lo.specY + 0.5, gw - 1, Lo.specH - 1); g.strokeRect(Lo.left + 0.5, Lo.origY + 0.5, gw - 1, Lo.origH - 1);
+    g.fillStyle = muted; g.textAlign = "right";
+    g.fillText("decoded", Lo.left - 6, Lo.specY + 10); g.fillText("0-8 kHz", Lo.left - 6, Lo.specY + 24);
+    g.fillText("original", Lo.left - 6, Lo.origY + 10);
+    // time axis
+    g.textAlign = "center"; g.fillStyle = muted;
+    const secs = c.n * 0.02, tick = secs > 16 ? 4 : 2;
+    for (let t = 0; t <= secs + 1e-9; t += tick) {
+      const x = Lo.left + gw * t / secs;
+      g.fillRect(x, Lo.origY + Lo.origH, 1, 4);
+      g.fillText(`${t} s`, Math.min(Lo.right - 10, Math.max(Lo.left + 8, x)), Lo.origY + Lo.origH + 11);
+    }
+    // playhead
+    if (S.playing || S.playPos > 0) {
+      const p = S.playPos / 16000;
+      if (p >= 0) {
+        const x = Lo.left + gw * Math.min(1, p / secs);
+        g.fillStyle = "#ffffff"; g.globalAlpha = 0.95; g.fillRect(x - 1, Lo.gridY - 3, 2, Lo.origY + Lo.origH - Lo.gridY + 3);
+        g.globalAlpha = 1; g.fillStyle = fg; g.fillRect(x - 0.5, Lo.gridY - 3, 1, Lo.origY + Lo.origH - Lo.gridY + 3);
+      }
+    }
+  }
+
+  function drawPipe(dt) {
+    const w = pipe.clientWidth, h = 86, g = sizeCanvas(pipe, w, h);
+    g.clearRect(0, 0, w, h);
+    const y = 30, rw = Math.min(150, w * 0.45), rx0 = (w - rw) / 2, rx1 = rx0 + rw;
+    const moving = S.running && !S.paused && S.stream && S.B < S.stream.totalBits;
+    // pipe and the bits flowing through it: faster for a smaller R
+    g.strokeStyle = css("--line"); g.lineWidth = 10; g.lineCap = "round";
+    g.beginPath(); g.moveTo(4, y); g.lineTo(w - 4, y); g.stroke();
+    const speed = 20 + 55 * Math.log10(Math.max(10, rate()) / 10);
+    if (moving) flowPhase = (flowPhase + dt * speed) % 16;
+    g.fillStyle = css("--accent");
+    if (S.started && S.stream && S.B < S.stream.totalBits) {
+      for (let x = 6 + flowPhase; x < w - 6; x += 16) {
+        if (x > rx0 - 6 && x < rx1 + 6) continue;
+        const dense = x < rx0 ? 1 : 0.35 + 0.65 * Math.min(1, rate() / 4800);
+        g.globalAlpha = dense; g.beginPath(); g.arc(x, y, 3, 0, 2 * Math.PI); g.fill();
+      }
+      g.globalAlpha = 1;
+    }
+    // the resistor: beige body, colour bands for R
+    const bh = 22;
+    g.fillStyle = "#d8c49a"; g.strokeStyle = "#8c7a52"; g.lineWidth = 1;
+    g.beginPath(); g.roundRect(rx0, y - bh / 2, rw, bh, 9); g.fill(); g.stroke();
+    const bc = bands(S.R), bw = Math.max(5, rw * 0.06);
+    [0.22, 0.34, 0.46, 0.8].forEach((p, i) => { g.fillStyle = bc[i]; g.fillRect(rx0 + rw * p - bw / 2, y - bh / 2, bw, bh); });
+    g.fillStyle = css("--muted"); g.font = "11px system-ui, sans-serif"; g.textAlign = "center";
+    g.fillText(S.paused ? "paused" : moving ? "bits flowing" : S.started ? "all sent" : "press Start", w / 2, y + 26);
+  }
+
+  function readout() {
+    const c = S.clip, st = S.stream;
+    $("hopper-t").innerHTML = c ? `${c.name}<br>${c.n} frames, ${fmt(c.n * FRAME_BITS)} bits` : "–";
+    if (!c || !st) { $("readout").textContent = c ? "Press Start to send the clip." : ""; return; }
+    const L = landed(), share = L / st.totalBits;
+    $("hopper-fill").style.height = `${100 * (1 - S.B / st.totalBits)}%`;
+    $("dec-fill").style.height = `${100 * share}%`;
+    let lostN = 0; if (S.packets) for (const v of S.cell) lostN += v === 2;
+    const playS = Math.max(0, S.playPos / 16000);
+    $("dec-t").innerHTML = `${(100 * share).toFixed(0)}% of the bits<br>${S.playing ? `playing ${playS.toFixed(1)} s` : "not playing"}`;
+    let what = "";
+    if (st.order === "progressive") {
+      let k = st.ends.findIndex(e => L < e); if (k < 0) k = st.ends.length;
+      const done = k;
+      what = done >= st.ends.length ? "all 7 scans in: the streamed clip, bit for bit"
+        : `scan ${k + 1} of 7 arriving: ${SCRIPT_SI[k].what}`;
+      if (done > 0 && !lostN) what += ` · after scan ${done}, 16 voices average PESQ ${SCAN_PESQ[done - 1].toFixed(2)} (full clip 2.94)`;
+    } else if (st.order === "jit") {
+      what = L < st.ends[0] ? "scan 1 arriving (24% of the bits): playback starts when it is in"
+        : L < st.ends[1] ? `each frame's other fields, timed to land before it plays (planned for ${st.ratio.toFixed(2)} s of air per second)`
+        : L < st.totalBits ? "the fields that missed their frame's turn, for the copy you keep" : "complete: the streamed clip, bit for bit";
+    } else {
+      what = L < st.totalBits ? `frames in time order: ${Math.floor(L / FRAME_BITS)} of ${c.n} in` : "complete";
+    }
+    const air = S.B / rate();
+    $("readout").innerHTML = `<b>${(100 * share).toFixed(1)}%</b> of ${fmt(st.totalBits)} bits landed · ${air.toFixed(1)} s on the air` +
+      (S.packets ? ` · packet ${Math.min(S.lostPk.length, Math.ceil(L / PACKET_BITS))} of ${S.lostPk.length}, ${lostPkSoFar(L)} lost (${lostN} fields)` : "") +
+      `<br>${what}` + (S.decMs ? ` · decode ${S.decMs.toFixed(0)} ms` : "");
+  }
+
+  function lostPkSoFar(L) {
+    let n = 0; for (let k = 0; k < S.lostPk.length && (k + 1) * PACKET_BITS <= L + PACKET_BITS - 1; k++) n += S.lostPk[k];
+    return n;
+  }
+  function legend() {
+    $("legend").innerHTML = FIELDS.map((f, i) => `<span><i style="background:${FCOL[i]}"></i>${f.name} (${f.bits})</span>`).join("") +
+      `<span><i style="background:${css("--flash")}"></i>just landed</span><span><i style="background:${css("--lost")}"></i>lost</span>`;
+  }
+
+  // ---------------------------------------------------------------- main loop
+  let lastT = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+    advance(dt, now);
+    if (S.dirty && (now - S.lastDec > Math.max(150, 4 * S.decMs) || !S.running)) decodeNow(now);
+    draw(now); drawPipe(dt); readout();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------------------------------------------------------------- loading clips
+  async function to16k(ch, rate) {
+    if (rate === 16000) return ch;
+    const oc = new OfflineAudioContext(1, Math.ceil(ch.length * 16000 / rate), 16000);
+    const b = oc.createBuffer(1, ch.length, rate); b.copyToChannel(ch, 0);
+    const src = oc.createBufferSource(); src.buffer = b; src.connect(oc.destination); src.start();
+    return (await oc.startRendering()).getChannelData(0);
+  }
+  async function decodeFile(buf) {
+    const ab = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(buf);
+    const x = new Float32Array(ab.length);
+    for (let ch = 0; ch < ab.numberOfChannels; ch++) { const d = ab.getChannelData(ch); for (let i = 0; i < x.length; i++) x[i] += d[i] / ab.numberOfChannels; }
+    return to16k(x, ab.sampleRate);
+  }
+  function setClip(clip) {
+    S.clip = clip;
+    S.stream = null; S.started = false; S.running = false; S.cell = null; S.spec = null; S.B = 0;
+    S.pcm = new Float32Array(clip.n * 320);
+    S.origSpec = clip.orig ? spectrogram(clip.orig) : null;
+    $("orig-audio").src = clip.origUrl || "";
+    $("orig").disabled = !clip.origUrl;
+    stopPlay(); S.playPos = 0;
+    $("go").textContent = "Start"; $("pause").disabled = true; $("play").disabled = false;
+    sendBuffer();
+  }
+  const NAMES = { librispeech_3536_f: "female voice", librispeech_251_m: "male voice" };
+  const cache = {};
+  async function loadCanned(id) {
+    if (!cache[id]) {
+      const frames = new Uint8Array(await (await fetch(`samples/rates/${id}__2400.bit`)).arrayBuffer());
+      const origUrl = `samples/v38/${id}__original16.flac`;
+      let orig = null;
+      try { orig = await decodeFile(await (await fetch(origUrl)).arrayBuffer()); } catch (e) { /* no FLAC here: no original strip */ }
+      cache[id] = { id, name: NAMES[id], frames, n: frames.length / 6, orig, origUrl };
+    }
+    return cache[id];
+  }
+  async function useClip(id, start) {
+    const c = id === "mine" ? cache.mine : await loadCanned(id);
+    if (!c) return;
+    setClip(c);
+    if (start) { await ensureAudio(); restart(); }
+  }
+
+  // ---------------------------------------------------------------- recording
+  let rec = null;
+  async function startRec() {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+    } catch (e) {
+      msg(e.name === "NotAllowedError" ? "The browser blocked the microphone. Allow it for this page and try again." : `No microphone (${e.message}).`);
+      return;
+    }
+    stopPlay(); S.running = false;
+    const ctx = new AudioContext();
+    const w = "registerProcessor('grab', class extends AudioWorkletProcessor { process(i) { if (i[0][0]) this.port.postMessage(i[0][0].slice()); return true; } });";
+    const u = URL.createObjectURL(new Blob([w], { type: "text/javascript" }));
+    await ctx.audioWorklet.addModule(u); URL.revokeObjectURL(u);
+    const node = new AudioWorkletNode(ctx, "grab"), chunks = []; let n = 0;
+    node.port.onmessage = e => {
+      chunks.push(e.data); n += e.data.length;
+      msg(`Recording… ${(n / ctx.sampleRate).toFixed(1)} s of ${MAX_REC} s`);
+      if (n >= MAX_REC * ctx.sampleRate) stopRec();
+    };
+    ctx.createMediaStreamSource(stream).connect(node); node.connect(ctx.destination);
+    await ctx.resume();
+    rec = { stream, ctx, node, chunks };
+    $("rec").innerHTML = '<span class="rec-dot"></span>Stop';
+    msg("Recording… talk, then press Stop.");
+  }
+  async function stopRec() {
+    if (!rec) return;
+    const { stream, ctx, node, chunks } = rec; rec = null;
+    stream.getTracks().forEach(t => t.stop()); node.port.onmessage = null; node.disconnect();
+    $("rec").textContent = "Record";
+    const total = chunks.reduce((a, c) => a + c.length, 0);
+    try {
+      if (total < ctx.sampleRate * 0.5) { msg("That was too short."); return; }
+      const x = new Float32Array(total); let o = 0; for (const c of chunks) { x.set(c, o); o += c.length; }
+      const x16 = await to16k(x, ctx.sampleRate);
+      const { pcm } = levelTo(x16);
+      const frames = S.sotto.encode16(pcm);
+      const orig = Float32Array.from(pcm, v => v / 32768);
+      if (cache.mine?.origUrl) URL.revokeObjectURL(cache.mine.origUrl);
+      cache.mine = { id: "mine", name: "your recording", frames, n: frames.length / 6, orig, origUrl: URL.createObjectURL(wavBlob(pcm, 16000)) };
+      const opt = $("src").querySelector('option[value="mine"]');
+      opt.disabled = false; opt.textContent = `Your recording (${(pcm.length / 16000).toFixed(1)} s)`;
+      $("src").value = "mine";
+      msg(`Encoded ${(pcm.length / 16000).toFixed(1)} s at 2400 bit/s (${frames.length} bytes).`);
+      await useClip("mine", true);
+    } finally { ctx.close(); }
+  }
+
+  // ---------------------------------------------------------------- controls
+  for (const r of document.querySelectorAll('input[name="order"]'))
+    r.addEventListener("change", () => { S.order = r.value; if (S.started) restart(); });
+  $("res").addEventListener("input", e => setR(rFromSlider(+e.target.value)));
+  for (const b of document.querySelectorAll(".presets button"))
+    b.addEventListener("click", () => { const r = +b.dataset.r; $("res").value = sliderFromR(r); setR(r); });
+  $("pk").addEventListener("change", e => { S.packets = e.target.checked; $("loss").disabled = !S.packets; if (S.started) restart(); });
+  $("loss").addEventListener("input", e => { S.loss = +e.target.value; $("loss-v").textContent = `${S.loss}%`; });
+  $("loss").addEventListener("change", () => { if (S.started && S.packets) restart(); });
+  $("go").addEventListener("click", async () => { await ensureAudio(); restart(); });
+  $("pause").addEventListener("click", () => {
+    if (!S.started) return;
+    S.paused = !S.paused;
+    $("pause").textContent = S.paused ? "Resume" : "Pause";
+    if (S.paused) S.wantStart = false;
+  });
+  $("play").addEventListener("click", async () => {
+    await ensureAudio();
+    if (S.playing) stopPlay(); else startPlay(S.playPos > 0 ? S.playPos : 0);
+  });
+  $("loop").addEventListener("change", e => { S.node?.port.postMessage({ loop: e.target.checked }); });
+  $("src").addEventListener("change", e => useClip(e.target.value, S.started).catch(err => msg(`Couldn't load that clip (${err.message}).`)));
+  $("orig").addEventListener("click", () => {
+    const a = $("orig-audio");
+    if (a.paused) { stopPlay(); a.currentTime = 0; a.play(); } else a.pause();
+  });
+  $("rec").addEventListener("click", () => rec ? stopRec().catch(e => msg(`Encoding failed (${e.message}).`))
+                                               : startRec().catch(e => msg(`Recording failed (${e.message}).`)));
+  $("sot").addEventListener("change", async e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    const frames = new Uint8Array(await f.arrayBuffer());
+    if (!frames.length || frames.length % 6) { msg(`${f.name} isn't a .sot file (its size should be a multiple of 6 bytes).`); return; }
+    if (/-(1200|600|400)\.sot$/i.test(f.name)) { msg("Only sotto 2400 streams work here for now."); return; }
+    const n = Math.min(frames.length / 6, MAX_REC * 50);
+    cache.mine = { id: "mine", name: f.name, frames: frames.slice(0, 6 * n), n, orig: null, origUrl: null };
+    const opt = $("src").querySelector('option[value="mine"]');
+    opt.disabled = false; opt.textContent = `${f.name} (${(n / 50).toFixed(1)} s)`;
+    $("src").value = "mine";
+    msg(`Opened ${f.name}: ${n} frames as sotto 2400.`);
+    await useClip("mine", true);
+  });
+  // seek by clicking or dragging on the view
+  let dragging = false;
+  function seek(ev) {
+    if (!S.clip) return;
+    const Lo = layout(), r = view.getBoundingClientRect(), x = ev.clientX - r.left;
+    const t = Math.max(0, Math.min(1, (x - Lo.left) / (Lo.right - Lo.left))) * S.clip.n * 320;
+    S.playPos = t;
+    if (S.playing) S.node.port.postMessage({ pos: t });
+  }
+  view.addEventListener("pointerdown", async ev => { dragging = true; view.setPointerCapture(ev.pointerId); await ensureAudio(); seek(ev); if (!S.playing) startPlay(S.playPos); });
+  view.addEventListener("pointermove", ev => { if (dragging) seek(ev); });
+  view.addEventListener("pointerup", () => { dragging = false; });
+
+  // ---------------------------------------------------------------- start
+  const audioEl = document.createElement("audio"); audioEl.id = "orig-audio"; audioEl.preload = "none"; document.body.append(audioEl);
+  setR(3300); $("res").value = sliderFromR(3300);
+  legend();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", legend);
+  requestAnimationFrame(frame);
+  try {
+    S.sotto = await loadSotto("sotto.wasm");
+    await useClip("librispeech_3536_f", false);
+    $("go").disabled = false;
+    $("rec").disabled = !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.AudioWorkletNode);
+    msg("Ready: press Start.");
+  } catch (err) {
+    msg(`This browser couldn't run the decoder (${err.message}).`);
+  }
+  window.__prog = S;   // for the page test
+</script>
+</body>
+</html>
