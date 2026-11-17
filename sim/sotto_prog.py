@@ -165,6 +165,66 @@ def order(mode, ns, script):
     return seq, ends
 
 
+def deadline_order(mode, ns, script, nbase):
+    """Playback-aware order: the first nbase scans of `script` over the whole block (spread,
+    as order()), then every remaining field superframe by superframe in time order. A
+    receiver that starts playing once the base is in then gets each frame's refinements
+    before (or as close as the link allows to) the moment it plays that frame."""
+    seq, _ = order(mode, ns, script)
+    nb = sum(len(range(ph, ns, st)) * sum(1 for k in f if dict(layout(mode))[k])
+             for f, st, ph in script[:nbase])
+    base = seq[:nb]
+    have = set(base)
+    names = [k for k, w in layout(mode) if w]
+    rest = [(s, k) for s in range(ns) for k in names if (s, k) not in have]
+    return base + rest
+
+
+def jit_order(mode, ns, script, nbase, ratio, lag=0):
+    """Just-in-time order for a receiver that plays while it receives. The first nbase scans
+    of `script` go first over the whole block (the receiver starts playing when they are
+    in). After that the link brings 48 / ratio bits per superframe of playback (ratio = air
+    time per second of speech). Going through the superframes in time order, each one gets
+    its remaining fields, in the script's field order, while they still arrive before it
+    plays (`lag` superframes of margin); what doesn't fit is sent after all of that, in time
+    order, so the stored copy ends up complete. Sender and receiver compute the same order
+    from (ns, script, nbase, ratio), so ratio goes in the header."""
+    seq, _ = order(mode, ns, script)
+    w = dict(layout(mode))
+    nb = sum(len(range(ph, ns, st)) * sum(1 for k in f if w[k]) for f, st, ph in script[:nbase])
+    base = seq[:nb]
+    have = set(base)
+    fields = []                                    # field priority: the order scans name them
+    for f, _, _ in script:
+        for k in f:
+            if w[k] and k not in fields:
+                fields.append(k)
+    cum = sum(w[k] for _, k in base)
+    out, late = list(base), []
+    for sf in range(ns):
+        budget = sum(w[k] for _, k in base) + max(0, sf - lag) * 48.0 / ratio
+        for k in fields:
+            if (sf, k) in have:
+                continue
+            if cum + w[k] <= budget:
+                out.append((sf, k))
+                cum += w[k]
+            else:
+                late.append((sf, k))
+    return out + late
+
+
+def known_items(mode, ns, items):
+    """Known mask from a received list of (superframe, field) items."""
+    known = {k: np.zeros(ns, bool) for k, _ in layout(mode)}
+    for k, w in layout(mode):
+        if not w:
+            known[k][:] = True
+    for s, k in items:
+        known[k][s] = True
+    return known
+
+
 def permutation(mode, ns, script):
     """Bit permutation: position p of the progressive block carries streamed bit perm[p]
     (index into the ns*48 streamed bits)."""

@@ -1,0 +1,1653 @@
+{
+ "clips": 16,
+ "links": {
+  "2400/F1800": 1.65,
+  "2400/D2400": 1.24,
+  "1200/F1800": 0.85,
+  "1200/D2400": 0.64
+ },
+ "summary": {
+  "2400/F1800": {
+   "progressive, start at scan 1": {
+    "start_s": 4.442,
+    "start_frac": 0.395,
+    "pesq": 2.363,
+    "estoi": 0.723
+   },
+   "just in time, start at scan 1": {
+    "start_s": 4.442,
+    "start_frac": 0.395,
+    "pesq": 2.78,
+    "estoi": 0.793
+   },
+   "progressive, start at half": {
+    "start_s": 8.881,
+    "start_frac": 0.791,
+    "pesq": 2.695,
+    "estoi": 0.781
+   },
+   "streamed": {
+    "start_s": 7.301,
+    "start_frac": 0.65
+   }
+  },
+  "2400/D2400": {
+   "progressive, start at scan 1": {
+    "start_s": 3.338,
+    "start_frac": 0.297,
+    "pesq": 2.467,
+    "estoi": 0.747
+   },
+   "just in time, start at scan 1": {
+    "start_s": 3.338,
+    "start_frac": 0.297,
+    "pesq": 2.913,
+    "estoi": 0.815
+   },
+   "progressive, start at half": {
+    "start_s": 6.674,
+    "start_frac": 0.594,
+    "pesq": 2.748,
+    "estoi": 0.791
+   },
+   "streamed": {
+    "start_s": 2.696,
+    "start_frac": 0.24
+   }
+  },
+  "1200/F1800": {
+   "progressive, start at scan 1": {
+    "start_s": 2.291,
+    "start_frac": 0.204,
+    "pesq": 2.156,
+    "estoi": 0.703
+   },
+   "just in time, start at scan 1": {
+    "start_s": 2.291,
+    "start_frac": 0.204,
+    "pesq": 2.596,
+    "estoi": 0.762
+   },
+   "progressive, start at half": {
+    "start_s": 4.577,
+    "start_frac": 0.407,
+    "pesq": 2.448,
+    "estoi": 0.741
+   },
+   "streamed": {
+    "start_s": 0.0,
+    "start_frac": 0.0
+   }
+  },
+  "1200/D2400": {
+   "progressive, start at scan 1": {
+    "start_s": 1.725,
+    "start_frac": 0.154,
+    "pesq": 2.265,
+    "estoi": 0.721
+   },
+   "just in time, start at scan 1": {
+    "start_s": 1.725,
+    "start_frac": 0.154,
+    "pesq": 2.596,
+    "estoi": 0.762
+   },
+   "progressive, start at half": {
+    "start_s": 3.446,
+    "start_frac": 0.307,
+    "pesq": 2.481,
+    "estoi": 0.747
+   },
+   "streamed": {
+    "start_s": 0.0,
+    "start_frac": 0.0
+   }
+  }
+ },
+ "per_clip": {
+  "2400/F1800": {
+   "ears_p020_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.5381875,
+     "start_frac": 0.3953125,
+     "pesq": 2.5026960372924805,
+     "estoi": 0.700658832933103
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.5381875,
+     "start_frac": 0.3953125,
+     "pesq": 2.9246857166290283,
+     "estoi": 0.7770864636256237
+    },
+    "progressive, start at half": {
+     "start_s": 9.076375,
+     "start_frac": 0.790625,
+     "pesq": 2.733942985534668,
+     "estoi": 0.7599080974266844
+    },
+    "streamed": {
+     "start_s": 7.461999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "ears_p025_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.206125,
+     "start_frac": 0.39605696798493406,
+     "pesq": 2.502485513687134,
+     "estoi": 0.6532490340599532
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.206125,
+     "start_frac": 0.39605696798493406,
+     "pesq": 3.0975170135498047,
+     "estoi": 0.7346810698756474
+    },
+    "progressive, start at half": {
+     "start_s": 8.396437500000001,
+     "start_frac": 0.790625,
+     "pesq": 2.943040609359741,
+     "estoi": 0.7205213125825102
+    },
+    "streamed": {
+     "start_s": 6.903,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "ears_p047_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5261875000000003,
+     "start_frac": 0.3953125,
+     "pesq": 2.353222608566284,
+     "estoi": 0.7558185007001219
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5261875000000003,
+     "start_frac": 0.3953125,
+     "pesq": 2.632290840148926,
+     "estoi": 0.8230537155392477
+    },
+    "progressive, start at half": {
+     "start_s": 7.0523750000000005,
+     "start_frac": 0.790625,
+     "pesq": 2.648696184158325,
+     "estoi": 0.8114823177392709
+    },
+    "streamed": {
+     "start_s": 5.797999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "ears_p051_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.7121249999999995,
+     "start_frac": 0.3959768907563025,
+     "pesq": 2.185722589492798,
+     "estoi": 0.746689462397062
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.7121249999999995,
+     "start_frac": 0.3959768907563025,
+     "pesq": 2.570044755935669,
+     "estoi": 0.813137826165182
+    },
+    "progressive, start at half": {
+     "start_s": 9.4084375,
+     "start_frac": 0.7906249999999999,
+     "pesq": 2.5227086544036865,
+     "estoi": 0.8059274073467543
+    },
+    "streamed": {
+     "start_s": 7.734999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "ears_p070_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.585625,
+     "start_frac": 0.3953125,
+     "pesq": 2.2062149047851562,
+     "estoi": 0.7232470596809547
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.585625,
+     "start_frac": 0.3953125,
+     "pesq": 2.5566606521606445,
+     "estoi": 0.8066843434953495
+    },
+    "progressive, start at half": {
+     "start_s": 9.17125,
+     "start_frac": 0.790625,
+     "pesq": 2.5962297916412354,
+     "estoi": 0.794562651453831
+    },
+    "streamed": {
+     "start_s": 7.539999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "ears_p095_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.4945625000000002,
+     "start_frac": 0.3953125,
+     "pesq": 2.3455708026885986,
+     "estoi": 0.7317117760415378
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.4945625000000002,
+     "start_frac": 0.3953125,
+     "pesq": 2.7932751178741455,
+     "estoi": 0.7976626930714503
+    },
+    "progressive, start at half": {
+     "start_s": 6.9891250000000005,
+     "start_frac": 0.790625,
+     "pesq": 2.694622039794922,
+     "estoi": 0.7877576044338853
+    },
+    "streamed": {
+     "start_s": 5.7459999999999996,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "ears_p100_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.7159375,
+     "start_frac": 0.3961553837953091,
+     "pesq": 2.313295602798462,
+     "estoi": 0.7661754600553359
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.7159375,
+     "start_frac": 0.3961553837953091,
+     "pesq": 2.612987756729126,
+     "estoi": 0.8272986623005146
+    },
+    "progressive, start at half": {
+     "start_s": 7.416062500000001,
+     "start_frac": 0.790625,
+     "pesq": 2.5268547534942627,
+     "estoi": 0.812465943169044
+    },
+    "streamed": {
+     "start_s": 6.0969999999999995,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "ears_p107_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.3484375,
+     "start_frac": 0.3960325591985428,
+     "pesq": 2.5532066822052,
+     "estoi": 0.7338354829991635
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.3484375,
+     "start_frac": 0.3960325591985428,
+     "pesq": 2.9372029304504395,
+     "estoi": 0.8118430708550992
+    },
+    "progressive, start at half": {
+     "start_s": 8.681062500000001,
+     "start_frac": 0.7906250000000001,
+     "pesq": 2.8888678550720215,
+     "estoi": 0.7997736410811591
+    },
+    "streamed": {
+     "start_s": 7.137,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "librispeech_2428_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.6090705394744873,
+     "estoi": 0.7437044847362895
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 3.092170000076294,
+     "estoi": 0.8099860921780563
+    },
+    "progressive, start at half": {
+     "start_s": 9.4875,
+     "start_frac": 0.790625,
+     "pesq": 3.03438401222229,
+     "estoi": 0.8045757239030618
+    },
+    "streamed": {
+     "start_s": 7.799999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "librispeech_251_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.416661262512207,
+     "estoi": 0.7864952301175177
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.880023717880249,
+     "estoi": 0.8373614222836293
+    },
+    "progressive, start at half": {
+     "start_s": 9.4875,
+     "start_frac": 0.790625,
+     "pesq": 2.7331249713897705,
+     "estoi": 0.82627451253059
+    },
+    "streamed": {
+     "start_s": 7.799999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "librispeech_3081_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.1949193477630615,
+     "estoi": 0.618750662681117
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.430976152420044,
+     "estoi": 0.6843385853282838
+    },
+    "progressive, start at half": {
+     "start_s": 9.4875,
+     "start_frac": 0.790625,
+     "pesq": 2.3760361671447754,
+     "estoi": 0.6697648096123909
+    },
+    "streamed": {
+     "start_s": 7.799999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "librispeech_3536_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.4717330932617188,
+     "estoi": 0.7593095954103688
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.8203635215759277,
+     "estoi": 0.8032716522565143
+    },
+    "progressive, start at half": {
+     "start_s": 9.4875,
+     "start_frac": 0.790625,
+     "pesq": 2.7255327701568604,
+     "estoi": 0.7942723874912141
+    },
+    "streamed": {
+     "start_s": 7.799999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "librispeech_6313_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.1615617275238037,
+     "estoi": 0.6867077937981849
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.698535919189453,
+     "estoi": 0.7726608162017486
+    },
+    "progressive, start at half": {
+     "start_s": 9.4875,
+     "start_frac": 0.790625,
+     "pesq": 2.617845296859741,
+     "estoi": 0.7538668258405832
+    },
+    "streamed": {
+     "start_s": 7.799999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "librispeech_652_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.3397414684295654,
+     "estoi": 0.7256063720230794
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.765242576599121,
+     "estoi": 0.7877135133130247
+    },
+    "progressive, start at half": {
+     "start_s": 9.4875,
+     "start_frac": 0.790625,
+     "pesq": 2.598801374435425,
+     "estoi": 0.7761707809417646
+    },
+    "streamed": {
+     "start_s": 7.799999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "librispeech_777_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.5136148929595947,
+     "estoi": 0.7022638297669394
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 3.006598472595215,
+     "estoi": 0.7857758875466898
+    },
+    "progressive, start at half": {
+     "start_s": 9.4875,
+     "start_frac": 0.790625,
+     "pesq": 2.88051700592041,
+     "estoi": 0.7700784244764436
+    },
+    "streamed": {
+     "start_s": 7.799999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   },
+   "librispeech_8842_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.1396358013153076,
+     "estoi": 0.7414093422070793
+    },
+    "just in time, start at scan 1": {
+     "start_s": 4.74375,
+     "start_frac": 0.3953125,
+     "pesq": 2.6552538871765137,
+     "estoi": 0.8189974505366715
+    },
+    "progressive, start at half": {
+     "start_s": 9.4875,
+     "start_frac": 0.790625,
+     "pesq": 2.6014208793640137,
+     "estoi": 0.80314000071828
+    },
+    "streamed": {
+     "start_s": 7.799999999999999,
+     "start_frac": 0.6499999999999999
+    }
+   }
+  },
+  "2400/D2400": {
+   "ears_p020_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.410516666666667,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.6008355617523193,
+     "estoi": 0.7248809980453128
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.410516666666667,
+     "start_frac": 0.29708333333333337,
+     "pesq": 3.0868895053863525,
+     "estoi": 0.8047300423477026
+    },
+    "progressive, start at half": {
+     "start_s": 6.821033333333334,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.824112892150879,
+     "estoi": 0.7721488918648817
+    },
+    "streamed": {
+     "start_s": 2.7552,
+     "start_frac": 0.24
+    }
+   },
+   "ears_p025_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.1609666666666674,
+     "start_frac": 0.2976428123038293,
+     "pesq": 2.676823616027832,
+     "estoi": 0.6845689513014664
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.1609666666666674,
+     "start_frac": 0.2976428123038293,
+     "pesq": 3.2782938480377197,
+     "estoi": 0.7677321691621448
+    },
+    "progressive, start at half": {
+     "start_s": 6.310050000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 3.08063006401062,
+     "estoi": 0.7350391107020382
+    },
+    "streamed": {
+     "start_s": 2.5488,
+     "start_frac": 0.24
+    }
+   },
+   "ears_p047_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.6499833333333336,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.456840753555298,
+     "estoi": 0.7709033979111747
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.6499833333333336,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.7473068237304688,
+     "estoi": 0.8482648847700344
+    },
+    "progressive, start at half": {
+     "start_s": 5.299966666666667,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.7344653606414795,
+     "estoi": 0.8242164663671564
+    },
+    "streamed": {
+     "start_s": 2.1408,
+     "start_frac": 0.24
+    }
+   },
+   "ears_p051_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5412333333333335,
+     "start_frac": 0.2975826330532213,
+     "pesq": 2.2831509113311768,
+     "estoi": 0.7647770614794754
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5412333333333335,
+     "start_frac": 0.2975826330532213,
+     "pesq": 2.7871413230895996,
+     "estoi": 0.839700811550011
+    },
+    "progressive, start at half": {
+     "start_s": 7.070583333333334,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.5522804260253906,
+     "estoi": 0.8135380663083419
+    },
+    "streamed": {
+     "start_s": 2.856,
+     "start_frac": 0.24
+    }
+   },
+   "ears_p070_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.446166666666667,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.338345527648926,
+     "estoi": 0.7527624580473526
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.446166666666667,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.6398651599884033,
+     "estoi": 0.828292743289372
+    },
+    "progressive, start at half": {
+     "start_s": 6.892333333333334,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.5995004177093506,
+     "estoi": 0.8060727539086731
+    },
+    "streamed": {
+     "start_s": 2.784,
+     "start_frac": 0.24
+    }
+   },
+   "ears_p095_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.626216666666667,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.435152769088745,
+     "estoi": 0.7564009086834919
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.626216666666667,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.929924249649048,
+     "estoi": 0.8202239249090757
+    },
+    "progressive, start at half": {
+     "start_s": 5.252433333333334,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.6799814701080322,
+     "estoi": 0.7985542502246326
+    },
+    "streamed": {
+     "start_s": 2.1216,
+     "start_frac": 0.24
+    }
+   },
+   "ears_p100_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.792583333333334,
+     "start_frac": 0.2977167732764748,
+     "pesq": 2.3345398902893066,
+     "estoi": 0.7830730256552928
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.792583333333334,
+     "start_frac": 0.2977167732764748,
+     "pesq": 2.6866981983184814,
+     "estoi": 0.846156308882963
+    },
+    "progressive, start at half": {
+     "start_s": 5.573283333333334,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.5622551441192627,
+     "estoi": 0.8237284111459376
+    },
+    "streamed": {
+     "start_s": 2.2512000000000003,
+     "start_frac": 0.24
+    }
+   },
+   "ears_p107_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.267916666666667,
+     "start_frac": 0.2976244687310261,
+     "pesq": 2.7277333736419678,
+     "estoi": 0.7566283719506833
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.267916666666667,
+     "start_frac": 0.2976244687310261,
+     "pesq": 3.1035208702087402,
+     "estoi": 0.8313373653959371
+    },
+    "progressive, start at half": {
+     "start_s": 6.523950000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.8669252395629883,
+     "estoi": 0.8138388065388057
+    },
+    "streamed": {
+     "start_s": 2.6352,
+     "start_frac": 0.24
+    }
+   },
+   "librispeech_2428_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.70833158493042,
+     "estoi": 0.7703587265534697
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 3.2864391803741455,
+     "estoi": 0.8409200454594383
+    },
+    "progressive, start at half": {
+     "start_s": 7.130000000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 3.0797765254974365,
+     "estoi": 0.8146699125099363
+    },
+    "streamed": {
+     "start_s": 2.88,
+     "start_frac": 0.24
+    }
+   },
+   "librispeech_251_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.551715850830078,
+     "estoi": 0.8035383764848073
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.88104248046875,
+     "estoi": 0.8531121858039066
+    },
+    "progressive, start at half": {
+     "start_s": 7.130000000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.8419911861419678,
+     "estoi": 0.8330712443326597
+    },
+    "streamed": {
+     "start_s": 2.88,
+     "start_frac": 0.24
+    }
+   },
+   "librispeech_3081_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.2371838092803955,
+     "estoi": 0.6395005088126196
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.5235016345977783,
+     "estoi": 0.705890962793898
+    },
+    "progressive, start at half": {
+     "start_s": 7.130000000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.4331820011138916,
+     "estoi": 0.6812076899906703
+    },
+    "streamed": {
+     "start_s": 2.88,
+     "start_frac": 0.24
+    }
+   },
+   "librispeech_3536_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.5549564361572266,
+     "estoi": 0.7711757681949434
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.9948837757110596,
+     "estoi": 0.8126759018030081
+    },
+    "progressive, start at half": {
+     "start_s": 7.130000000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.8337128162384033,
+     "estoi": 0.8014496153209458
+    },
+    "streamed": {
+     "start_s": 2.88,
+     "start_frac": 0.24
+    }
+   },
+   "librispeech_6313_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.3233680725097656,
+     "estoi": 0.7317671874826163
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.8814337253570557,
+     "estoi": 0.7935842702252771
+    },
+    "progressive, start at half": {
+     "start_s": 7.130000000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.6453676223754883,
+     "estoi": 0.7660505323496576
+    },
+    "streamed": {
+     "start_s": 2.88,
+     "start_frac": 0.24
+    }
+   },
+   "librispeech_652_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.4397528171539307,
+     "estoi": 0.7485475162087443
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.884660243988037,
+     "estoi": 0.8132106537147327
+    },
+    "progressive, start at half": {
+     "start_s": 7.130000000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.6511881351470947,
+     "estoi": 0.7846990835450397
+    },
+    "streamed": {
+     "start_s": 2.88,
+     "start_frac": 0.24
+    }
+   },
+   "librispeech_777_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.564030170440674,
+     "estoi": 0.7261882647135914
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 3.1027777194976807,
+     "estoi": 0.8006229516354995
+    },
+    "progressive, start at half": {
+     "start_s": 7.130000000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.9226410388946533,
+     "estoi": 0.7789539028309531
+    },
+    "streamed": {
+     "start_s": 2.88,
+     "start_frac": 0.24
+    }
+   },
+   "librispeech_8842_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.238285541534424,
+     "estoi": 0.7609093595294696
+    },
+    "just in time, start at scan 1": {
+     "start_s": 3.5650000000000004,
+     "start_frac": 0.29708333333333337,
+     "pesq": 2.7977447509765625,
+     "estoi": 0.837273416983547
+    },
+    "progressive, start at half": {
+     "start_s": 7.130000000000001,
+     "start_frac": 0.5941666666666667,
+     "pesq": 2.662259101867676,
+     "estoi": 0.8151147227871324
+    },
+    "streamed": {
+     "start_s": 2.88,
+     "start_frac": 0.24
+    }
+   }
+  },
+  "1200/F1800": {
+   "ears_p020_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.346,
+     "start_frac": 0.20435540069686411,
+     "pesq": 2.2150866985321045,
+     "estoi": 0.6795329453934711
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.346,
+     "start_frac": 0.20435540069686411,
+     "pesq": 2.652778148651123,
+     "estoi": 0.7446618905980169
+    },
+    "progressive, start at half": {
+     "start_s": 4.675708333333334,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.500519037246704,
+     "estoi": 0.7231369840131135
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p025_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.1667916666666667,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.34495210647583,
+     "estoi": 0.6428190366683317
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.1667916666666667,
+     "start_frac": 0.20364583333333333,
+     "pesq": 3.037672996520996,
+     "estoi": 0.7018028935998635
+    },
+    "progressive, start at half": {
+     "start_s": 4.333583333333333,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.638927459716797,
+     "estoi": 0.68760207750904
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p047_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8246666666666667,
+     "start_frac": 0.204559043348281,
+     "pesq": 2.123955011367798,
+     "estoi": 0.723587591711125
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8246666666666667,
+     "start_frac": 0.204559043348281,
+     "pesq": 2.5238449573516846,
+     "estoi": 0.7867005148610836
+    },
+    "progressive, start at half": {
+     "start_s": 3.6330416666666667,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.3145453929901123,
+     "estoi": 0.7680657085339548
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p051_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.4274583333333335,
+     "start_frac": 0.20364583333333336,
+     "pesq": 2.106574296951294,
+     "estoi": 0.7304444107173619
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.4274583333333335,
+     "start_frac": 0.20364583333333336,
+     "pesq": 2.4242138862609863,
+     "estoi": 0.7810353652928157
+    },
+    "progressive, start at half": {
+     "start_s": 4.854916666666667,
+     "start_frac": 0.4072916666666667,
+     "pesq": 2.3437952995300293,
+     "estoi": 0.7613315775766987
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p070_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.3622916666666667,
+     "start_frac": 0.20364583333333333,
+     "pesq": 1.9694502353668213,
+     "estoi": 0.6861302776192553
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.3622916666666667,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.346606731414795,
+     "estoi": 0.7664116751631491
+    },
+    "progressive, start at half": {
+     "start_s": 4.724583333333333,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.2803008556365967,
+     "estoi": 0.7396516289161652
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p095_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8083749999999998,
+     "start_frac": 0.2045673076923077,
+     "pesq": 2.1082310676574707,
+     "estoi": 0.7055311562574278
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8083749999999998,
+     "start_frac": 0.2045673076923077,
+     "pesq": 2.4813928604125977,
+     "estoi": 0.7649407536132729
+    },
+    "progressive, start at half": {
+     "start_s": 3.600458333333333,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.415314197540283,
+     "estoi": 0.7397098573980949
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p100_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.9224166666666667,
+     "start_frac": 0.20451241134751771,
+     "pesq": 1.9677326679229736,
+     "estoi": 0.7104476248663234
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.9224166666666667,
+     "start_frac": 0.20451241134751771,
+     "pesq": 2.3034591674804688,
+     "estoi": 0.7805619860898496
+    },
+    "progressive, start at half": {
+     "start_s": 3.8285416666666667,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.290144205093384,
+     "estoi": 0.7593590381809378
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p107_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.2482499999999996,
+     "start_frac": 0.20438636363636362,
+     "pesq": 2.4010703563690186,
+     "estoi": 0.7360867649329835
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.2482499999999996,
+     "start_frac": 0.20438636363636362,
+     "pesq": 2.906219720840454,
+     "estoi": 0.7882175961483819
+    },
+    "progressive, start at half": {
+     "start_s": 4.480208333333334,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.6791908740997314,
+     "estoi": 0.765096634309045
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_2428_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.3319549560546875,
+     "estoi": 0.7287675668054235
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.9330992698669434,
+     "estoi": 0.7894443138439102
+    },
+    "progressive, start at half": {
+     "start_s": 4.8875,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.740870237350464,
+     "estoi": 0.7628317548384357
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_251_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.1570591926574707,
+     "estoi": 0.7728255306609139
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.5704345703125,
+     "estoi": 0.815001043085871
+    },
+    "progressive, start at half": {
+     "start_s": 4.8875,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.4880177974700928,
+     "estoi": 0.8002452228853063
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_3081_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.0401010513305664,
+     "estoi": 0.5935241635399384
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.301959991455078,
+     "estoi": 0.6543790098080708
+    },
+    "progressive, start at half": {
+     "start_s": 4.8875,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.2295525074005127,
+     "estoi": 0.6318074012725412
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_3536_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.2171521186828613,
+     "estoi": 0.7381490002864862
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.7131028175354004,
+     "estoi": 0.7797850815797491
+    },
+    "progressive, start at half": {
+     "start_s": 4.8875,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.572226047515869,
+     "estoi": 0.7693238083973462
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_6313_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.022693157196045,
+     "estoi": 0.6751368624924283
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.530661106109619,
+     "estoi": 0.7406860505148445
+    },
+    "progressive, start at half": {
+     "start_s": 4.8875,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.325599431991577,
+     "estoi": 0.716165874206145
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_652_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.221735954284668,
+     "estoi": 0.7044789557989821
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.5310091972351074,
+     "estoi": 0.7577012943533583
+    },
+    "progressive, start at half": {
+     "start_s": 4.8875,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.432744264602661,
+     "estoi": 0.7373574396843553
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_777_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.3575267791748047,
+     "estoi": 0.7004579053743618
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.8022143840789795,
+     "estoi": 0.7585589974544636
+    },
+    "progressive, start at half": {
+     "start_s": 4.8875,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.621440887451172,
+     "estoi": 0.7333863210426198
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_8842_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 1.909947395324707,
+     "estoi": 0.7226373281449573
+    },
+    "just in time, start at scan 1": {
+     "start_s": 2.44375,
+     "start_frac": 0.20364583333333333,
+     "pesq": 2.478459596633911,
+     "estoi": 0.7876042403742887
+    },
+    "progressive, start at half": {
+     "start_s": 4.8875,
+     "start_frac": 0.40729166666666666,
+     "pesq": 2.300597906112671,
+     "estoi": 0.7605039530136418
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   }
+  },
+  "1200/D2400": {
+   "ears_p020_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.7664000000000002,
+     "start_frac": 0.15386759581881534,
+     "pesq": 2.2481465339660645,
+     "estoi": 0.6964292803759875
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.7664000000000002,
+     "start_frac": 0.15386759581881534,
+     "pesq": 2.652778148651123,
+     "estoi": 0.7446618905980169
+    },
+    "progressive, start at half": {
+     "start_s": 3.5205333333333337,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.428905487060547,
+     "estoi": 0.7292457992863578
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p025_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.6314666666666668,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.4520206451416016,
+     "estoi": 0.6620696249815776
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.6314666666666668,
+     "start_frac": 0.15333333333333335,
+     "pesq": 3.037672996520996,
+     "estoi": 0.7018028935998637
+    },
+    "progressive, start at half": {
+     "start_s": 3.2629333333333337,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.777094602584839,
+     "estoi": 0.6877670889008718
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p047_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.3738666666666668,
+     "start_frac": 0.1540209267563528,
+     "pesq": 2.1809422969818115,
+     "estoi": 0.7370354202307474
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.3738666666666668,
+     "start_frac": 0.1540209267563528,
+     "pesq": 2.5238449573516846,
+     "estoi": 0.7867005148610834
+    },
+    "progressive, start at half": {
+     "start_s": 2.735466666666667,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.4345571994781494,
+     "estoi": 0.7747745141586996
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p051_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8277333333333334,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.188650608062744,
+     "estoi": 0.7421343128717288
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8277333333333334,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.4242138862609863,
+     "estoi": 0.7810353652928157
+    },
+    "progressive, start at half": {
+     "start_s": 3.655466666666667,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.3475658893585205,
+     "estoi": 0.7672738746878609
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p070_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.7786666666666668,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.0101852416992188,
+     "estoi": 0.707618067453456
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.7786666666666668,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.346606731414795,
+     "estoi": 0.7664116751631493
+    },
+    "progressive, start at half": {
+     "start_s": 3.5573333333333337,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.307485580444336,
+     "estoi": 0.7494747109259202
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p095_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.3616000000000001,
+     "start_frac": 0.154027149321267,
+     "pesq": 2.1585659980773926,
+     "estoi": 0.7249728083045262
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.3616000000000001,
+     "start_frac": 0.154027149321267,
+     "pesq": 2.4813928604125977,
+     "estoi": 0.7649407536132729
+    },
+    "progressive, start at half": {
+     "start_s": 2.7109333333333336,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.410642385482788,
+     "estoi": 0.747284736559228
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p100_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.447466666666667,
+     "start_frac": 0.1539858156028369,
+     "pesq": 2.023305654525757,
+     "estoi": 0.727107923135602
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.447466666666667,
+     "start_frac": 0.1539858156028369,
+     "pesq": 2.3034591674804688,
+     "estoi": 0.7805619860898496
+    },
+    "progressive, start at half": {
+     "start_s": 2.882666666666667,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.3272552490234375,
+     "estoi": 0.7707688087285521
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "ears_p107_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.6927999999999999,
+     "start_frac": 0.15389090909090908,
+     "pesq": 2.5138487815856934,
+     "estoi": 0.7528129407442203
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.6927999999999999,
+     "start_frac": 0.15389090909090908,
+     "pesq": 2.906219720840454,
+     "estoi": 0.7882175961483818
+    },
+    "progressive, start at half": {
+     "start_s": 3.3733333333333335,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.7092771530151367,
+     "estoi": 0.7680131195787423
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_2428_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.54282546043396,
+     "estoi": 0.7496270241558911
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.9330992698669434,
+     "estoi": 0.7894443138439102
+    },
+    "progressive, start at half": {
+     "start_s": 3.6800000000000006,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.7640533447265625,
+     "estoi": 0.7701941847033721
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_251_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.3720991611480713,
+     "estoi": 0.7885710410109625
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.5704345703125,
+     "estoi": 0.815001043085871
+    },
+    "progressive, start at half": {
+     "start_s": 3.6800000000000006,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.479182243347168,
+     "estoi": 0.8046574091239745
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_3081_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.0797972679138184,
+     "estoi": 0.6092487490047492
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.301959991455078,
+     "estoi": 0.6543790098080708
+    },
+    "progressive, start at half": {
+     "start_s": 3.6800000000000006,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.2378387451171875,
+     "estoi": 0.6364454548017496
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_3536_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.315796375274658,
+     "estoi": 0.7511401082855571
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.7131028175354004,
+     "estoi": 0.7797850815797491
+    },
+    "progressive, start at half": {
+     "start_s": 3.6800000000000006,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.5759596824645996,
+     "estoi": 0.7705104027213
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_6313_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.19999361038208,
+     "estoi": 0.7003501969428685
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.530661106109619,
+     "estoi": 0.7406860505148445
+    },
+    "progressive, start at half": {
+     "start_s": 3.6800000000000006,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.368323564529419,
+     "estoi": 0.7278382438693156
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_652_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.376863718032837,
+     "estoi": 0.7309476822929782
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.5310091972351074,
+     "estoi": 0.7577012943533584
+    },
+    "progressive, start at half": {
+     "start_s": 3.6800000000000006,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.4663257598876953,
+     "estoi": 0.7360325076413938
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_777_m.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.6033833026885986,
+     "estoi": 0.7219521259752697
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.8022143840789795,
+     "estoi": 0.7585589974544635
+    },
+    "progressive, start at half": {
+     "start_s": 3.6800000000000006,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.734126091003418,
+     "estoi": 0.7423310227130753
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   },
+   "librispeech_8842_f.flac": {
+    "progressive, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 1.9741272926330566,
+     "estoi": 0.7374034820434084
+    },
+    "just in time, start at scan 1": {
+     "start_s": 1.8400000000000003,
+     "start_frac": 0.15333333333333335,
+     "pesq": 2.478459596633911,
+     "estoi": 0.7876042403742887
+    },
+    "progressive, start at half": {
+     "start_s": 3.6800000000000006,
+     "start_frac": 0.3066666666666667,
+     "pesq": 2.330626964569092,
+     "estoi": 0.7693894266350256
+    },
+    "streamed": {
+     "start_s": 0.0,
+     "start_frac": 0.0
+    }
+   }
+  }
+ }
+}

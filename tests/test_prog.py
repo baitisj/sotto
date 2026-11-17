@@ -92,3 +92,27 @@ def test_prior_table():
     p = sp.load_prior()
     assert p.shape == (4, 19)
     assert np.abs(p).max() < 128          # fits int8 dB steps on a radio
+
+
+@pytest.mark.parametrize("mode,ratio", [("2400", 1.65), ("2400", 1.24), ("1200", 0.85)])
+def test_jit_order(mode, ratio):
+    """The just-in-time order sends every field once, the base scan first, and every item it
+    schedules before the late tail arrives before its superframe plays."""
+    ns = 120
+    script = sp.SCRIPTS[mode]["SI"]
+    seq = sp.jit_order(mode, ns, script, 1, ratio)
+    names = [k for k, w in sp.layout(mode) if w]
+    assert sorted(seq) == sorted((s, k) for s in range(ns) for k in names)
+    base, _ = sp.order(mode, ns, script)
+    nb = len(range(0, ns, 2)) * len(script[0][0])
+    assert seq[:nb] == base[:nb]
+    w = dict(sp.layout(mode))
+    cum = np.cumsum([w[k] for _, k in seq])
+    base_bits = cum[nb - 1]
+    last = -1
+    for i in range(nb, len(seq)):
+        s = seq[i][0]
+        if s < last:                 # the late tail starts where time order breaks
+            break
+        last = s
+        assert cum[i] <= base_bits + s * 48 / ratio + 1e-9

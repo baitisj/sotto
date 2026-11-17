@@ -199,20 +199,21 @@ Then the normal decoder runs. When every field is known this is the streamed dec
 ### Clip container (files, message stores, the UV-380 player, Ragtime)
 
 Streamed `.sot` files stay as they are: raw 6-byte slots. A clip that needs its order said
-carries a 12-byte header:
+carries a 13-byte header:
 
 | Bytes | Field |
 |---|---|
 | 0-3 | `S O T P` |
 | 4 | version, 1 |
 | 5 | mode: 0 = 2400, 1 = 1200, 2 = 600, 3 = 400; bit 7 set = the frames carry the 4-8 kHz hiss layer (same layout) |
-| 6 | order: 0 = streamed, 1 = progressive |
+| 6 | order: 0 = streamed, 1 = progressive, 2 = just in time (section 6) |
 | 7 | script: 1 = SI (0 for streamed) |
 | 8-9 | block length B in superframes, big-endian; 0 = the whole clip |
 | 10-11 | total superframes, big-endian |
+| 12 | just in time: the link's air time per second of speech x 32 (0 otherwise) |
 
 Then the payload: the superframes in time order (streamed), or each block's scan stream in
-order, the last padded with zero bits to a whole byte (progressive). A receiver that keeps clips
+order, the last padded with zero bits to a whole byte (progressive and just in time). A receiver that keeps clips
 (the UV-380 player, a K6 store) keeps them as streamed slots once reassembled; the header is a
 transport matter.
 
@@ -240,10 +241,11 @@ Progressive XL payload (PN9 whitening and CRC as today):
 | 2-3 | packet number in the message (13 bits; bits 15-13 zero, as no depth or short-last flag applies) |
 | 4-5 | total superframes |
 | 6 | bits 7-5: script (1 = SI); bits 4-0: block, in units of 20 superframes (1-31, so a block fits the K6's 640-slot ring); 0 = the whole message |
-| 7-125 | 119 bytes = 952 bits of the scan stream |
+| 7 | order: 0 = scans as section 3; 1-255 = just-in-time order (section 6) for a link whose air time is this / 32 seconds per second of speech |
+| 8-125 | 118 bytes = 944 bits of the scan stream |
 | 126-127 | CRC-16/CCITT-FALSE |
 
-Packets per block = ceil(B x 48 / 952), so a receiver knows from `total`, the block byte and the
+Packets per block = ceil(B x 48 / 944), so a receiver knows from `total`, the block byte and the
 packet number exactly which bits a packet carries, and which are lost when it doesn't come. One
 progressive parity packet follows every 4 packets of the first half of a block (ceil(n/2)
 packets for an n-packet block), its body the XOR of theirs, so a single loss among them comes
@@ -256,17 +258,17 @@ of the packet spec already allows repeats with the same msg_id).
 - **Progressive or block-progressive:**
   1. Keep the store as streamed slots and a bitmap of the packets received (a 12 s sotto 2400 clip
      is 31 packets, so 4 bytes).
-  2. Scatter each good packet's 952 bits into the slots by the scan order.
+  2. Scatter each good packet's 944 bits into the slots by the scan order.
   3. When a block is complete, or nothing more arrives for 3 s (the spec's rule), play it,
      filling unknown fields by section 4. A field is known when the packets holding all its bits
      are in.
-  4. A receiver may also **preview**: start playing once the first scan of the clip is in, reading
-     each slot from the store as it plays it. Later scans keep landing during playback, so the
-     clip sharpens as it plays (section 6).
+  4. A receiver may also **play while it receives**: start once the first scan of the clip is in,
+     reading each slot from the store as it plays it. With the just-in-time order (byte 7 non-zero)
+     each frame's refinements are scheduled to land before it plays (section 6).
 
 ## 6. Timing on the K6 and the 2400-baud path
 
-A 12 s clip in XL packets (952 bits each for progressive, 960 for streamed), 12-byte preambles
+A 12 s clip in XL packets (944 bits each for progressive, 960 for streamed; the simulations used 960 for both), 12-byte preambles
 between packets:
 
 | | Packets | F/1800 on air | Rough clip (scan 1) | D/2400 on air | Rough clip |
@@ -278,12 +280,48 @@ between packets:
 or the UV-380's C6000 PHY, 12-15 dB more sensitive than F/1800; blowfang `docs/k6-fsk24.md`. The
 progressive bitstream is the same on any PHY.)
 
-**Preview while it plays.** sotto 2400 over F/1800 runs at 1.65 times real time, so streamed
-playback has to wait for most of the clip or it runs dry. A progressive receiver can start at
-4.8 s; when it reaches the clip's last second (16.8 s) it already has 85% of the bits (scan 6),
-so the clip starts rough and is close to full quality by the end. For sotto 1200 (0.85 times
-real time) streaming already starts in about 3.75 s at depth 4 at full quality, so on a clean
-link progressive mostly helps when packets are lost or the transmission is cut short.
+### Playing while it receives
+
+A receiver doesn't have to wait for the end. It can start once the first scan is in and decode
+each frame at the moment it plays it, with everything that has arrived by then. The decoder
+needs nothing new for this: it reads each slot from the store when it plays it, and the fill
+rules of section 4 use whatever is there. Later frames have had more time, so they play with
+more of their bits.
+
+The sender can do better than letting quality ramp up. Once the receiver is playing, frame t's
+refinements are only useful if they land before frame t plays. The **just-in-time order**
+(`jit_order`) sends the first scan for the whole clip, then walks through the frames in time
+order and gives each one the rest of its fields, in scan priority, as long as they still arrive
+before it plays. What doesn't fit goes after all of that, so the stored copy still ends up
+complete for a replay. Sender and receiver compute the same order from the clip length, the
+script and the link's air-time ratio, which the packet header carries (byte 7). On a slow link,
+every frame then gets about the first scan plus 1 / ratio of a full frame's bits, and the
+quality is level from the first second instead of rough at the start.
+
+A 12 s clip, 16 voices, mean PESQ / ESTOI of what the listener hears on first playback
+(`tools/prog_race.py --heard`, `docs/results/prog_heard.json`). Full quality is 2.94 / 0.817 for
+sotto 2400 and 2.61 / 0.763 for sotto 1200.
+
+| Mode and link (air time per second of speech) | Playback starts | Progressive order | Just in time | Streamed |
+|---|---:|---:|---:|---|
+| sotto 2400, F/1800 (1.65) | 4.7 s | 2.36 / 0.723 | **2.78 / 0.793** | full quality from 7.8 s |
+| sotto 2400, D/2400 (1.24) | 3.6 s | 2.47 / 0.747 | **2.91 / 0.815** | full quality from 2.9 s |
+| sotto 1200, F/1800 (0.85) | 2.4 s | 2.16 / 0.703 | **2.60 / 0.762** | full quality as soon as the first group is in |
+| sotto 1200, D/2400 (0.64) | 1.8 s | 2.27 / 0.721 | **2.60 / 0.762** | the same |
+
+- **Just in time beats the plain progressive order by 0.33-0.44 PESQ** on first playback, at the
+  same start, and loses nothing for the stored copy.
+- **On sotto 1200 it plays at full quality** (2.60 against 2.61) from 2.4 s at F/1800, because the
+  link is faster than real time and every refinement makes its deadline.
+- **On a link much slower than real time it buys time.** sotto 2400 over F/1800 starts 3.1 s sooner
+  than the streamed order can without running dry, at 2.78 instead of 2.94. On links at or faster
+  than real time, the streamed order already starts early at full quality. There, the reasons to
+  send progressive are a cut-short transmission and packet loss (section 2), and just in time keeps
+  both: the first scan still covers the whole clip, spread.
+- The streamed start times assume no buffering; the K6 also waits for a full interleave group
+  (about 3.75 s at depth 4 for sotto 1200).
+- The plain progressive order is still the right one when nobody listens until the end (a
+  message store), since it degrades most gracefully if the transmission stops early.
 
 **Live audio** goes block-progressive with B = the interleave group: the K6's ring, the 3.2 s
 groups of `tools/k6_talk.py` and the latency (about 6.3 s at depth 4) are unchanged. What changes
@@ -325,6 +363,8 @@ get both, but it is a new codec with new tables (and the K6 flash has no room fo
 
 ## 9. Next steps
 
+**Hiss band.** The 4-8 kHz hiss layer (v3.8) travels in the same order: its hiss index is in unvoiced frames' pitch bits, so it arrives with the first scans, and the clip header has a hiss flag. Not done: a fill rule for a missing hiss index (copy the nearer neighbour's, never average two) and a check of the speaker side channel, scored with the 16 kHz decoder. Everything above is the 8 kHz core.
+
 1. A blind listening round: the SI scans against sotto 600 / 1200 at the same share, and the 10%
    loss pairs, to check by ear what PESQ says.
 2. `modem.k6 tx --order progressive` and `rx` in blowfang (Python, host only), with the
@@ -336,6 +376,8 @@ get both, but it is a new codec with new tables (and the K6 flash has no room fo
 ```sh
 python tools/prog_race.py                       # scans, 16 voices, all modes -> stdout (--json OUT)
 python tools/prog_race.py --loss every8,rate0.1 # packet loss, streamed vs progressive
+python tools/prog_race.py --heard               # playing while receiving, progressive vs just in time
+python tools/prog_race.py --heard --demo CLIP.flac --out build/prog-heard
 python tools/prog_race.py --demo CLIP.flac --mode 2400 --script SI --out build/prog-demo
 python tools/prog_race.py --train-prior         # sim/data/prog_prior.npz
 ```
