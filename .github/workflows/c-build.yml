@@ -63,21 +63,23 @@ jobs:
       - name: DEBUG k6 decoder (temporary)
         if: always()
         run: |
-          cc --version | head -1
-          lsb_release -d
-          grep -m1 "model name" /proc/cpuinfo
-          python - <<'PYEOF'
-          import subprocess, numpy as np, hashlib
-          ref = "fff9 ffbb 0029 fff8 0002 ffff fff7 0006 0002 ffa0 084a d888 fd13 631c 2e5f 3b7f f0a0 044d f3d8 16ca 2ceb 5e0e ade1 4c1e c759 4bc0 e50a 1caa 600a 3830 f292 b693 1ede 8953 b7f4 0633 f934 2098 5828 c92d 907e bb57 f039 0836 f53e 8535 dfe2 1f81 f79c 04df 01a7 ffdf ffe1 0199 0b15 ea7e 245f e013 6ca6 6367 1441 dc98 6f69 beac da61 1a72 1510 e3db 4e8e 749d f6f8 6c0e ecfd fb7a fc18 fe71 05da 0d3b 13b7 12f6 2eb0 d8c8 f6b1 d3b5 e020 3fe3 d58a 0960 fca1 018c 0311 ffff ffff ffe8 fe09 ff45 0232 00f7 ff97 ff49 008f 0048 ffff fff8 fffd 0002 fffa fffe 0004 fffd 0002 0000 ffff 0002 fffe fffb 0004 fffc 0002 0006 fffb 0002 0003 0002 fffe 0005 fff8 ff73 ffa8 005e 002e 00b8 fdff 0215 ff54 ffaf ff47 012b fff4 0001 003f ffbe fff5 0002 fffe 0008 fe98 37a3 8b28 c31a 759b 2c0b 0eeb c23b 6beb f6eb e312 0a0a 0795 fe67 fda1 a022 04ba 37bb c5c3 c8e6 40c3 8175 e3ba ffaf fe85 f683 13d4 19ed 2359 c52d 9844 196b cf85 2fe1 60c0 446b aba4 6045 a81e 6de1 d5f4 0958 8dde bb0e d2a0 171c fdaf 90ea cb4d 0412 0038 ff72 ff3c c7a2 b3a3 8f0c 90c9 880a 97bc aa4a 524b ce00 3a2e e6c7 0b68 2015 a362 278e 6701 04a4 33b6 7b49 65e7 d8b7 008c 04b6 5409 2557 ed27 c83c a525 2792 4a05 827f dcb2 08b6 e5a8 6497 a199 dcce b3b2 c54f e0f6 57f6 c6ba 42c9 da1b 0ff7 3cba 92fd 75e2 cf73 f277 feeb 099b fabd fe82 01fc 0156 fc12 03eb 0193 01d9 feba fffe ff12 01c7 ffac ffd0 ffbc ffa7 0005 005b ff7b 00b7 fff1 fa3c 066c 04b1 cb14 2a38 4ad7 5487 accd 1ea3 d0a2 d5fc 09c3 4f50 5c3d 9323 89b1 52db 0884 492b 613b 8e0d b183 3191 5070 cf4c a77e 8b19 cc38".split()
-          subprocess.run(["c/fixed/sotto_dec_fx_k6", "-16", "tests/golden/male_libri3436_15s__2400.bit", "/tmp/o.raw"], check=True)
-          y = np.fromfile("/tmp/o.raw", "<i2").astype(np.int64)
-          b = y[:len(y) // 320 * 320].reshape(-1, 320)
-          got = [f"{int(x.sum()) & 0xffff:04x}" for x in b]
-          bad = [i for i in range(len(got)) if got[i] != ref[i]]
-          print("sha", hashlib.sha256(y.astype("<i2").tobytes()).hexdigest()[:16], "blocks differ:", len(bad), bad[:40])
-          if bad:
-              print("block", bad[0], "samples:", " ".join(map(str, b[bad[0]].tolist())))
-          PYEOF
+          sudo apt-get install -y valgrind gcc-14 clang >/dev/null 2>&1 || true
+          cd c
+          SRC="sotto_dec.c fixed/sotto_fx_hiss.c fixed/sotto_fx_dec.c fixed/sotto_fx_enc.c fixed/sotto_fx_lr.c fixed/sotto_fx_lr_enc.c fixed/sotto_fx_vlr.c sotto_vlr_tables.c fixed/fx_math.c fixed/fx_tables.c"
+          F="-std=c99 -ffp-contract=off -I. -DFX_CHECK -DSOTTO_V36 -DSOTTO_PITCH_THIRD -DSOTTO_V38 -DFX_NARROW_MUL -DFX_HISS_LIGHT -DFX_HISS_FB"
+          B=../tests/golden/male_libri3436_15s__2400.bit
+          echo "local (gcc 13/14, clang 18, any -O): 7581dfe4224cf5b8"
+          for v in "gcc -O2" "gcc -O0" "gcc -O1" "gcc -O2 -fwrapv" "gcc -O2 -fno-strict-aliasing" "gcc -O2 -fno-tree-vectorize" "gcc -O2 -fno-builtin" "gcc -O2 -static" "gcc-14 -O2" "clang -O2" "gcc -O1 -fsanitize=undefined -fno-sanitize-recover=all"; do
+            if $v $F -o /tmp/k6 $SRC 2>/tmp/err; then
+              /tmp/k6 -16 $B /tmp/o.raw 2>&1 | head -5
+              echo "$v: $(sha256sum < /tmp/o.raw | cut -c1-16)"
+            else
+              echo "$v: build failed: $(head -2 /tmp/err)"
+            fi
+          done
+          clang --version | head -1
+          ldd --version | head -1
+          gcc -O2 $F -g -o /tmp/k6 $SRC && valgrind -q --track-origins=yes /tmp/k6 -16 $B /tmp/o.raw 2>&1 | head -30
       - name: WebAssembly codec against the native tools
         run: make -C c/wasm check PYTHON=python
       - name: docs/sotto.wasm and docs/sotto_vlr.wasm are the build of the current sources
