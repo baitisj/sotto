@@ -613,6 +613,15 @@ class SottoV2P(SottoV2):
 
 
 # ---------------------------------------------------------------- multistage VQ for the shape
+def shape_weights(shape, gamma=0.5, floor=40.0):
+    """Per-point weights of the peak-weighted shape distortion (v3.8 encoder): a rate-K point
+    x dB below the frame's highest point weighs 10^(-gamma min(x, floor) / 20), so formant
+    peaks count more than the valleys between them, as the ear hears them. Mean 1 per frame."""
+    s = np.atleast_2d(shape)
+    w = 10 ** (gamma * np.maximum(s - s.max(1, keepdims=True), -floor) / 20)
+    return w / w.mean(1, keepdims=True)
+
+
 class ShapeMSVQ:
     """Multistage vector quantizer for the mean-removed rate-K shape (K = 20, DC removed, so
     it works on DCT coefficients 1..K-1). Stage s has 2**bits[s] codewords; each stage codes
@@ -640,10 +649,13 @@ class ShapeMSVQ:
                     if sel.any():
                         self.cb[s][k] = others[sel].mean(0)
 
-    def _search(self, c, chunk=2000):
+    def _search(self, c, chunk=2000, w=None):
+        """M-best search for DCT coefficient vectors c; w (n, K): the final pick among the M
+        survivors minimises the weighted squared error in the rate-K domain instead."""
         c = np.atleast_2d(c)
         if len(c) > chunk:
-            return np.concatenate([self._search(c[i:i + chunk]) for i in range(0, len(c), chunk)])
+            return np.concatenate([self._search(c[i:i + chunk], w=None if w is None else w[i:i + chunk])
+                                   for i in range(0, len(c), chunk)])
         n = len(c)
         paths = np.zeros((n, 1, 0), int)
         recon = np.zeros((n, 1, c.shape[1]))
@@ -655,7 +667,11 @@ class ShapeMSVQ:
             pi, ci = keep // C, keep % C
             paths = np.concatenate([np.take_along_axis(paths, pi[..., None], 1), ci[..., None]], 2)
             recon = np.take_along_axis(recon, pi[..., None], 1) + cb[ci]
-        best = ((c[:, None, :] - recon) ** 2).sum(-1).argmin(1)
+        if w is None:
+            best = ((c[:, None, :] - recon) ** 2).sum(-1).argmin(1)
+        else:
+            e = (c[:, None, :] - recon) @ DCT[1:]                  # n, P, K: error per rate-K point
+            best = ((e ** 2) * w[:, None, :]).sum(-1).argmin(1)
         return paths[np.arange(n), best]
 
     @classmethod
@@ -670,8 +686,41 @@ class ShapeMSVQ:
         np.savez_compressed(path, bits=np.array(self.bits), m_best=self.m,
                             **{f"stage{i}": cb.astype(np.float32) for i, cb in enumerate(self.cb)})
 
+    # wpick (v3.8 encoder since 2026-11-19): None, or dict(gamma, floor): the M-best search
+    # is unchanged, and the final pick among its M survivors uses shape_weights.
+    # wsearch (experiments, tools/env_vq_lab.py): dict(gamma, floor, from_stage): weighted
+    # search from stage `from_stage` on as well
+    wpick = None
+    wsearch = None
+
     def indices(self, shape):
-        return self._search((np.atleast_2d(shape) @ DCT.T)[:, 1:])
+        shape = np.atleast_2d(shape)
+        if self.wsearch:
+            return self._search_w(shape, **self.wsearch)
+        c = (shape @ DCT.T)[:, 1:]
+        return self._search(c, w=shape_weights(shape, **self.wpick) if self.wpick else None)
+
+    def _search_w(self, x, gamma=0.5, floor=40.0, from_stage=0):
+        """M-best search in the rate-K domain; stages before `from_stage` use the plain squared
+        error (the same as _search's), the later ones and the final pick the weighted one."""
+        wt = shape_weights(x, gamma, floor)
+        n = len(x)
+        paths = np.zeros((n, 1, 0), int)
+        recon = np.zeros((n, 1, K))
+        for s, cb in enumerate(self.cb):
+            cbk = np.hstack([np.zeros((len(cb), 1)), cb]) @ DCT
+            w = wt if s >= from_stage else np.ones_like(wt)
+            r = x[:, None] - recon
+            rw = r * w[:, None]
+            d = (r * rw).sum(-1)[..., None] - 2 * rw @ cbk.T + (w @ (cbk ** 2).T)[:, None, :]
+            C = d.shape[2]
+            k = min(self.m, d.shape[1] * C)
+            keep = np.argpartition(d.reshape(n, -1), k - 1, 1)[:, :k]
+            pi, ci = keep // C, keep % C
+            paths = np.concatenate([np.take_along_axis(paths, pi[..., None], 1), ci[..., None]], 2)
+            recon = np.take_along_axis(recon, pi[..., None], 1) + cbk[ci]
+        best = (((x[:, None] - recon) ** 2) * wt[:, None]).sum(-1).argmin(1)
+        return paths[np.arange(n), best]
 
     def value(self, idx):
         idx = np.atleast_2d(idx)

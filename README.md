@@ -74,6 +74,7 @@ the API and the input level the codec expects (speech near −26 dBFS).
 - `sim/`: a C4FM (4-level FSK over FM) link simulator with Rayleigh and two-path
   fading; an FEC race (`fec_race.py`); a waveform race (`waveform_race.py`, `vw_race.py`); and an
   end-to-end speech test through the softmodem (`audio_race.py`, needs the Codec 2 build).
+- `tools/env_vq_lab.py` and `docs/envelope-vq.md`: how much the 34-bit envelope quantizer loses in sotto's own decoder, and the v3.8 encoder's peak-weighted shape pick (+0.044 NB PESQ, decoder unchanged).
 - `tools/fargan_study.py` and `docs/fargan-study.md`: sotto's decoder against Opus's FARGAN neural vocoder on the same bits (needs a separately built Opus `fargan_demo`).
 - `tools/score_samples.py`: PESQ (narrowband) and ESTOI scoring of coded clips
   against the originals.

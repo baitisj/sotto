@@ -18,6 +18,7 @@ PYTHON ?= python3
 # VARIANT=v3.7: v3.6 plus a pitch candidate at a third of Codec 2's estimate (encoder only,
 #               same frames as v3.6)
 # VARIANT=v3.8: v3.7 plus the 16 kHz hiss band (sotto_hiss.c, sim/hiss_band.py)
+#   (its encoder picks the shape index by a peak-weighted error, docs/envelope-vq.md; -DSOTTO_WPICK=0 for the pick before 2026-11-19)
 VARIANT ?= v3.8
 ifeq ($(VARIANT),v3.8)
 CODEBOOK ?= sim/data/shape_msvq_9988.npz

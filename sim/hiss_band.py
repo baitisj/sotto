@@ -370,6 +370,10 @@ class SottoV38(vl.SottoV37):
     returns the 8 kHz model like the other versions."""
 
     UU_WO_GUARD = True      # UU frames' pitch field is a hiss index: never interpolate from it
+    # Encoder (2026-11-19, docs/envelope-vq.md): the shape index is the M-best survivor with the
+    # least peak-weighted error (vocoder_lab.shape_weights), not the least plain squared
+    # error. Same codebook, frame and decoder; WPICK = None gives the encoder before it.
+    WPICK = dict(gamma=0.5, floor=40.0)
 
 
     def __init__(self, model=MODEL, vowel=None, voiced_trim=0.0, texture="noise", pulse=1.0, vowel_shape=False, smooth_ms=30.0, peak_hz=None, peak_db=9.0, peak_bw=250.0, peak_floor=4.0, spk_pc=None, blend=False, whisper=False, release_ms=20.0, vsmooth=False, keep_mixed=False, sib_db=None, sib_voiced=False, whisper_lag=None, vowel_src="stft", synth8=False, hb_max_hz=None, uv50=True, fb=None, fb_order=2, fb_inband=True, causal=None, fb_pair=False, fb_hop2=False, **kw):
@@ -377,6 +381,7 @@ class SottoV38(vl.SottoV37):
         - 3 dB) or "adaptive" (voiced and mixed frames at the guess + a per-speaker offset
         sent one bit per UU frame; the UU index is then 6 bits)."""
         super().__init__(**kw)
+        self.vq.wpick = self.WPICK
         self.vowel, self.voiced_trim, self.texture, self.pulse = vowel, voiced_trim, texture, pulse
         self.vowel_shape, self.smooth_ms = vowel_shape, smooth_ms
         self.peak_hz, self.peak_db, self.peak_bw, self.peak_floor = peak_hz, peak_db, peak_bw, peak_floor
