@@ -63,28 +63,16 @@ jobs:
       - name: DEBUG k6 decoder (temporary)
         if: always()
         run: |
+          gcc -O2 -o /tmp/vr tools/ci_tmp/vec_repro.c && /tmp/vr || true
+          git show HEAD~1:c/fixed/sotto_fx_hiss.c > /tmp/hiss_old.c
           cd c
           OTH="sotto_dec.c fixed/sotto_fx_dec.c fixed/sotto_fx_enc.c fixed/sotto_fx_lr.c fixed/sotto_fx_lr_enc.c fixed/sotto_fx_vlr.c sotto_vlr_tables.c fixed/fx_math.c fixed/fx_tables.c"
-          F="-std=c99 -ffp-contract=off -I. -DFX_CHECK -DSOTTO_V36 -DSOTTO_PITCH_THIRD -DSOTTO_V38 -DFX_NARROW_MUL -DFX_HISS_LIGHT -DFX_HISS_FB"
+          F="-std=c99 -ffp-contract=off -I. -Ifixed -DFX_CHECK -DSOTTO_V36 -DSOTTO_PITCH_THIRD -DSOTTO_V38 -DFX_NARROW_MUL -DFX_HISS_LIGHT -DFX_HISS_FB"
           B=../tests/golden/male_libri3436_15s__2400.bit
-          gcc -Q --help=target -O2 | grep -E "^ +-march=|^ +-mavx2 |^ +-mtune=" || true
-          gcc -O2 $F -c $OTH
-          prev=""
-          for n in $(seq 0 60); do
-            gcc -O2 $F -fdbg-cnt=vect_loop:$n -c -o hiss.o fixed/sotto_fx_hiss.c 2>/dev/null || { echo "dbg-cnt $n failed"; break; }
-            gcc -o /tmp/k6 *.o hiss.o 2>/dev/null || gcc -o /tmp/k6 $(for f in $OTH; do echo $(basename $f .c).o; done) hiss.o
-            /tmp/k6 -16 $B /tmp/o.raw
-            h=$(sha256sum < /tmp/o.raw | cut -c1-16)
-            echo "vect_loop:$n $h"
-            if [ "$h" != "7581dfe4224cf5b8" ]; then
-              echo "first bad at $n; loops vectorized at $n:"
-              gcc -O2 $F -fdbg-cnt=vect_loop:$n -fopt-info-vec-optimized -c -o /dev/null fixed/sotto_fx_hiss.c 2>&1 | grep "loop vectorized"
-              break
-            fi
+          cp /tmp/hiss_old.c fixed/hiss_old.c
+          for src in fixed/sotto_fx_hiss.c fixed/hiss_old.c; do
+            gcc -O2 $F -o /tmp/k6 $OTH $src && /tmp/k6 -16 $B /tmp/o.raw && echo "$src: $(sha256sum < /tmp/o.raw | cut -c1-16) (want 7581dfe4224cf5b8)"
           done
-          echo "x86-64 baseline:"
-          gcc -O2 -march=x86-64 $F -o /tmp/k6 $OTH fixed/sotto_fx_hiss.c && /tmp/k6 -16 $B /tmp/o.raw && sha256sum < /tmp/o.raw | cut -c1-16
-          gcc -O2 -march=x86-64-v3 $F -o /tmp/k6 $OTH fixed/sotto_fx_hiss.c && /tmp/k6 -16 $B /tmp/o.raw && sha256sum < /tmp/o.raw | cut -c1-16
       - name: WebAssembly codec against the native tools
         run: make -C c/wasm check PYTHON=python
       - name: docs/sotto.wasm and docs/sotto_vlr.wasm are the build of the current sources

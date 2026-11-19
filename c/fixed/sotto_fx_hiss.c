@@ -1345,10 +1345,13 @@ static void dec_stage_a(struct sotto_dec16 *d, int32_t t, tframe_t *s) {
     pr[o] = fx_rshr(a, 14);
   }
   pc = d->pc[f % GR];
+  /* m0 joins after the rounding shift: (m0 2^14 + c + 2^13) >> 14 = m0 + ((c + 2^13) >> 14),
+     the same numbers. Written as before, GCC 15 -O2 -march=x86-64-v3 (Ubuntu 26.04's default
+     target) vectorized this loop into one that rounded a few levels 1 off */
   for (b = 0; b < 16; b++) {
-    fx_acc corr = (fx_acc)fx_hs_fine_m0[b] * 16384;
+    fx_acc corr = 0;
     for (c = 0; c < 3; c++) corr += (fx_acc)pc[c] * fx_hs_fine_vt[c * 16 + b];
-    s->vt[b] = pr[b] + ref + fx_rshr(corr, 14);
+    s->vt[b] = pr[b] + ref + fx_hs_fine_m0[b] + fx_rshr(corr, 14);
   }
 }
 
