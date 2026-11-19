@@ -63,23 +63,28 @@ jobs:
       - name: DEBUG k6 decoder (temporary)
         if: always()
         run: |
-          sudo apt-get install -y valgrind gcc-14 clang >/dev/null 2>&1 || true
           cd c
           SRC="sotto_dec.c fixed/sotto_fx_hiss.c fixed/sotto_fx_dec.c fixed/sotto_fx_enc.c fixed/sotto_fx_lr.c fixed/sotto_fx_lr_enc.c fixed/sotto_fx_vlr.c sotto_vlr_tables.c fixed/fx_math.c fixed/fx_tables.c"
           F="-std=c99 -ffp-contract=off -I. -DFX_CHECK -DSOTTO_V36 -DSOTTO_PITCH_THIRD -DSOTTO_V38 -DFX_NARROW_MUL -DFX_HISS_LIGHT -DFX_HISS_FB"
           B=../tests/golden/male_libri3436_15s__2400.bit
-          echo "local (gcc 13/14, clang 18, any -O): 7581dfe4224cf5b8"
-          for v in "gcc -O2" "gcc -O0" "gcc -O1" "gcc -O2 -fwrapv" "gcc -O2 -fno-strict-aliasing" "gcc -O2 -fno-tree-vectorize" "gcc -O2 -fno-builtin" "gcc -O2 -static" "gcc-14 -O2" "clang -O2" "gcc -O1 -fsanitize=undefined -fno-sanitize-recover=all"; do
-            if $v $F -o /tmp/k6 $SRC 2>/tmp/err; then
-              /tmp/k6 -16 $B /tmp/o.raw 2>&1 | head -5
-              echo "$v: $(sha256sum < /tmp/o.raw | cut -c1-16)"
-            else
-              echo "$v: build failed: $(head -2 /tmp/err)"
-            fi
+          echo "want 7581dfe4224cf5b8"
+          for v in "-fno-tree-loop-vectorize" "-fno-tree-slp-vectorize"; do
+            gcc -O2 $v $F -o /tmp/k6 $SRC && /tmp/k6 -16 $B /tmp/o.raw && echo "gcc -O2 $v: $(sha256sum < /tmp/o.raw | cut -c1-16)"
           done
-          clang --version | head -1
-          ldd --version | head -1
-          gcc -O2 $F -g -o /tmp/k6 $SRC && valgrind -q --track-origins=yes /tmp/k6 -16 $B /tmp/o.raw 2>&1 | head -30
+          mkdir -p /tmp/ob
+          for x in $SRC; do
+            objs=""
+            for f in $SRC; do
+              o=/tmp/ob/$(basename $f .c).o
+              if [ $f = $x ]; then gcc -O2 $F -c -o $o $f; else gcc -O2 -fno-tree-vectorize $F -c -o $o $f; fi
+              objs="$objs $o"
+            done
+            gcc -o /tmp/k6 $objs && /tmp/k6 -16 $B /tmp/o.raw && echo "only $x vectorized: $(sha256sum < /tmp/o.raw | cut -c1-16)"
+          done
+          for f in fixed/sotto_fx_hiss.c fixed/sotto_fx_dec.c fixed/fx_math.c fixed/sotto_fx_lr.c fixed/sotto_fx_vlr.c; do
+            echo "== vectorized loops in $f"
+            gcc -O2 $F -fopt-info-vec-optimized -c -o /tmp/x.o $f 2>&1 | sed 's/^/  /'
+          done
       - name: WebAssembly codec against the native tools
         run: make -C c/wasm check PYTHON=python
       - name: docs/sotto.wasm and docs/sotto_vlr.wasm are the build of the current sources
