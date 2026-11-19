@@ -40,6 +40,7 @@ DCT[0] /= np.sqrt(2)                                     # orthonormal DCT-II
 # ---------------------------------------------------------------- c2sim I/O
 TRACK = {}
 TRACK2 = {}
+FOLD = True     # "tracked4" (the v3.7+ encoders): sinusoid.fold_subharmonics after the tracker
 
 
 def analyse(x, pitch="c2"):
@@ -66,6 +67,9 @@ def analyse(x, pitch="c2"):
         if TRACK2.get("up") or opts.get("up"):
             opts = {"x": xi, **opts}
         wo, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"], **opts)
+        if pitch == "tracked4" and FOLD:
+            # v3.9: short sub-octave runs lifted back up (sinusoid.fold_subharmonics)
+            wo = sn.fold_subharmonics(Sw, xi, wo, v, **sn.FOLD)
         m2 = sn.analyse(xi, wo, voicing=v, do_refine=False)[:len(m)]
         if pitch in ("tracked2t", "tracked3", "tracked4"):
             # v3.1: fading voiced-fricative tails played as noise

@@ -337,6 +337,54 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
     return wo, voiced
 
 
+FOLD = dict(maxrun=12, ratio=0.62, k_tol=1.5, glide=1.3, fold_nc=0.45, bridge_nc=0.5)
+
+
+def fold_subharmonics(Sw, x, wo, voiced, maxrun=12, ratio=0.62, k_tol=1.5, glide=1.3,
+                      fold_nc=0.45, bridge_nc=0.5):
+    """Lift short sub-octave runs in a decided pitch track back to the voice's pitch (v3.9
+    encoder, docs/pitch-errors.md; listening round 22 won 4-0 with 4 ties).
+
+    In breathy, diplophonic or creaky stretches the tracker (and often Codec 2) drops to half
+    or a third of the pitch for a few frames: the voice repeats every second cycle, or its
+    harmonics have energy between them, so a comb at the sub-octave fits better. A run starts
+    at a voiced frame whose pitch is at most `ratio` of the voiced frame before it (one
+    unvoiced frame between is allowed), the anchor a; it takes k = round(wo[a] / wo[t]),
+    2 or 3, and lasts while the frames stay voiced, at most `maxrun` frames, without a jump up
+    of more than `glide` from the frame before, and with k * wo within `k_tol` of the anchor.
+    Each frame in it takes refine(k * wo) when the speech still repeats at that period
+    (nccf >= fold_nc); otherwise, when even its own period is weakly periodic (nccf <
+    bridge_nc, creak), it takes refine(anchor). Causal: each frame needs only the frames
+    decided before it and its own samples, so a streaming encoder applies it as it decides
+    frames, with no extra delay. Voicing is unchanged. x: the int-scaled speech spectra() was
+    given. Returns the new Wo track."""
+    wo = np.asarray(wo, float)
+    n = len(wo)
+    vo = np.asarray(voiced) > 0
+    xp = np.concatenate([np.ones(M_PITCH - N), np.asarray(x, float), np.zeros(n * N)])
+    out = wo.copy()
+    run, a_wo, k0 = 0, 0.0, 0
+    for u in range(1, n):
+        if run and not (vo[u] and run < maxrun and wo[u] < glide * wo[u - 1]
+                        and a_wo / k_tol <= k0 * wo[u] <= a_wo * k_tol):
+            run = 0
+        if not run:
+            a = u - 1 if vo[u - 1] else (u - 2 if u >= 2 and vo[u - 2] else -1)
+            if not vo[u] or a < 0 or wo[u] > ratio * out[a]:
+                continue
+            k0 = int(min(3, max(2, round(out[a] / wo[u]))))
+            if not out[a] / k_tol <= k0 * wo[u] <= out[a] * k_tol:
+                continue
+            run, a_wo = 0, out[a]
+        run += 1
+        buf = xp[u * N:u * N + M_PITCH]
+        if nccf(buf, 2 * np.pi / (k0 * wo[u])) >= fold_nc:
+            out[u] = refine(Sw[u], float(np.clip(k0 * wo[u], WO_MIN, WO_MAX_HI)), WO_MAX_HI)
+        elif nccf(buf, 2 * np.pi / wo[u]) < bridge_nc:
+            out[u] = refine(Sw[u], float(np.clip(a_wo, WO_MIN, WO_MAX_HI)), WO_MAX_HI)
+    return out
+
+
 def nccf(buf, period):
     """normalised autocorrelation of buf at a (fractional) period in samples: the larger at
     the two whole lags either side; 0 for periods under 2 samples"""

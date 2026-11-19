@@ -49,6 +49,16 @@
 #define SOTTO_WPICK 0
 #endif
 #endif
+/* v3.9 encoder (c/sotto.c SOTTO_FOLD, sinusoid.fold_subharmonics): short sub-octave runs in
+   the decided pitch track lifted back up. -DSOTTO_FOLD=0: before */
+#ifndef SOTTO_FOLD
+#ifdef SOTTO_PITCH_THIRD
+#define SOTTO_FOLD 1
+#else
+#define SOTTO_FOLD 0
+#endif
+#endif
+#define FOLD_MAXRUN 12
 #define NCAND 10
 #define NST (NCAND + 1)
 #define RING (LAG + 2)        /* tracker frames: decide_from walks LAG + 1 back from the newest but one */
@@ -64,6 +74,7 @@
 #define LN_RAD (-1333188)     /* (ln(2 pi) - 32 ln 2), Q16: ln(Wo in radians) from Q32 turns */
 
 #define HIST MPITCH           /* the analysis buffer */
+#define XHN ((LAG + 2) * NSAMP + MPITCH - NSAMP)   /* speech kept for the fold's nccf */
 #define SRING (LAG + 2)       /* spectra kept: frame t is decided after frame t + LAG + 1 is analysed */
 #define NQW ((2 * NB + 15) / 16)   /* words of 2-bit codes, one a value of sw */
 
@@ -112,6 +123,12 @@ struct sotto_enc {
   fx_fparams_t qp[8];         /* the queued frames' fields before shape quantization (sotto 1200) */
   int16_t q_head, q_n, flushed;
   int16_t no_shape;           /* skip the shape search: its bits are 0 (sotto_enc_set_no_shape) */
+#if SOTTO_FOLD
+  /* fold_subharmonics: the speech of the frames not yet decided, and the run state */
+  int16_t xh[XHN];
+  uint32_t raw1, out1, out2, fold_a;   /* frame t-1's tracker pitch, t-1's and t-2's output */
+  int16_t vo1, vo2, fold_run, fold_k;
+#endif
 };                            /* followed by the scratch when the encoder has its own */
 
 #define R(e, t) (&(e)->ring[(t) % RING])
@@ -988,11 +1005,88 @@ static int32_t power_db(int ex, fx_acc p, int xb) {
 
 static void emit(struct sotto_enc *e, int cls, uint32_t wo_o);
 
+#if SOTTO_FOLD
+/* sinusoid.nccf(frame t's 320 samples, period) >= thr (Q8), period as Q16 samples: true when
+   either whole lag next to the period reaches it. Sums at 15 bits, so products fit 40 bits. */
+static int nccf_ge(const struct sotto_enc *e, int32_t t, uint32_t per, int32_t thr_q8) {
+  int c, i;
+  if (per < ((uint32_t)2 << 16)) return thr_q8 <= 0;
+  int32_t s0 = t * NSAMP - (MPITCH - NSAMP);
+  for (c = 0; c < 2; c++) {
+    int P = (int)(c ? (per + 65535u) >> 16 : per >> 16);
+    fx_acc ab = 0, aa = 0, bb = 0;
+    for (i = 0; i < MPITCH - P; i++) {
+      int32_t ia = s0 + i, ib = s0 + i + P;
+      int32_t a = ia < 0 ? 1 : e->xh[ia % XHN], b = ib < 0 ? 1 : e->xh[ib % XHN];
+      ab += (fx_acc)a * b, aa += (fx_acc)a * a, bb += (fx_acc)b * b;
+    }
+    if (ab <= 0 || aa == 0 || bb == 0) {
+      if (thr_q8 <= 0) return 1;
+      continue;
+    }
+    fx_acc m = aa > bb ? aa : bb;
+    int sh = 0;
+    while ((m >> sh) >= ((fx_acc)1 << 15)) sh++;
+    int32_t a2 = (int32_t)(aa >> sh), b2 = (int32_t)(bb >> sh), x = (int32_t)(ab >> sh);
+    /* ab / sqrt(aa bb) >= thr  <=>  ab^2 256^2 >= thr^2 aa bb, at 15-bit precision */
+    if ((fx_acc)x * x * 256 >= (fx_acc)((a2 * b2 + 128) >> 8) * thr_q8 * thr_q8) return 1;
+  }
+  return 0;
+}
+
+/* sinusoid.refine on frame t's kept 16-bit spectrum (its 31-bit powers are gone by now) */
+static uint32_t refine_kept(const struct sotto_enc *e, int32_t t, uint32_t wo) {
+  uint32_t p[NB];
+  spec_t sp;
+  const int16_t *sw = e->sw[t % SRING];
+  int b;
+  for (b = 0; b < NB; b++) p[b] = (uint32_t)((int32_t)sw[2 * b] * sw[2 * b]) + (uint32_t)((int32_t)sw[2 * b + 1] * sw[2 * b + 1]);
+  sp.sw = sw, sp.p = p;
+  return refine(&sp, wo < WO_MIN ? WO_MIN : wo > WO_HI ? WO_HI : wo, WO_HI);
+}
+
+/* sinusoid.fold_subharmonics, one decided frame at a time (c/sotto.c fold_step) */
+static uint32_t fold_step(struct sotto_enc *e, int32_t t, uint32_t wd, int vo) {
+  uint32_t out = wd;
+  if (t >= 1) {
+    if (e->fold_run) {
+      fx_uacc kw = (fx_uacc)e->fold_k * wd;
+      if (!(vo && e->fold_run < FOLD_MAXRUN && (fx_uacc)wd * 10 < (fx_uacc)e->raw1 * 13 &&
+            2 * (fx_uacc)e->fold_a <= 3 * kw && 2 * kw <= 3 * (fx_uacc)e->fold_a))
+        e->fold_run = 0;
+    }
+    int go = e->fold_run > 0;
+    if (!go) {
+      uint32_t wa = e->vo1 ? e->out1 : (t >= 2 && e->vo2) ? e->out2 : 0;
+      if (vo && wa && (fx_uacc)wd * 100 <= (fx_uacc)wa * 62) {
+        int k = 2 * (fx_uacc)wa > 5 * (fx_uacc)wd ? 3 : 2;
+        fx_uacc kw = (fx_uacc)k * wd;
+        if (2 * (fx_uacc)wa <= 3 * kw && 2 * kw <= 3 * (fx_uacc)wa) e->fold_k = (int16_t)k, e->fold_a = wa, go = 1;
+      }
+    }
+    if (go) {
+      uint32_t kw = (uint32_t)e->fold_k * wd;
+      e->fold_run++;
+      if (nccf_ge(e, t, recip48(kw), 115))                        /* 0.45 */
+        out = refine_kept(e, t, kw);
+      else if (!nccf_ge(e, t, recip48(wd), 128))                  /* 0.5 */
+        out = refine_kept(e, t, e->fold_a);
+    }
+  }
+  e->raw1 = wd, e->out2 = e->out1, e->out1 = out, e->vo2 = e->vo1, e->vo1 = (int16_t)vo;
+  return out;
+}
+#endif
+
 static void decide(struct sotto_enc *e, int32_t t, int k) {
   int h, i, l, j;
   int32_t u;
   frame_t *f = R(e, t);
+#if SOTTO_FOLD
+  uint32_t wo = fold_step(e, t, k ? f->cand[k - 1] : f->wo0, k > 0);
+#else
   uint32_t wo = k ? f->cand[k - 1] : f->wo0;
+#endif
   int L = n_harm(wo);
   /* frame t's spectrum, kept from its analysis: the 16-bit copy for the harmonic fits, and
      the bins rounded to 16 bits (by t16) for the harmonic levels, rebuilt from it */
@@ -1165,6 +1259,9 @@ static void analyse_10ms(struct sotto_enc *e, const short *x) {
   int i;
   memmove(e->hist, e->hist + NSAMP, (HIST - NSAMP) * sizeof(int16_t));
   for (i = 0; i < NSAMP; i++) e->hist[HIST - NSAMP + i] = x[i];
+#if SOTTO_FOLD
+  for (i = 0; i < NSAMP; i++) e->xh[(e->n_an * NSAMP + i) % XHN] = x[i];
+#endif
   int32_t a = e->n_an++;
   frame_t *f = R(e, a);
   spec_t spa, *sp = &spa;

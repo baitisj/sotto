@@ -65,6 +65,24 @@
 
 #define MBEST 8
 
+/* v3.9 encoder (2026-11-19, docs/pitch-errors.md): short sub-octave runs in the decided pitch
+   track lifted back up (sinusoid.fold_subharmonics; listening round 22 won 4-0, 4 ties).
+   Causal, so no extra delay. -DSOTTO_FOLD=0: before. */
+#ifndef SOTTO_FOLD
+#ifdef SOTTO_PITCH_THIRD
+#define SOTTO_FOLD 1      /* the v3.7 and v3.8 builds, as vocoder_lab.analyse "tracked4" */
+#else
+#define SOTTO_FOLD 0
+#endif
+#endif
+#define FOLD_MAXRUN 12
+#define FOLD_RATIO 0.62
+#define FOLD_KTOL 1.5
+#define FOLD_GLIDE 1.3
+#define FOLD_NC 0.45
+#define BRIDGE_NC 0.5
+#define XH 2048           /* speech history, samples (> (LAG + 2) * NSAMP + MPITCH) */
+
 /* v3.6: energy field from the rate-K envelope (vocoder_lab.SottoV36). Build with
    make VARIANT=v3.6, which also picks the 9+9+8+8 codebook in 8-bit values. */
 #ifdef SOTTO_V36
@@ -216,6 +234,10 @@ struct sotto_enc {
   double peak;                     /* causal loudness reference (hiss_band._onsets) */
   sotto_enc_frame_t q[8];
   int q_head, q_n, flushed;
+  /* fold_subharmonics: the speech history and the run state over decided frames */
+  float xh[XH];
+  double raw1, out1, out2, fold_a;   /* frame t-1's tracker pitch, t-1's and t-2's output */
+  int vo1, vo2, fold_run, fold_k;
 };
 
 #define R(e, t) (&(e)->ring[(t) % RING])
@@ -484,10 +506,62 @@ static int q_index(double x, double lo, double hi, int bits) {
 
 static void emit(struct sotto_enc *e, int cls, float wo_o);
 
+/* speech sample i (before the first one, 1.0 as c2sim starts Sn) */
+static double xs(const struct sotto_enc *e, long i) { return i < 0 ? 1.0 : e->xh[i % XH]; }
+
+/* sinusoid.nccf over frame t's 320-sample buffer (samples 80 t - 240 .. 80 t + 79) */
+static double nccf_t(const struct sotto_enc *e, long t, double period) {
+  if (period < 2) return 0.0;
+  long s0 = t * NSAMP - (MPITCH - NSAMP);
+  double best = -1.0;
+  for (int c = 0; c < 2; c++) {
+    int P = c ? (int)ceil(period) : (int)floor(period);
+    double ab = 0, aa = 0, bb = 0;
+    for (int i = 0; i < MPITCH - P; i++) {
+      double a = xs(e, s0 + i), b = xs(e, s0 + i + P);
+      ab += a * b, aa += a * a, bb += b * b;
+    }
+    double d = sqrt(aa * bb), r = d > 0 ? ab / d : 0.0;
+    if (r > best) best = r;
+  }
+  return best;
+}
+
+/* sinusoid.fold_subharmonics, one decided frame at a time: frame t's tracker pitch wd
+   (voiced or not) -> the pitch it is coded with */
+static double fold_step(struct sotto_enc *e, long t, double wd, int vo) {
+  double out = wd;
+  if (t >= 1) {
+    if (e->fold_run && !(vo && e->fold_run < FOLD_MAXRUN && wd < FOLD_GLIDE * e->raw1 &&
+                         e->fold_a / FOLD_KTOL <= e->fold_k * wd && e->fold_k * wd <= e->fold_a * FOLD_KTOL))
+      e->fold_run = 0;
+    int go = e->fold_run > 0;
+    if (!go) {
+      double wa = e->vo1 ? e->out1 : (t >= 2 && e->vo2) ? e->out2 : -1;
+      if (vo && wa > 0 && wd <= FOLD_RATIO * wa) {
+        double r = rint(wa / wd);
+        int k = r < 2 ? 2 : r > 3 ? 3 : (int)r;
+        if (wa / FOLD_KTOL <= k * wd && k * wd <= wa * FOLD_KTOL) e->fold_k = k, e->fold_a = wa, go = 1;
+      }
+    }
+    if (go && SOTTO_FOLD) {
+      const frame_t *f = R(e, t);
+      double kw = e->fold_k * wd;
+      e->fold_run++;
+      if (nccf_t(e, t, 2 * PI_D / kw) >= FOLD_NC)
+        out = refine(f->Sw, kw < WO_MIN ? WO_MIN : kw > WO_HI ? WO_HI : kw, WO_HI);
+      else if (nccf_t(e, t, 2 * PI_D / wd) < BRIDGE_NC)
+        out = refine(f->Sw, e->fold_a < WO_MIN ? WO_MIN : e->fold_a > WO_HI ? WO_HI : e->fold_a, WO_HI);
+    }
+  }
+  e->raw1 = wd, e->out2 = e->out1, e->out1 = out, e->vo2 = e->vo1, e->vo1 = vo;
+  return out;
+}
+
 /* frame t is decided: voiced at candidate k-1, or unvoiced (k = 0) */
 static void decide(struct sotto_enc *e, long t, int k) {
   frame_t *f = R(e, t);
-  double wd = k ? f->cand[k - 1] : f->wo0;
+  double wd = fold_step(e, t, k ? f->cand[k - 1] : f->wo0, k > 0);
   float wo = (float)wd;
   MODEL m;
   memset(&m, 0, sizeof m);
@@ -611,6 +685,7 @@ static void analyse_10ms(struct sotto_enc *e, const short *x) {
   float pitch;
   memmove(e->Sn, e->Sn + NSAMP, (MPITCH - NSAMP) * sizeof(float));
   for (int i = 0; i < NSAMP; i++) e->Sn[MPITCH - NSAMP + i] = x[i];
+  for (int i = 0; i < NSAMP; i++) e->xh[(e->n_an * NSAMP + i) % XH] = x[i];
   nlp(e->nlp, e->Sn, NSAMP, &pitch, e->Sw, e->W, &e->prev_f0);
   m.Wo = TWO_PI / pitch;
   dft_speech(&e->c2, e->fft, e->Sw, e->Sn, e->w);
