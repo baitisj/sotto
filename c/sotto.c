@@ -90,6 +90,15 @@
 #define V38 0
 #endif
 #define UV_GAIN_DB 3.0
+/* v3.8 encoder since 2026-11-19 (docs/envelope-vq.md): the shape index is the M-best survivor
+   with the least peak-weighted error over the rate-K points (vocoder_lab.shape_weights:
+   weight 10^(-0.5 min(x, 40) / 20) for a point x dB below the frame's peak), not the least
+   plain squared error. Same search, codebook, frame and decoder. -DSOTTO_WPICK=0: before. */
+#ifndef SOTTO_WPICK
+#define SOTTO_WPICK V38
+#endif
+#define WPICK_GAMMA 0.5
+#define WPICK_FLOOR 40.0
 
 static const double PI_D = 3.14159265358979323846;
 #define WO_MIN (2 * PI_D / 160)
@@ -395,8 +404,9 @@ static int get_bits(const unsigned char *in, int *pos, int nb) {
   return v;
 }
 
-/* ShapeMSVQ._search: M-best multistage search over DCT coefficients 1..K-1 */
-static void msvq_search(const double *c, int *idx) {
+/* ShapeMSVQ._search: M-best multistage search over DCT coefficients 1..K-1; with SOTTO_WPICK
+   the final pick weighs each rate-K point of the error by shape_weights of sh (rk - mean) */
+static void msvq_search(const double *c, const double *sh, int *idx) {
   int np = 1, path[MBEST][SOTTO_CB_MAX_STAGES];
   double recon[MBEST][NC];
   memset(recon, 0, sizeof recon);
@@ -431,10 +441,22 @@ static void msvq_search(const double *c, int *idx) {
     np = nk;
   }
   int best = 0;
-  double bd = 0;
+  double bd = 0, w[K];
+  if (SOTTO_WPICK) {
+    double mx = sh[0];
+    for (int i = 1; i < K; i++) mx = sh[i] > mx ? sh[i] : mx;
+    for (int i = 0; i < K; i++) w[i] = pow(10, WPICK_GAMMA * fmax(sh[i] - mx, -WPICK_FLOOR) / 20);
+  }
   for (int p = 0; p < np; p++) {
     double d = 0;
-    for (int k = 0; k < NC; k++) d += (c[k] - recon[p][k]) * (c[k] - recon[p][k]);
+    if (SOTTO_WPICK)
+      for (int i = 0; i < K; i++) {
+        double e = 0;
+        for (int k = 0; k < NC; k++) e += (c[k] - recon[p][k]) * dct[k + 1][i];
+        d += w[i] * e * e;
+      }
+    else
+      for (int k = 0; k < NC; k++) d += (c[k] - recon[p][k]) * (c[k] - recon[p][k]);
     if (p == 0 || d < bd) bd = d, best = p;
   }
   memcpy(idx, path[best], sotto_cb_stages * sizeof(int));
@@ -501,16 +523,17 @@ static void decide(struct sotto_enc *e, long t, int k) {
   }
 
   if (t % 2 == 0) {
-    double rk[K], mean = 0, c[NC];
+    double rk[K], mean = 0, c[NC], sh[K];
     to_rate_k(&m, rk);
     for (int i = 0; i < K; i++) mean += rk[i];
     mean /= K;
+    for (int i = 0; i < K; i++) sh[i] = rk[i] - mean;
     for (int j = 1; j < K; j++) {
       double v = 0;
       for (int i = 0; i < K; i++) v += dct[j][i] * (rk[i] - mean);
       c[j - 1] = v;
     }
-    msvq_search(c, e->idx_e);
+    msvq_search(c, sh, e->idx_e);
     memcpy(e->c_e, c, sizeof e->c_e);
     e->wo_e = wo;
     if (SOTTO_ENERGY_RK) {   /* energy of from_rate_k(m, rk), as SottoV36 codes it */

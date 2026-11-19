@@ -40,6 +40,15 @@
 #else
 #define N_MU 3
 #endif
+/* v3.8 encoder since 2026-11-19 (docs/envelope-vq.md, c/sotto.c SOTTO_WPICK): the shape index
+   is the M-best survivor with the least peak-weighted error. -DSOTTO_WPICK=0: before */
+#ifndef SOTTO_WPICK
+#ifdef SOTTO_V38
+#define SOTTO_WPICK 1
+#else
+#define SOTTO_WPICK 0
+#endif
+#endif
 #define NCAND 10
 #define NST (NCAND + 1)
 #define RING (LAG + 2)        /* tracker frames: decide_from walks LAG + 1 back from the newest but one */
@@ -902,15 +911,60 @@ fx_acc fx_shape_err(const int32_t *c, const int32_t *rec) {
   return d;
 }
 
-/* M-best multistage search over every stage; c in dB Q16; hv: scratch for 512 values */
-static void msvq_search(const int32_t *c, int16_t *idx, int32_t *hv) {
+#if SOTTO_WPICK
+/* 10^(-x / 40) for x = 0..40 dB, Q12: vocoder_lab.shape_weights (gamma 0.5, floor 40 dB) */
+static const int16_t wpick_w[41] = {
+  4096, 3867, 3651, 3446, 3254, 3072, 2900, 2738, 2584, 2440, 2303, 2175, 2053, 1938,
+  1830, 1727, 1631, 1539, 1453, 1372, 1295, 1223, 1154, 1090, 1029, 971, 917, 866,
+  817, 772, 728, 688, 649, 613, 579, 546, 516, 487, 460, 434, 410};
+
+/* peak-weighted error of a reconstruction: the error at each rate-K point (inverse DCT of
+   c - rec, dB Q8) squared and weighted by w (Q12) */
+static fx_acc wpick_err(const int32_t *c, const int32_t *rec, const int16_t *w) {
+  int i, j;
+  int32_t q[NC];
+  fx_acc d = 0;
+  for (j = 0; j < NC; j++) q[j] = fx_rshr(c[j] - rec[j], 8);
+  for (i = 0; i < K; i++) {
+    fx_acc e = 0;
+    int32_t ei;
+    for (j = 0; j < NC; j++) e += (fx_acc)q[j] * fx_dct[(j + 1) * K + i];
+    ei = (int32_t)((e + 16384) >> 15);                       /* dB Q8 */
+    if (ei > 32767) ei = 32767;
+    if (ei < -32767) ei = -32767;                            /* 128 dB: never reached */
+    d += (fx_acc)(((int32_t)ei * ei) >> 8) * w[i];           /* < 2^22 x 2^12 */
+  }
+  FX_ACC_CHECK(d);
+  return d;
+}
+#endif
+
+/* M-best multistage search over every stage; c in dB Q16, rk the frame's rate-K envelope (dB
+   Q8, for the weighted pick); hv: scratch for 512 values */
+static void msvq_search(const int32_t *c, const int32_t *rk, int16_t *idx, int32_t *hv) {
   int p, best = 0;
   int16_t path[FX_MBEST][FX_MAXST];
   int32_t recon[FX_MBEST][NC];                               /* dB Q16 */
   fx_acc bd = 0;
   int np = fx_msvq_paths(c, fx_cb_stages, path, recon, hv);
+#if SOTTO_WPICK
+  int16_t w[K];
+  int32_t mx = rk[0];
+  for (p = 1; p < K; p++) mx = rk[p] > mx ? rk[p] : mx;
+  for (p = 0; p < K; p++) {                                  /* 10^(-min(mx - rk, 40) / 40) */
+    int32_t x = mx - rk[p], xi = x >> 8;
+    w[p] = xi >= 40 ? wpick_w[40]
+                    : (int16_t)(wpick_w[xi] + (((int32_t)(wpick_w[xi + 1] - wpick_w[xi]) * (x & 255) + 128) >> 8));
+  }
+#else
+  (void)rk;
+#endif
   for (p = 0; p < np; p++) {
+#if SOTTO_WPICK
+    fx_acc d = wpick_err(c, recon[p], w);
+#else
     fx_acc d = fx_shape_err(c, recon[p]);
+#endif
     if (p == 0 || d < bd) bd = d, best = p;
   }
   memcpy(idx, path[best], fx_cb_stages * sizeof(int16_t));
@@ -1031,7 +1085,7 @@ static void decide(struct sotto_enc *e, int32_t t, int k) {
     }
     memcpy(e->c_e, c, sizeof e->c_e);
     FX_PROF(6, 1);
-    if (!e->no_shape) msvq_search(c, e->idx_e, e->re);   /* e->re is free here */
+    if (!e->no_shape) msvq_search(c, rk, e->idx_e, e->re);   /* e->re is free here */
     FX_PROF(6, 0);
     e->wo_e = wo;
     /* v3.6: energy of the envelope at the harmonics */
