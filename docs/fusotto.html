@@ -85,7 +85,7 @@
   .framenote { font-size: 0.95rem; }
 
   /* principles */
-  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px 40px; margin-top: 24px; }
+  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 28px 40px; margin-top: 24px; }
   .principles div { display: grid; gap: 6px; border-top: 2px solid var(--ink); padding-top: 12px; min-width: 0; }
 
   /* names */
@@ -187,7 +187,6 @@
       <div><h3>Keep the air interface</h3><p>A good frame format is shared infrastructure. We don't invent a new modulation or a new sync word. A stock radio should see a normal call from a known station.</p></div>
       <div><h3>Open all the way down</h3><p>Codec, channel code, framers and test tools are published. Each C framer is tested byte for byte against a Python reference that anyone can read.</p></div>
       <div><h3>The radios you already own</h3><p>No solder, no hardware mods. Everything below runs on unmodified handhelds through firmware, RAM modules and the programming cable.</p></div>
-      <div><h3>Measure before claiming</h3><p>Each result on this page comes from a bench log with frame counts and CRCs. Where something is untested or broken, we say so.</p></div>
       <div><h3>Nothing borrowed that isn't ours</h3><p>No manufacturer firmware is used, changed or redistributed. Frame layouts come from public descriptions and open software, and every source is credited.</p></div>
     </div>
   </section>
