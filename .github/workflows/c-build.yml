@@ -31,9 +31,11 @@ jobs:
         run: make check-tables PYTHON=python
   # make check: the C API test, the table check, the v3.7 copy (make c37) and every Python test,
   # including the C-against-Python checks and the golden outputs (tools/golden.py: a cleanup
-  # that moves any mode's frames, fixed-point samples or PESQ fails). Then the page's WebAssembly
-  # codec against the native tools, and docs/*.wasm must be the build of the current sources.
-  # The fixed-point against float report (tools/check_fx.py) goes to the job summary.
+  # that moves any mode's frames, fixed-point samples or PESQ fails; test_wasm.py checks the
+  # committed docs/*.wasm against the native tools). Then a fresh WebAssembly build against the
+  # native tools. (Not a byte compare of docs/*.wasm: ubuntu-latest's clang and wasi-libc are
+  # newer than the ones that built them.) The fixed-point against float report
+  # (tools/check_fx.py) goes to the job summary.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -50,39 +52,18 @@ jobs:
             pesq \
             pystoi \
             pytest
-      - name: clang, lld and the wasm32-wasi sysroot
+      - name: clang 18, lld 18 and the wasm32-wasi sysroot (the toolchain docs/*.wasm was built with)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            clang \
-            lld \
+            clang-18 \
+            lld-18 \
             wasi-libc \
             libclang-rt-18-dev-wasm32
       - name: make check
         run: make check PYTHON=python
-      - name: DEBUG k6 decoder (temporary)
-        if: always()
-        run: |
-          gcc -O2 -o /tmp/vr tools/ci_tmp/vec_repro.c && /tmp/vr || true
-          git show HEAD~1:c/fixed/sotto_fx_hiss.c > /tmp/hiss_old.c
-          cd c
-          OTH="sotto_dec.c fixed/sotto_fx_dec.c fixed/sotto_fx_enc.c fixed/sotto_fx_lr.c fixed/sotto_fx_lr_enc.c fixed/sotto_fx_vlr.c sotto_vlr_tables.c fixed/fx_math.c fixed/fx_tables.c"
-          F="-std=c99 -ffp-contract=off -I. -Ifixed -DFX_CHECK -DSOTTO_V36 -DSOTTO_PITCH_THIRD -DSOTTO_V38 -DFX_NARROW_MUL -DFX_HISS_LIGHT -DFX_HISS_FB"
-          B=../tests/golden/male_libri3436_15s__2400.bit
-          cp /tmp/hiss_old.c fixed/hiss_old.c
-          for src in fixed/sotto_fx_hiss.c fixed/hiss_old.c; do
-            gcc -O2 $F -o /tmp/k6 $OTH $src && /tmp/k6 -16 $B /tmp/o.raw && echo "$src: $(sha256sum < /tmp/o.raw | cut -c1-16) (want 7581dfe4224cf5b8)"
-          done
       - name: WebAssembly codec against the native tools
-        run: make -C c/wasm check PYTHON=python
-      - name: docs/sotto.wasm and docs/sotto_vlr.wasm are the build of the current sources
-        run: |
-          for f in sotto.wasm sotto_vlr.wasm; do
-            if ! cmp -s c/wasm/$f docs/$f; then
-              echo "docs/$f is stale: run make -C c/wasm install and commit it"
-              exit 1
-            fi
-          done
+        run: PATH=/usr/lib/llvm-18/bin:$PATH make -C c/wasm check PYTHON=python
       - name: fixed point against float (report)
         run: |
           {

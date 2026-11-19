@@ -6,8 +6,9 @@ voices (6 s of each) and every mode in MODES, tests/golden/ holds:
 
   - the encoder's frames (tests/golden/<voice>__<mode>.bit), compared frame by frame;
   - each float decoder's PESQ-NB on those frames, clean and with every 13th frame lost
-    (float output may differ in the last bit between compilers and libms, so it is compared
-    by score, to within PESQ_TOL);
+    (float output differs in the last bits between compilers, targets and libms, so it is
+    compared by score, to within PESQ_TOL; the frames and the fixed-point hashes are the
+    exact checks);
   - a SHA-256 of each fixed-point (integer-only) decoder's samples on those frames, clean and
     with losses: they must match exactly on any machine (their PESQ-NB is kept beside it, so
     a moved hash comes with what it did to the score).
@@ -33,7 +34,7 @@ C38 = os.path.join(ROOT, "c")                     # the default build, VARIANT=v
 C37 = os.path.join(ROOT, "build", "c37")          # make c37: the v3.7 core the K6 plays
 SECONDS = 6                                       # a whole number of 120 ms (sotto 400) frames
 LOSS_EVERY = 13
-PESQ_TOL = 0.005
+PESQ_TOL = 0.02                                   # GCC 15 x86-64-v3 moved one by 0.005
 
 # 16 kHz voices from docs/samples/v38/, with their 8 kHz versions from docs/samples/ for the
 # plain modes (read as stored, so no resampler sits between the files and the encoders)
