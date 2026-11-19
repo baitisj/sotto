@@ -64,27 +64,27 @@ jobs:
         if: always()
         run: |
           cd c
-          SRC="sotto_dec.c fixed/sotto_fx_hiss.c fixed/sotto_fx_dec.c fixed/sotto_fx_enc.c fixed/sotto_fx_lr.c fixed/sotto_fx_lr_enc.c fixed/sotto_fx_vlr.c sotto_vlr_tables.c fixed/fx_math.c fixed/fx_tables.c"
+          OTH="sotto_dec.c fixed/sotto_fx_dec.c fixed/sotto_fx_enc.c fixed/sotto_fx_lr.c fixed/sotto_fx_lr_enc.c fixed/sotto_fx_vlr.c sotto_vlr_tables.c fixed/fx_math.c fixed/fx_tables.c"
           F="-std=c99 -ffp-contract=off -I. -DFX_CHECK -DSOTTO_V36 -DSOTTO_PITCH_THIRD -DSOTTO_V38 -DFX_NARROW_MUL -DFX_HISS_LIGHT -DFX_HISS_FB"
           B=../tests/golden/male_libri3436_15s__2400.bit
-          echo "want 7581dfe4224cf5b8"
-          for v in "-fno-tree-loop-vectorize" "-fno-tree-slp-vectorize"; do
-            gcc -O2 $v $F -o /tmp/k6 $SRC && /tmp/k6 -16 $B /tmp/o.raw && echo "gcc -O2 $v: $(sha256sum < /tmp/o.raw | cut -c1-16)"
+          gcc -Q --help=target -O2 | grep -E "^ +-march=|^ +-mavx2 |^ +-mtune=" || true
+          gcc -O2 $F -c $OTH
+          prev=""
+          for n in $(seq 0 60); do
+            gcc -O2 $F -fdbg-cnt=vect_loop:$n -c -o hiss.o fixed/sotto_fx_hiss.c 2>/dev/null || { echo "dbg-cnt $n failed"; break; }
+            gcc -o /tmp/k6 *.o hiss.o 2>/dev/null || gcc -o /tmp/k6 $(for f in $OTH; do echo $(basename $f .c).o; done) hiss.o
+            /tmp/k6 -16 $B /tmp/o.raw
+            h=$(sha256sum < /tmp/o.raw | cut -c1-16)
+            echo "vect_loop:$n $h"
+            if [ "$h" != "7581dfe4224cf5b8" ]; then
+              echo "first bad at $n; loops vectorized at $n:"
+              gcc -O2 $F -fdbg-cnt=vect_loop:$n -fopt-info-vec-optimized -c -o /dev/null fixed/sotto_fx_hiss.c 2>&1 | grep "loop vectorized"
+              break
+            fi
           done
-          mkdir -p /tmp/ob
-          for x in $SRC; do
-            objs=""
-            for f in $SRC; do
-              o=/tmp/ob/$(basename $f .c).o
-              if [ $f = $x ]; then gcc -O2 $F -c -o $o $f; else gcc -O2 -fno-tree-vectorize $F -c -o $o $f; fi
-              objs="$objs $o"
-            done
-            gcc -o /tmp/k6 $objs && /tmp/k6 -16 $B /tmp/o.raw && echo "only $x vectorized: $(sha256sum < /tmp/o.raw | cut -c1-16)"
-          done
-          for f in fixed/sotto_fx_hiss.c fixed/sotto_fx_dec.c fixed/fx_math.c fixed/sotto_fx_lr.c fixed/sotto_fx_vlr.c; do
-            echo "== vectorized loops in $f"
-            gcc -O2 $F -fopt-info-vec-optimized -c -o /tmp/x.o $f 2>&1 | sed 's/^/  /'
-          done
+          echo "x86-64 baseline:"
+          gcc -O2 -march=x86-64 $F -o /tmp/k6 $OTH fixed/sotto_fx_hiss.c && /tmp/k6 -16 $B /tmp/o.raw && sha256sum < /tmp/o.raw | cut -c1-16
+          gcc -O2 -march=x86-64-v3 $F -o /tmp/k6 $OTH fixed/sotto_fx_hiss.c && /tmp/k6 -16 $B /tmp/o.raw && sha256sum < /tmp/o.raw | cut -c1-16
       - name: WebAssembly codec against the native tools
         run: make -C c/wasm check PYTHON=python
       - name: docs/sotto.wasm and docs/sotto_vlr.wasm are the build of the current sources
