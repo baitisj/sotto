@@ -32,9 +32,7 @@ jobs:
   # make check: the C API test, the table check, the v3.7 copy (make c37) and every Python test,
   # including the C-against-Python checks and the golden outputs (tools/golden.py: a cleanup
   # that moves any mode's frames, fixed-point samples or PESQ fails; test_wasm.py checks the
-  # committed docs/*.wasm against the native tools). Then a fresh WebAssembly build against the
-  # native tools. (Not a byte compare of docs/*.wasm: ubuntu-latest's clang and wasi-libc are
-  # newer than the ones that built them.) The fixed-point against float report
+  # committed docs/*.wasm against the native tools). The fixed-point against float report
   # (tools/check_fx.py) goes to the job summary.
   check:
     runs-on: ubuntu-latest
@@ -52,18 +50,8 @@ jobs:
             pesq \
             pystoi \
             pytest
-      - name: clang 18, lld 18 and the wasm32-wasi sysroot (the toolchain docs/*.wasm was built with)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang-18 \
-            lld-18 \
-            wasi-libc \
-            libclang-rt-18-dev-wasm32
       - name: make check
         run: make check PYTHON=python
-      - name: WebAssembly codec against the native tools
-        run: PATH=/usr/lib/llvm-18/bin:$PATH make -C c/wasm check PYTHON=python
       - name: fixed point against float (report)
         run: |
           {
@@ -74,6 +62,34 @@ jobs:
             python tools/check_fx.py --lr docs/samples/male_libri3436_15s__original.flac
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+  # A fresh WebAssembly build of the page's codec against the native tools (make -C c/wasm check).
+  # Ubuntu 24.04: its clang 18 and wasi-libc built docs/*.wasm; 26.04's wasi-libc imports
+  # fd_prestat_get, which docs/sotto.js does not provide.
+  wasm:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python packages (the check reads FLAC and resamples)
+        run: |
+          pip install \
+            numpy \
+            scipy \
+            soundfile
+      - name: clang, lld and the wasm32-wasi sysroot
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            lld \
+            wasi-libc \
+            libclang-rt-18-dev-wasm32
+      - name: native tools
+        run: make PYTHON=false
+      - name: WebAssembly codec against the native tools
+        run: make -C c/wasm check PYTHON=python
   # The K6 firmware moved to baitisj/blowfang (2026-11-09). A new file under one of its old paths
   # here would fork it quietly, so this fails and points there. One path per line.
   k6-moved-to-blowfang:
