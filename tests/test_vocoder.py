@@ -154,6 +154,24 @@ def test_odd_even_flags_half_pitch():
     assert sn.odd_even_db(Sw[20], w) > -6
 
 
+def test_fold_lifts_a_short_sub_octave_run():
+    # a steady 220 Hz voice; the track says 110 Hz for 8 frames in the middle (a period-doubling
+    # slip): the fold puts those frames back near 220 Hz and leaves the rest alone
+    t = np.arange(8000) / 8000
+    x = sum(np.cos(2 * np.pi * 220 * k * t) / k for k in range(1, 16))
+    xi = np.round(x / np.abs(x).max() * 16000)
+    Sw = sn.spectra(xi)
+    w = 2 * np.pi * 220 / 8000
+    wo = np.full(len(Sw), w)
+    wo[40:48] = w / 2
+    out = sn.fold_subharmonics(Sw, xi, wo, np.ones(len(Sw), int))
+    assert np.all(np.abs(out[40:48] / w - 1) < 0.05)
+    assert np.array_equal(out[:40], wo[:40]) and np.array_equal(out[48:], wo[48:])
+    # not when the voice really is low: a run of 110 Hz frames in a 110 Hz voice has no anchor
+    wo2 = np.full(len(Sw), w / 2)
+    assert np.array_equal(sn.fold_subharmonics(Sw, xi, wo2, np.ones(len(Sw), int)), wo2)
+
+
 def test_v34_conceals_lost_frames():
     x = _ve9qrp(2.0)
     v = vl.SottoV34(slope=3.0, max_lost=5)

@@ -200,10 +200,10 @@ and 0.6407 → 0.6433. Per voice, PESQ moves by up to ±0.1, more of it up than 
 lose (worst 777 −0.081, best EARS p100 +0.114). PESQ isn't a pitch measure, and the pitch
 counts improve on most voices.
 
-## Still open
+## Sub-octave runs: the fold (2026-11-19)
 
-**The tracker halves some female voices in breathy or rough stretches.** About 140 tracker
-frames are at half or a third of pYIN's pitch:
+**The problem.** The tracker played some female voices at half or a third of their pitch for a
+few frames in breathy or rough stretches. About 140 tracker frames were affected:
 
 | Voice | Time | Tracker | pYIN |
 |---|---|---|---|
@@ -214,19 +214,58 @@ frames are at half or a third of pYIN's pitch:
 | EARS p051 | 3.77-3.83 s | 108 Hz | 200 Hz |
 | LibriSpeech 3536 | 1.64 s | 82 Hz | 262 Hz |
 
-Codec 2's own estimate is right in most of these. The tracker overrules it because the voice has
-energy between its harmonics, and a comb at half the pitch fits that better (the MBE fit error is
-1-2 units lower). The odd/even sub-octave check doesn't fire: the odd harmonics of the half pitch
-are only 0-2 dB down, not the 10 dB it looks for.
+There are two kinds:
 
-An experiment, `track_pitch_voicing(up=4, up_thr=0.65)`, adds a time-domain check: a candidate
-costs extra when the speech repeats at half (or a third of) its period, which means its double is
-the pitch.
+- **Period doubling** (p070 at 8.1 s): the waveform really repeats every second cycle. The
+  normalised autocorrelation is 0.93-0.97 at twice the period and only 0.55-0.8 at the period.
+  So a comb at half the pitch fits better, by 1-2 units of MBE fit error, but listeners hear the
+  higher pitch. Codec 2's own estimate is right here, and the tracker overrules it.
+- **Creak** (3536 at 1.6 s): the stretch is barely periodic (autocorrelation under 0.4 at every
+  candidate). Codec 2 and the tracker both sit near a third of the pitch, so no candidate is
+  near the true one.
 
-- Octave-low frames drop from 142 to 97, with no new octave-high ones. Per voice: p070 38 → 15
-  frames off, p051 21 → 10.
-- PESQ is flat: 2400 −0.016, 1200 and 600 within 0.005, 400 +0.006.
-- It is off by default and has no C port. Whether it sounds better is for a listening test.
+The odd/even sub-octave check doesn't fire in either case, because the odd harmonics of the
+half pitch are only 0-2 dB down, not the 10 dB it looks for.
+
+**What didn't work.** A time-domain cost in the tracker, `track_pitch_voicing(up=4,
+up_thr=0.65)`, cut octave-low frames from 142 to 97 and left PESQ flat. In the blind pitch-pairs
+round (2026-11-07 page, unblinded 2026-11-19) it won nothing: one loss (p070 0.82 s) and three
+ties. It stays off and has no C port.
+
+**The fold** (`sinusoid.fold_subharmonics`, on in the v3.7 and v3.8 encoders since 2026-11-19).
+After the tracker decides each frame, a run starts at a voiced frame whose pitch is at most 0.62
+of the voiced frame before it (one unvoiced frame between is allowed). The run takes k = 2 or 3
+(the nearer of anchor / pitch). It lasts while the frames stay voiced, for at most 12 frames,
+with no jump up of more than 1.3 times from frame to frame, and with k times the pitch within
+1.5 times of the anchor. Each frame in the run then gets one of these:
+
+- k times its pitch, refined, when the speech still repeats at that period (autocorrelation
+  0.45 or more);
+- otherwise the anchor's pitch, refined, when even its own period is weakly periodic
+  (autocorrelation under 0.5, creak);
+- otherwise no change.
+
+The fold is causal, so the streaming C encoders apply it as they decide frames, with no extra
+delay. Voicing is unchanged.
+
+- **sotto 400, 16 voices, against pYIN:** gross errors fell from 120 to 99 and frames off by
+  20% from 246 to 201. p070 went from 47 to 15, 3536 from 16 to 6 and p051 from 21 to 15. Male
+  voices didn't change. On 3081's creaky phrase end (10.7 s) the fold plays about 195 Hz where
+  pYIN hears about 62 Hz creak, so that clip's count rose from 59 to 66.
+- **PESQ-NB, 16 voices:** 2400 2.943 to 2.939, 1200 2.608 to 2.612, 600 2.146 to 2.146 and
+  400 1.880 to 1.878. These are ties.
+- **Listening round 22** (sotto 400, 9 pairs, 2026-11-19): the fold won 4 with no losses and 4
+  ties, and the null pair was called correctly. The wins were p070 8.1 s, 3536 1.6 s, p070
+  0.8 s and 3081 3.0 s. The 3081 creaky end was a tie. Key and scripts are in the project
+  folder (`vocoder/listening/ab22/`).
+- **C:** the float encoder (`c/sotto.c`, `SOTTO_FOLD`) is bit-exact with Python on p070, 3536
+  and 3081 (p051 99.7%, the same as before the fold). The fixed-point encoder
+  (`c/fixed/sotto_fx_enc.c`) refines on its kept 16-bit spectrum and runs the autocorrelation
+  tests at 15-bit precision. It matches the float encoder on 96.4% of frames (97.0% before),
+  and it keeps the last (LAG + 2) x 80 + 240 samples, 2,080 bytes more state.
+  `-DSOTTO_FOLD=0` gives the encoder before.
+
+## Still open
 
 **Creaky phrase ends.** In LibriSpeech 3081 at 9.5-11 s, pYIN hears 60-65 Hz creak and sotto
 plays 115-260 Hz. pYIN's floor makes this one hard to judge without ears.

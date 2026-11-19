@@ -49,43 +49,43 @@
   },
   "female_libri198_14s__plain2400": {
    "frames": 300,
-   "pesq_nb": 2.453,
-   "sha256_fx": "c453382ef3a9d391",
-   "pesq_nb_fx": 2.451,
-   "sha256_fx_m0": "c453382ef3a9d391",
-   "pesq_nb_fx_m0": 2.451,
-   "pesq_nb_loss": 2.24,
-   "sha256_fx_loss": "3a50382dd0d6def3",
-   "pesq_nb_fx_loss": 2.276,
-   "sha256_fx_m0_loss": "3a50382dd0d6def3",
-   "pesq_nb_fx_m0_loss": 2.276
+   "pesq_nb": 2.508,
+   "sha256_fx": "6dec8592e3a98721",
+   "pesq_nb_fx": 2.508,
+   "sha256_fx_m0": "6dec8592e3a98721",
+   "pesq_nb_fx_m0": 2.508,
+   "pesq_nb_loss": 2.314,
+   "sha256_fx_loss": "d67e917c3c034c04",
+   "pesq_nb_fx_loss": 2.331,
+   "sha256_fx_m0_loss": "d67e917c3c034c04",
+   "pesq_nb_fx_m0_loss": 2.331
   },
   "female_libri198_14s__plain1200": {
    "frames": 150,
-   "pesq_nb": 2.258,
-   "sha256_fx": "b4d122d1a5bd28fe",
-   "pesq_nb_fx": 2.261,
-   "sha256_fx_m0": "b4d122d1a5bd28fe",
-   "pesq_nb_fx_m0": 2.261,
-   "pesq_nb_loss": 1.795,
-   "sha256_fx_loss": "e47686330b8e7609",
-   "pesq_nb_fx_loss": 1.8,
-   "sha256_fx_m0_loss": "e47686330b8e7609",
-   "pesq_nb_fx_m0_loss": 1.8
+   "pesq_nb": 2.319,
+   "sha256_fx": "4434cb16132e4311",
+   "pesq_nb_fx": 2.338,
+   "sha256_fx_m0": "4434cb16132e4311",
+   "pesq_nb_fx_m0": 2.338,
+   "pesq_nb_loss": 1.841,
+   "sha256_fx_loss": "cc0dbb20305c5e2c",
+   "pesq_nb_fx_loss": 1.849,
+   "sha256_fx_m0_loss": "cc0dbb20305c5e2c",
+   "pesq_nb_fx_m0_loss": 1.849
   },
   "female_libri198_14s__plain600": {
    "frames": 75,
-   "sha256_fx_vlr": "cdc3e6141c7c472a",
+   "sha256_fx_vlr": "6f99ea6b2bb93a83",
    "pesq_nb_fx_vlr": 1.786,
-   "sha256_fx_vlr_loss": "f70c172481c47008",
-   "pesq_nb_fx_vlr_loss": 1.544
+   "sha256_fx_vlr_loss": "a61680eaf297c80f",
+   "pesq_nb_fx_vlr_loss": 1.547
   },
   "female_libri198_14s__plain400": {
    "frames": 50,
-   "sha256_fx_vlr": "463298df0c8acd6c",
-   "pesq_nb_fx_vlr": 1.532,
-   "sha256_fx_vlr_loss": "3582141a4f178482",
-   "pesq_nb_fx_vlr_loss": 1.482
+   "sha256_fx_vlr": "4eb2940f05c25430",
+   "pesq_nb_fx_vlr": 1.554,
+   "sha256_fx_vlr_loss": "92d491f4f68c9cc2",
+   "pesq_nb_fx_vlr_loss": 1.457
   },
   "male_libri3436_15s__2400": {
    "frames": 300,
@@ -133,43 +133,43 @@
   },
   "male_libri3436_15s__plain2400": {
    "frames": 300,
-   "pesq_nb": 2.842,
-   "sha256_fx": "d56550ff0b3f1539",
-   "pesq_nb_fx": 2.842,
-   "sha256_fx_m0": "d56550ff0b3f1539",
-   "pesq_nb_fx_m0": 2.842,
-   "pesq_nb_loss": 2.565,
-   "sha256_fx_loss": "b5e65bb02a66ba7f",
-   "pesq_nb_fx_loss": 2.565,
-   "sha256_fx_m0_loss": "b5e65bb02a66ba7f",
-   "pesq_nb_fx_m0_loss": 2.565
+   "pesq_nb": 3.18,
+   "sha256_fx": "5a61c2285aaab2c9",
+   "pesq_nb_fx": 3.18,
+   "sha256_fx_m0": "5a61c2285aaab2c9",
+   "pesq_nb_fx_m0": 3.18,
+   "pesq_nb_loss": 2.605,
+   "sha256_fx_loss": "0fb2de2cb9572bc8",
+   "pesq_nb_fx_loss": 2.606,
+   "sha256_fx_m0_loss": "0fb2de2cb9572bc8",
+   "pesq_nb_fx_m0_loss": 2.606
   },
   "male_libri3436_15s__plain1200": {
    "frames": 150,
-   "pesq_nb": 2.559,
-   "sha256_fx": "3952007989ef0cec",
-   "pesq_nb_fx": 2.559,
-   "sha256_fx_m0": "3952007989ef0cec",
-   "pesq_nb_fx_m0": 2.559,
-   "pesq_nb_loss": 2.425,
-   "sha256_fx_loss": "f6013a6b2391c41a",
-   "pesq_nb_fx_loss": 2.428,
-   "sha256_fx_m0_loss": "f6013a6b2391c41a",
-   "pesq_nb_fx_m0_loss": 2.428
+   "pesq_nb": 2.561,
+   "sha256_fx": "584de780a4f6a9e3",
+   "pesq_nb_fx": 2.561,
+   "sha256_fx_m0": "584de780a4f6a9e3",
+   "pesq_nb_fx_m0": 2.561,
+   "pesq_nb_loss": 2.416,
+   "sha256_fx_loss": "c458bfc3906f7282",
+   "pesq_nb_fx_loss": 2.406,
+   "sha256_fx_m0_loss": "c458bfc3906f7282",
+   "pesq_nb_fx_m0_loss": 2.406
   },
   "male_libri3436_15s__plain600": {
    "frames": 75,
-   "sha256_fx_vlr": "76004ccc033ddb91",
-   "pesq_nb_fx_vlr": 2.098,
-   "sha256_fx_vlr_loss": "437d3f0f584184bf",
-   "pesq_nb_fx_vlr_loss": 2.087
+   "sha256_fx_vlr": "aec52b2f31777ee2",
+   "pesq_nb_fx_vlr": 2.091,
+   "sha256_fx_vlr_loss": "155727396f913f09",
+   "pesq_nb_fx_vlr_loss": 2.057
   },
   "male_libri3436_15s__plain400": {
    "frames": 50,
-   "sha256_fx_vlr": "d50ee9cee92cae36",
-   "pesq_nb_fx_vlr": 1.83,
-   "sha256_fx_vlr_loss": "0e7c1a03c50a4538",
-   "pesq_nb_fx_vlr_loss": 1.72
+   "sha256_fx_vlr": "8b2258e9b8289325",
+   "pesq_nb_fx_vlr": 1.843,
+   "sha256_fx_vlr_loss": "8d251d98f5f0fc65",
+   "pesq_nb_fx_vlr_loss": 1.728
   }
  }
 }
