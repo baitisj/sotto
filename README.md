@@ -20,7 +20,7 @@ repository:
 
 ```sh
 make                      # Codec 2 fork into build/codec2, then libsotto and the tools in c/
-make check                # C API test, table check, then the Python tests (needs the Python dependencies below)
+make check                # C API test, table check, a v3.7 copy in build/c37, then the Python tests (needs the Python dependencies below)
 sudo make install         # PREFIX=/usr/local by default; then run sudo ldconfig on Linux
 ```
 
@@ -51,6 +51,13 @@ the API and the input level the codec expects (speech near −26 dBFS).
   encoder is v3.7, which only tracks pitch better, so v3.6 and v3.7 frames are the same
   format. `make clean all VARIANT=v3.6` builds v3.6's encoder, `VARIANT=v3.5` the older
   bitstream (its codebook is generated at build time, so it needs Python with numpy).
+- `make check` also builds `build/c37` (`make c37`), a `VARIANT=v3.7` copy of `c/`: the plain
+  sotto 1200 / 600 / 400 codecs the K6 plays run on the v3.7 core, while `c/` is v3.8.
+- **Golden outputs** (`tools/golden.py`, `tests/golden/`): for two voices, every
+  release-candidate mode's encoder frames, its fixed-point decoders' sample hashes and its float
+  decoder's PESQ are stored, and `make check` (and CI) fails when any of them moves. A cleanup
+  should move nothing. When a change is meant to change the sound, run
+  `python tools/golden.py --update`, commit `tests/golden/`, and say in the PR what PESQ did.
 - `make distclean` also removes the Codec 2 build. More detail is in `c/README.md`.
 
 ## Contents
@@ -82,7 +89,7 @@ the API and the input level the codec expects (speech near −26 dBFS).
 
 - No third-party code with incompatible licenses (for example the STANAG 4591
   reference code). No Yaesu firmware or images.
-- Python dependencies: numpy, scipy, soundfile, pesq, pystoi, pytest (pesq needs Python 3.11 or older to build).
+- Python dependencies: numpy, scipy, soundfile, pesq, pystoi, pytest (pesq builds under Python 3.12 in CI and 3.13 in a venv with current setuptools; an old system setuptools fails with `install_layout`).
 - Audio is stored as 16-bit FLAC. `sim/` writes it with [HamFLAC](https://github.com/baitisj/hamflac) when the `hamflac` binary is on PATH or in `$HAMFLAC`, and with soundfile otherwise.
 
 ## License

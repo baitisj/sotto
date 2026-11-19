@@ -1,5 +1,7 @@
-"""Check the C port (c/) against the Python model (sim/vocoder_lab.py SottoV37, or SottoV36 or SottoV35, with the
-fixed-lag tracker, TRACK2["lag"] = 8).
+"""Check the C port (c/) at 8 kHz against the Python model (sim/vocoder_lab.py SottoV37, or SottoV36 or SottoV35, with the
+fixed-lag tracker, TRACK2["lag"] = 8). --variant v3.8 (the default build) encodes with SottoV37, as the v3.8 C
+encoder does at 8 kHz, and decodes with hiss_band.SottoV38's 8 kHz core (unvoiced halves 50 Hz apart);
+tools/check_c_port38.py checks v3.8's 16 kHz mode.
 
 Usage: python tools/check_c_port.py CLIP.flac [...] [--loss 0.1] [--json OUT.json] [--codebook CB.npz] [--variant v3.6]
 
@@ -21,18 +23,18 @@ FIELDS = [("voicing", 0, 2), ("Wo", 2, 9), ("energy", 9, 14), ("vq1", 14, 26), (
           ("vq3", 37, 48)]
 
 
-def c_encode(x16):
+def c_encode(x16, cdir=f"{ROOT}/c"):
     with tempfile.TemporaryDirectory() as d:
         x16.astype("<i2").tofile(f"{d}/in.raw")
-        subprocess.run([f"{ROOT}/c/sotto_enc", f"{d}/in.raw", f"{d}/out.bit"], check=True)
+        subprocess.run([f"{cdir}/sotto_enc", f"{d}/in.raw", f"{d}/out.bit"], check=True)
         b = np.fromfile(f"{d}/out.bit", np.uint8)
     return np.unpackbits(b).reshape(-1, 48).astype(np.int8)
 
 
-def c_decode(bits, good=None):
+def c_decode(bits, good=None, cdir=f"{ROOT}/c"):
     with tempfile.TemporaryDirectory() as d:
         np.packbits(np.asarray(bits, np.uint8).reshape(-1, 48), axis=1).tofile(f"{d}/in.bit")
-        args = [f"{ROOT}/c/sotto_dec", f"{d}/in.bit", f"{d}/out.raw"]
+        args = [f"{cdir}/sotto_dec", f"{d}/in.bit", f"{d}/out.raw"]
         if good is not None:
             np.asarray(good, np.uint8).tofile(f"{d}/good.u8")
             args.append(f"{d}/good.u8")
@@ -45,10 +47,14 @@ def snr_db(ref, y):
     return 10 * np.log10(np.sum(ref[:n] ** 2) / (np.sum((ref[:n] - y[:n]) ** 2) + 1e-20))
 
 
-def main(clips, loss, out, codebook=None, variant="v3.7"):
+def main(clips, loss, out, codebook=None, variant="v3.8"):
     vl.TRACK2["lag"] = 8
-    cls = {"v3.7": vl.SottoV37, "v3.6": vl.SottoV36, "v3.5": vl.SottoV35}[variant]
+    cls = {"v3.8": vl.SottoV37, "v3.7": vl.SottoV37, "v3.6": vl.SottoV36, "v3.5": vl.SottoV35}[variant]
     v = cls(vq=vl.ShapeMSVQ.load(codebook) if codebook else None)
+    vdec = v
+    if variant == "v3.8":
+        import hiss_band as hb
+        vdec = hb.SottoV38(vq=vl.ShapeMSVQ.load(codebook) if codebook else None)
     import audio_race as ar
 
     def pesq(x, y):
@@ -69,7 +75,7 @@ def main(clips, loss, out, codebook=None, variant="v3.7"):
         if loss:
             good = np.random.default_rng(1).random(len(bp)) >= loss
             good[0] = True
-        yp = vl.synthesise(v.decode(bp, good))
+        yp = vl.synthesise(vdec.decode(bp, good))
         yc = c_decode(bp, good)
         r = {"clip": os.path.basename(path), "frames": int(n), "frames_py": len(bp), "frames_c": len(bc),
              "bit_exact": round(float(same.mean()), 4), "field_mismatch": diff,
@@ -90,6 +96,6 @@ if __name__ == "__main__":
     a.add_argument("--loss", type=float, default=0.0)
     a.add_argument("--json")
     a.add_argument("--codebook")
-    a.add_argument("--variant", default="v3.7", choices=["v3.5", "v3.6", "v3.7"])
+    a.add_argument("--variant", default="v3.8", choices=["v3.5", "v3.6", "v3.7", "v3.8"])
     a = a.parse_args()
     main(a.clips, a.loss, a.json, a.codebook, a.variant)
