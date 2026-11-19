@@ -167,28 +167,72 @@ def test_v34_conceals_lost_frames():
     assert e[2 * 36] < e[58] - 60                         # silent after max_lost frames
 
 
-@pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "c", "sotto_enc")),
-                    reason="C port not built (make -C c)")
-def test_c_port_matches_python():
+C38 = os.path.join(ROOT, "c")                              # the default build, VARIANT=v3.8
+C37 = os.path.join(ROOT, "build", "c37")                  # make c37: the 8 kHz core the K6 plays
+
+
+@pytest.mark.parametrize("variant", ["v3.8", "v3.7"])
+def test_c_port_matches_python(variant):
+    """The C tools at 8 kHz against the Python. Both builds encode 8 kHz input as SottoV37 does;
+    the v3.8 decoder synthesises unvoiced halves 50 Hz apart (hiss_band.SottoV38's 8 kHz core)."""
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     import check_c_port as cc
+    import hiss_band as hb
+    cdir = C38 if variant == "v3.8" else C37
+    if not os.path.exists(os.path.join(cdir, "sotto_dec")):
+        pytest.skip(f"needs the {variant} build ({'make' if variant == 'v3.8' else 'make c37'})")
     x16 = np.round(_ve9qrp(4.0) * 32767).astype(np.int16)
     x16 = x16[:len(x16) // 160 * 160]
     vl.TRACK2["lag"] = 8
     try:
-        v = vl.SottoV37()                                 # the C build's default variant
-        bp = v.encode(x16 / 32767.0)
+        bp = vl.SottoV37().encode(x16 / 32767.0)
     finally:
         vl.TRACK2.pop("lag")
-    bc = cc.c_encode(x16)
+    bc = cc.c_encode(x16, cdir)
     assert bc.shape == bp.shape
     assert np.mean(np.all(bp == bc, 1)) > 0.97            # rare pitch near-ties may differ
     good = np.ones(len(bp), bool)
     good[60:64] = False
+    v = hb.SottoV38() if variant == "v3.8" else vl.SottoV37()
     yp = vl.synthesise(v.decode(bp, good))
-    yc = cc.c_decode(bp, good)
+    yc = cc.c_decode(bp, good, cdir)
     assert len(yc) == len(yp)
     assert cc.snr_db(yp, yc) > 60
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(C38, "sotto_dec")), reason="needs the C build (make)")
+def test_c_port_v38_16k_matches_python():
+    """v3.8's 16 kHz mode (sotto_enc -16 / sotto_dec -16) against hiss_band.SottoV38, as
+    tools/check_c_port38.py measures it (docs/c-port.md): the encoder bit-exact with the
+    Python at the C's whisper look-ahead; the decoders, given the same bits and losses, agree
+    in 0-4 kHz to 30+ dB (hiss near 4 kHz leaks in with its random phase) and in their 4-8 kHz
+    level per 10 ms to within two Python seeds' spread (0.7 dB mean, 1.9 dB 95th percentile)."""
+    import soundfile as sf
+    from scipy.signal import resample_poly
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import check_c_port38 as c8
+    import hiss_band as hb
+    x, fs = sf.read(os.path.join(ROOT, "docs", "samples", "v38", "librispeech_3536_f__original16.flac"))
+    assert fs == 16000
+    x = x[:3 * fs]
+    x16 = np.round(x * 32767).astype(np.int16)
+    vl.TRACK2["lag"] = 8
+    try:
+        bp = hb.SottoV38(whisper_lag=10, **c8.ENC).encode(x16 / 32767.0)
+    finally:
+        vl.TRACK2.pop("lag")
+    bc = c8.c_encode(x16)
+    assert bc.shape == bp.shape
+    assert np.mean(np.all(bp == bc, 1)) > 0.97
+    good = np.random.default_rng(1).random(len(bp)) >= 0.05
+    good[0] = True
+    yp = hb.SottoV38(**c8.DEC).decode_audio16(bp, good, n16=len(x16))
+    yc = c8.c_decode(bp, good)
+    assert len(yc) == len(yp)
+    assert c8.snr_db(resample_poly(yp, 1, 2), resample_poly(yc, 1, 2)) > 30
+    hp, hc = c8.band_track(yp), c8.band_track(yc)
+    d = np.abs(hp - hc)[hp > -60]
+    assert d.mean() < 1.2 and np.percentile(d, 95) < 3.0
 
 
 def test_header_level_constants_match_energy_field():

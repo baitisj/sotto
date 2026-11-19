@@ -65,7 +65,8 @@ def test_round_trip_and_rebuild(mode):
     assert np.sqrt(np.mean(y ** 2)) > 1e-3
 
 
-EXE = os.path.join(ROOT, "c", "fixed", "sotto_vlr_dec_fx")
+# the plain (K6) decoder runs on the v3.7 core: the VARIANT=v3.7 copy `make c37` builds
+EXE = os.path.join(ROOT, "build", "c37", "fixed", "sotto_vlr_dec_fx")
 
 
 def _bands(y):
@@ -74,7 +75,7 @@ def _bands(y):
     return 10 * np.log10(f[:, :160].reshape(len(f), 16, 10).sum(2) + 1e-9)
 
 
-@pytest.mark.skipif(not os.path.exists(EXE), reason="needs make -C c VARIANT=v3.7 all fixed")
+@pytest.mark.skipif(not os.path.exists(EXE), reason="needs the v3.7 build (make c37)")
 @pytest.mark.parametrize("mode", ["600", "400"])
 def test_fixed_decoder_follows_python(mode):
     """The fixed-point decoder (c/fixed/sotto_fx_vlr.c) builds the same per-frame fields; the
@@ -87,7 +88,7 @@ def test_fixed_decoder_follows_python(mode):
     bits = v.encode(x)
     for good in (None, np.arange(len(bits)) % 5 != 3):
         yp = v.decode_audio(bits, good)
-        yc = cv.c_decode(mode, bits, good)
+        yc = cv.c_decode(mode, bits, good, exe=EXE)
         assert cv.offset(yp, yc) == 160
         yc = yc[160:160 + len(yp)]
         bp, bc = _bands(yp), _bands(yc)

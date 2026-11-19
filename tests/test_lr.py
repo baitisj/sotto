@@ -1,6 +1,7 @@
 """sotto 1200 (48 bits / 40 ms): the Python reference (sim/sotto_lr.py) against the C port
 (c/sotto_lr.c, float) and the fixed-point decoder (c/fixed/sotto_fx_lr.c), and its frame
-layout. Needs make -C c VARIANT=v3.7 all fixed for the C tests. SPDX-License-Identifier: MIT"""
+layout. The C tests use the v3.7 build in build/c37 (make c37): plain sotto 1200 runs on the
+v3.7 core, while c/ itself is v3.8. SPDX-License-Identifier: MIT"""
 import os
 import re
 import subprocess
@@ -16,9 +17,9 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 import vocoder_lab as vl  # noqa: E402
 import sotto_lr as lr  # noqa: E402
 
-C = os.path.join(ROOT, "c")
+C = os.path.join(ROOT, "build", "c37")      # binaries; the headers are read from c/
 need_c = pytest.mark.skipif(not os.path.exists(os.path.join(C, "fixed", "sotto_dec_fx_m0")),
-                            reason="needs make -C c VARIANT=v3.7 all fixed")
+                            reason="needs the v3.7 build (make c37)")
 
 
 def random_superframes(n, seed=1):
@@ -30,7 +31,7 @@ def random_superframes(n, seed=1):
 
 
 def c_header():
-    s = open(os.path.join(C, "sotto_lr_tables.h")).read()
+    s = open(os.path.join(ROOT, "c", "sotto_lr_tables.h")).read()
     tab = {m[0]: [int(v) for v in m[1].split(",")] for m in re.findall(r"lr_(\w+)\[8\] = \{([^}]*)\}", s)}
     num = {m[0]: float(m[1]) for m in re.findall(r"#define LR_(\w+) ([-\d.]+)", s)}
     return tab, num
@@ -44,7 +45,7 @@ def test_c_constants_match_python():
     assert (num["BST"], num["BG"]) == c.B_RES and num["JOINT"] == c.JOINT
     assert (num["WB_BITS"], num["EB_BITS"]) == (c.B_WO_BITS, c.B_E_BITS)
     assert num["INTERP"] == c.INTERP
-    h = open(os.path.join(C, "sotto.h")).read()
+    h = open(os.path.join(ROOT, "c", "sotto.h")).read()
     assert int(re.search(r"#define SOTTO_LR_DEC_DELAY (\d+)", h)[1]) == c.INTERP + 1
     assert num["W_ZERO"] == c.W_ZERO and num["E_ZERO"] == c.E_ZERO and c.E_TAB[c.E_ZERO] == 0
 
