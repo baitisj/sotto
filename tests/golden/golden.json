@@ -5,16 +5,16 @@
  "outputs": {
   "female_libri198_14s__2400": {
    "frames": 300,
-   "pesq_nb": 2.253,
-   "sha256_fx": "c54b9230692d2017",
-   "pesq_nb_fx": 2.266,
-   "sha256_fx_k6": "98040f0cea15e466",
-   "pesq_nb_fx_k6": 2.274,
-   "pesq_nb_loss": 2.04,
-   "sha256_fx_loss": "5d6a777113eb9579",
-   "pesq_nb_fx_loss": 2.094,
-   "sha256_fx_k6_loss": "d8b13de591ae82f1",
-   "pesq_nb_fx_k6_loss": 2.071
+   "pesq_nb": 2.165,
+   "sha256_fx": "41483b2b9cd2b424",
+   "pesq_nb_fx": 2.285,
+   "sha256_fx_k6": "45f694f5bc6126c0",
+   "pesq_nb_fx_k6": 2.282,
+   "pesq_nb_loss": 2.054,
+   "sha256_fx_loss": "e340f6e087a88c9b",
+   "pesq_nb_fx_loss": 2.088,
+   "sha256_fx_k6_loss": "690769c77670b59b",
+   "pesq_nb_fx_k6_loss": 2.077
   },
   "female_libri198_14s__1200": {
    "frames": 150,
@@ -89,16 +89,16 @@
   },
   "male_libri3436_15s__2400": {
    "frames": 300,
-   "pesq_nb": 2.745,
-   "sha256_fx": "f5196796688a5e82",
-   "pesq_nb_fx": 2.73,
-   "sha256_fx_k6": "7581dfe4224cf5b8",
-   "pesq_nb_fx_k6": 2.752,
-   "pesq_nb_loss": 2.608,
-   "sha256_fx_loss": "dcfe47f0d9bd03ee",
-   "pesq_nb_fx_loss": 2.832,
-   "sha256_fx_k6_loss": "23efe6ea79ffaf10",
-   "pesq_nb_fx_k6_loss": 2.818
+   "pesq_nb": 2.779,
+   "sha256_fx": "e7f89945da2b5387",
+   "pesq_nb_fx": 3.071,
+   "sha256_fx_k6": "bf10e60d223fc757",
+   "pesq_nb_fx_k6": 2.861,
+   "pesq_nb_loss": 2.587,
+   "sha256_fx_loss": "f16eda6387b17a22",
+   "pesq_nb_fx_loss": 2.628,
+   "sha256_fx_k6_loss": "25e6de991afe5491",
+   "pesq_nb_fx_k6_loss": 2.57
   },
   "male_libri3436_15s__1200": {
    "frames": 150,
