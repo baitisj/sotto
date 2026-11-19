@@ -1,6 +1,6 @@
 """Check the C port (c/) at 8 kHz against the Python model (sim/vocoder_lab.py SottoV37, or SottoV36 or SottoV35, with the
-fixed-lag tracker, TRACK2["lag"] = 8). --variant v3.8 (the default build) encodes with SottoV37, as the v3.8 C
-encoder does at 8 kHz, and decodes with hiss_band.SottoV38's 8 kHz core (unvoiced halves 50 Hz apart);
+fixed-lag tracker, TRACK2["lag"] = 8). --variant v3.8 (the default build) encodes with SottoV37 plus v3.8's peak-weighted shape pick
+(hiss_band.SottoV38.WPICK), as the v3.8 C encoder does at 8 kHz, and decodes with hiss_band.SottoV38's 8 kHz core (unvoiced halves 50 Hz apart);
 tools/check_c_port38.py checks v3.8's 16 kHz mode.
 
 Usage: python tools/check_c_port.py CLIP.flac [...] [--loss 0.1] [--json OUT.json] [--codebook CB.npz] [--variant v3.6]
@@ -54,6 +54,7 @@ def main(clips, loss, out, codebook=None, variant="v3.8"):
     vdec = v
     if variant == "v3.8":
         import hiss_band as hb
+        v.vq.wpick = hb.SottoV38.WPICK          # the v3.8 encoder's peak-weighted shape pick
         vdec = hb.SottoV38(vq=vl.ShapeMSVQ.load(codebook) if codebook else None)
     import audio_race as ar
 

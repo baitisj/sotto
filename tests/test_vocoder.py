@@ -173,8 +173,9 @@ C37 = os.path.join(ROOT, "build", "c37")                  # make c37: the 8 kHz 
 
 @pytest.mark.parametrize("variant", ["v3.8", "v3.7"])
 def test_c_port_matches_python(variant):
-    """The C tools at 8 kHz against the Python. Both builds encode 8 kHz input as SottoV37 does;
-    the v3.8 decoder synthesises unvoiced halves 50 Hz apart (hiss_band.SottoV38's 8 kHz core)."""
+    """The C tools at 8 kHz against the Python. Both builds encode 8 kHz input as SottoV37 does,
+    v3.8 with its peak-weighted shape pick (hiss_band.SottoV38.WPICK); the v3.8 decoder
+    synthesises unvoiced halves 50 Hz apart (hiss_band.SottoV38's 8 kHz core)."""
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     import check_c_port as cc
     import hiss_band as hb
@@ -185,7 +186,10 @@ def test_c_port_matches_python(variant):
     x16 = x16[:len(x16) // 160 * 160]
     vl.TRACK2["lag"] = 8
     try:
-        bp = vl.SottoV37().encode(x16 / 32767.0)
+        enc = vl.SottoV37()
+        if variant == "v3.8":
+            enc.vq.wpick = hb.SottoV38.WPICK
+        bp = enc.encode(x16 / 32767.0)
     finally:
         vl.TRACK2.pop("lag")
     bc = cc.c_encode(x16, cdir)
