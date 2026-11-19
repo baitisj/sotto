@@ -184,10 +184,10 @@
   <section>
     <h2>What we stand for</h2>
     <div class="principles">
-      <div><h3>Keep the air interface</h3><p>A good frame format is shared infrastructure. We don't invent a new modulation or a new sync word. A stock radio should see a normal call from a known station.</p></div>
-      <div><h3>Open all the way down</h3><p>Codec, channel code, framers and test tools are published. Each C framer is tested byte for byte against a Python reference that anyone can read.</p></div>
-      <div><h3>The radios you already own</h3><p>No solder, no hardware mods. Everything below runs on unmodified handhelds through firmware, RAM modules and the programming cable.</p></div>
-      <div><h3>Nothing borrowed that isn't ours</h3><p>No manufacturer firmware is used, changed or redistributed. Frame layouts come from public descriptions and open software, and every source is credited.</p></div>
+      <div><h3>The codec is the gate</h3><p>Whoever owns the vocoder decides who may build a digital radio. The frame formats were never the barrier. Open the codec and the mode opens with it.</p></div>
+      <div><h3>Join the network that's already on the air</h3><p>No new modulation, no new sync word, no new island. FuSotto rides the frames millions of radios already find, and a stock radio still shows who is calling even when it can't play the voice.</p></div>
+      <div><h3>Spend the saved bits on getting through</h3><p>sotto needs a fraction of the payload. Stock Fusion DN repeats part of each voice frame three times and leaves the rest bare. FuSotto puts every sotto frame under a CRC and a K=7 code at rate 7/18, more than twice as many protection bits as data.</p></div>
+      <div><h3>Any radio that can wiggle a carrier can join</h3><p>A Baofeng UV-K6 has no 4FSK modem, yet it learned C4FM from a RAM module that rewrites the chip's deviation on every symbol edge. If a radio's firmware can be loaded, it can learn the mode. No solder required.</p></div>
     </div>
   </section>
 
