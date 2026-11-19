@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FuSotto Manifesto</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Keep the digital radio frame, open the voice inside it: sotto, an open codec, carried in C4FM, DMR and M17 framing on unmodified handhelds.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  /* Layout: one left-aligned reading column; the frame diagrams and tables break out a little wider. */
+  :root {
+    --bg: #f3f6f4; --surface: #ffffff; --ink: #13201a; --muted: #56655d; --line: #d6dfd9;
+    --open: #2f6f5e; --open-soft: #dcebe4; --air: #3d5591; --air-soft: #e1e6f3;
+    --closed: #6b6661; --closed-soft: #e7e3de;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1512; --surface: #161e1a; --ink: #e5ebe7; --muted: #9aaaa1; --line: #26322c;
+      --open: #7fc4ac; --open-soft: #1c2d26; --air: #9cb0e4; --air-soft: #1e2539;
+      --closed: #a49f98; --closed-soft: #29272a; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1512; --surface: #161e1a; --ink: #e5ebe7; --muted: #9aaaa1; --line: #26322c;
+    --open: #7fc4ac; --open-soft: #1c2d26; --air: #9cb0e4; --air-soft: #1e2539;
+    --closed: #a49f98; --closed-soft: #29272a; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); }
+  main { max-width: 980px; margin: 0 auto; padding-block: 48px 72px;
+         padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .col { max-width: 68ch; }
+  a { color: var(--open); text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--open); outline-offset: 3px; border-radius: 4px; }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.1; margin: 0; }
+  h1 { font-weight: 800; font-size: clamp(2.6rem, 7vw, 4.6rem); letter-spacing: -0.02em; }
+  h2 { font-weight: 800; font-size: clamp(1.6rem, 3.4vw, 2.2rem); letter-spacing: -0.01em; margin-top: 72px; }
+  h3 { font-weight: 600; font-size: 1.2rem; }
+  p { margin: 0; }
+  .stack { display: grid; gap: 16px; }
+  .eyebrow { font: 500 0.78rem/1.2 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .lede { font-size: 1.22rem; color: var(--ink); }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.9rem; }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+
+  /* hero */
+  header.hero { display: grid; gap: 20px; }
+  .hero h1 span { color: var(--open); }
+
+  /* frame diagram */
+  .frames { margin-top: 36px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+            padding: 20px; display: grid; gap: 18px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tabs button { font: 600 0.95rem var(--body); padding: 7px 14px; border-radius: 999px; cursor: pointer;
+                 border: 1px solid var(--line); background: transparent; color: var(--ink); }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .scroll { overflow-x: auto; }
+  .rows { display: grid; gap: 14px; min-width: 520px; }
+  .rowlab { display: flex; justify-content: space-between; gap: 12px; font: 500 0.82rem var(--mono); color: var(--muted); margin-bottom: 6px; }
+  .bar { display: flex; height: 58px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+  .seg { display: flex; flex-direction: column; justify-content: center; padding: 0 8px; min-width: 0;
+         border-right: 1px solid var(--line); font: 500 0.78rem/1.25 var(--mono); white-space: nowrap; overflow: hidden; }
+  .seg:last-child { border-right: 0; }
+  .seg b { font-family: var(--body); font-weight: 600; font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; }
+  .seg.air { background: var(--air-soft); color: var(--air); }
+  .seg.closed { color: var(--closed);
+    background: repeating-linear-gradient(135deg, var(--closed-soft) 0 7px, var(--surface) 7px 12px); }
+  .seg.open { background: var(--open-soft); color: var(--open); }
+  .seg.open b, .seg.closed b, .seg.air b { color: inherit; }
+  .seg.open.grow { animation: grow 600ms ease-out; }
+  @keyframes grow { from { filter: saturate(0.2); } to { filter: none; } }
+  @media (prefers-reduced-motion: reduce) { .seg.open.grow { animation: none; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.86rem; color: var(--muted); }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; border: 1px solid var(--line); }
+  .legend .k-air { background: var(--air-soft); } .legend .k-open { background: var(--open-soft); }
+  .legend .k-closed { background: repeating-linear-gradient(135deg, var(--closed-soft) 0 4px, var(--surface) 4px 7px); }
+  .framenote { font-size: 0.95rem; }
+
+  /* principles */
+  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px 40px; margin-top: 24px; }
+  .principles div { display: grid; gap: 6px; border-top: 2px solid var(--ink); padding-top: 12px; min-width: 0; }
+
+  /* names */
+  .names { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 24px; }
+  .name { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .name h3 { font-size: 1.5rem; font-weight: 800; }
+  .name .eyebrow { color: var(--open); }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; margin-top: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: 0; }
+  th { font: 500 0.76rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  td.t { font-family: var(--mono); font-size: 0.84rem; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
+  table.log { min-width: 760px; }
+  table.matrix { min-width: 620px; }
+  .chip { display: inline-block; font: 500 0.78rem/1.4 var(--mono); padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+  .chip.ok { background: var(--open-soft); color: var(--open); border-color: transparent; }
+  .chip.wip { background: var(--air-soft); color: var(--air); border-color: transparent; }
+  .chip.no { color: var(--muted); }
+
+  /* listen */
+  .voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 20px; }
+  .voice { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 12px; min-width: 0; }
+  .clip { display: grid; gap: 4px; }
+  .clip span { font-size: 0.86rem; color: var(--muted); }
+  audio { width: 100%; height: 36px; }
+
+  ul.plain { margin: 16px 0 0; padding-left: 1.2em; display: grid; gap: 10px; }
+  footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--line); display: grid; gap: 10px; font-size: 0.86rem; color: var(--muted); }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  .btn { font: 600 0.95rem var(--body); padding: 9px 16px; border-radius: 8px; text-decoration: none;
+         border: 1px solid var(--open); color: var(--open); background: var(--surface); }
+  .btn.primary { background: var(--open); color: var(--surface); }
+  @media (max-width: 560px) { body { font-size: 16px; } .frames { padding: 14px; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="eyebrow">FuSotto · DSotto · M17-sotto</p>
+    <h1>Keep the frame.<br><span>Open the voice.</span></h1>
+    <div class="col stack">
+      <p class="lede">Digital voice on amateur radio has a locked room in the middle of it. The air interface is published, and the voice codec inside it is not. FuSotto keeps the standard frame, so radios still sync and still show who is calling, and puts an open codec where the closed one used to be. It runs on handhelds people already own, with no hardware changes.</p>
+    </div>
+
+    <section class="frames" aria-label="What changes inside the frame">
+      <div class="tabs" role="tablist" aria-label="Mode">
+        <button role="tab" id="tab-ysf" aria-selected="true" aria-controls="frame-panel">FuSotto (C4FM)</button>
+        <button role="tab" id="tab-dmr" aria-selected="false" aria-controls="frame-panel">DSotto (DMR)</button>
+        <button role="tab" id="tab-m17" aria-selected="false" aria-controls="frame-panel">M17-sotto</button>
+      </div>
+      <div id="frame-panel" role="tabpanel" aria-labelledby="tab-ysf" class="stack">
+        <div class="scroll"><div class="rows" id="rows"></div></div>
+        <p class="framenote" id="framenote"></p>
+      </div>
+      <div class="legend">
+        <span><i class="k-air"></i>Standard framing, kept as it is</span>
+        <span><i class="k-closed"></i>Closed vocoder</span>
+        <span><i class="k-open"></i>Open codec</span>
+      </div>
+    </section>
+  </header>
+
+  <section>
+    <h2>The locked room</h2>
+    <div class="col stack" style="margin-top:16px">
+      <p>Yaesu System Fusion and DMR are 4800-baud four-level FSK modes, and their frame layouts are public. The voice inside them is not. Fusion carries speech with DVSI's AMBE+2 vocoder in its DN mode and IMBE in Voice FR mode, and DMR uses AMBE+2. To make or play that voice you need DVSI's chip or its licensed software. Anyone can build a radio that frames a Fusion call correctly; the voice is the part nobody can open, study or improve.</p>
+      <p>M17 showed the other way: an open protocol with the open Codec 2 vocoder. But M17 started from scratch, and most of the digital radios on the air today speak C4FM or DMR.</p>
+      <p>FuSotto takes the frames everyone already has and opens the part that was locked. The sync words, the frame headers and the callsign fields stay exactly as the standards define them. Only the voice payload changes, to <a href="https://github.com/baitisj/sotto">sotto</a>, an open low-rate voice codec (MIT licence) built on Codec 2's analysis and synthesis.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Three names, one idea</h2>
+    <div class="names">
+      <article class="name">
+        <p class="eyebrow">sotto in C4FM framing</p>
+        <h3>FuSotto</h3>
+        <p>A standard 100 ms C4FM frame: sync, FICH, then 720 payload bits. Each frame carries five 48-bit sotto frames, each with its own CRC-8, under a tail-biting K=7 convolutional code at rate 7/18, spread across the frame and scrambled. The header and terminator carry the callsigns in the usual place.</p>
+      </article>
+      <article class="name">
+        <p class="eyebrow">sotto in DMR framing</p>
+        <h3>DSotto</h3>
+        <p>An ordinary DMR group voice call. The 216 voice bits of each burst (one every 60 ms on a timeslot), which normally hold three AMBE+2 frames, hold sotto blocks under our own rate 1/2 code instead: 9 bytes of sotto a burst, 1200 bit/s in real time.</p>
+      </article>
+      <article class="name">
+        <p class="eyebrow">sotto in M17 framing</p>
+        <h3>M17-sotto</h3>
+        <p>An M17 stream whose link setup marks the payload as data and tags it <span class="mono">SOTTO 1200</span>. Each 40 ms frame carries two sotto superframes and a CRC-16. M17's own voice is already open; M17-sotto adds sotto's lower rates and the same payload the other two modes carry.</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>What we stand for</h2>
+    <div class="principles">
+      <div><h3>Keep the air interface</h3><p>A good frame format is shared infrastructure. We don't invent a new modulation or a new sync word. A stock radio should see a normal call from a known station.</p></div>
+      <div><h3>Open all the way down</h3><p>Codec, channel code, framers and test tools are published. Each C framer is tested byte for byte against a Python reference that anyone can read.</p></div>
+      <div><h3>The radios you already own</h3><p>No solder, no hardware mods. Everything below runs on unmodified handhelds through firmware, RAM modules and the programming cable.</p></div>
+      <div><h3>Identify, always</h3><p>Every test transmission sends the station's callsign: in Morse before each key-up and in every frame header.</p></div>
+      <div><h3>Measure before claiming</h3><p>Each result on this page comes from a bench log with frame counts and CRCs. Where something is untested or broken, we say so.</p></div>
+      <div><h3>Nothing borrowed that isn't ours</h3><p>No manufacturer firmware is used, changed or redistributed. Frame layouts come from public descriptions and open software, and every source is credited.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where it stands</h2>
+    <p class="col muted" style="margin-top:12px">Three radios, three modes. "Sends" and "hears" mean whole sotto messages, decoded with every CRC checked. The SDR is an ADALM-Pluto running our open softmodem.</p>
+    <div class="tablewrap">
+      <table class="matrix">
+        <thead><tr><th>Radio</th><th>FuSotto</th><th>DSotto</th><th>M17-sotto</th></tr></thead>
+        <tbody>
+          <tr><td><b>TYT MD-UV380</b><br><span class="muted small">OpenRTX-based image</span></td>
+            <td><span class="chip ok">sends</span> <span class="chip ok">hears, plays</span></td>
+            <td><span class="chip ok">sends</span> <span class="chip no">receive not working yet</span></td>
+            <td><span class="chip ok">sends</span> <span class="chip ok">hears, plays</span></td></tr>
+          <tr><td><b>Baofeng UV-K6</b><br><span class="muted small">RAM modules, no 4FSK chip</span></td>
+            <td><span class="chip ok">sends (data frames)</span> <span class="chip wip">receive in progress</span></td>
+            <td><span class="chip ok">sends a test stream</span></td>
+            <td><span class="chip no">not tried</span></td></tr>
+          <tr><td><b>ADALM-Pluto SDR</b><br><span class="muted small">bench parrot</span></td>
+            <td><span class="chip ok">hears, answers</span></td>
+            <td><span class="chip ok">decodes</span></td>
+            <td><span class="chip ok">hears, answers</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="col muted small" style="margin-top:12px">A stock Yaesu FTM-300D, on its own unmodified firmware, accepts our C4FM calls: it shows the caller's callsign for calls built by the UV-380 and by the UV-K6. It can't play sotto, because its vocoder is fixed in firmware we don't touch.</p>
+
+    <h3 style="margin-top:40px">Bench log</h3>
+    <p class="col muted small" style="margin-top:6px">November 2026, times in UTC. Everything on the 70 cm amateur band at low power, mostly 0 W into the bench.</p>
+    <div class="tablewrap">
+      <table class="log">
+        <thead><tr><th>UTC</th><th>Radio</th><th>What happened</th><th>Record</th></tr></thead>
+        <tbody>
+          <tr><td class="t">11-18 01:32</td><td>UV-K6</td><td>A radio whose RF chip has no 4FSK modem sends C4FM. The MCU rewrites the chip's FSK deviation on symbol edges; the SDR decodes frames of every type with a good FICH, callsign AG7EW.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/k6-c4fm.md">k6-c4fm.md</a></td></tr>
+          <tr><td class="t">11-18 07:11</td><td>UV-380 → FTM-300D</td><td>The FTM-300D shows the callsign on a C4FM call framed by our own encoder, once the frame carries the radio-type block Fusion radios expect.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/uv380-ysf.md">uv380-ysf.md</a></td></tr>
+          <tr><td class="t">11-18 20:21</td><td>UV-380</td><td>The radio sends its own recorded sotto message in all three modes. SDR: M17-sotto 101/101 frames CRC good, FuSotto 205/205 sotto frames, DSotto 60/60 blocks.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/uv380-multimode.md">uv380-multimode.md</a></td></tr>
+          <tr><td class="t">11-18 20:32</td><td>UV-K6 → FTM-300D</td><td>The FTM-300D shows AG7EW from the UV-K6, a radio that was never designed for digital voice.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/k6-c4fm.md">k6-c4fm.md</a></td></tr>
+          <tr><td class="t">11-18 20:52</td><td>UV-K6</td><td>A whole sotto 400 clip in C4FM data frames: 240 of 240 bytes back at the SDR, so the audio is identical to what was sent.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/k6-c4fm.md">k6-c4fm.md</a></td></tr>
+          <tr><td class="t">11-18 21:24</td><td>UV-K6</td><td>A DMR-shaped stream carrying a DSotto test message; the SDR decodes the whole message.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/k6-c4fm.md">k6-c4fm.md</a></td></tr>
+          <tr><td class="t">11-18 21:49</td><td>UV-380</td><td>FuSotto receive on the radio's own FM path: 108/108 frames and 240/240 sotto frames from the SDR, including a run at about −92 dBm.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/uv380-multimode.md">uv380-multimode.md</a></td></tr>
+          <tr><td class="t">11-19 00:09</td><td>UV-380</td><td>All three modes sent from the radio's firmware, on channel: 102/102 M17 frames, 205/205 FuSotto frames, 60/60 DSotto blocks.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/uv380-multimode.md">uv380-multimode.md</a></td></tr>
+          <tr><td class="t">11-19 01:06</td><td>UV-380 ↔ FTM-300D</td><td>The UV-380 acts as a C4FM echo for the FTM-300D. It keeps each frame of the FTM's call as received and sends it back; the FTM shows the caller and plays the voice. This proves the framing, not sotto: the voice was the FTM's own AMBE+2 bits, untouched.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/uv380-multimode.md">uv380-multimode.md</a></td></tr>
+          <tr><td class="t">11-19 01:49</td><td>UV-380</td><td>The firmware hears FuSotto and M17-sotto and plays them: 3/3 messages each, every sotto frame present.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/uv380-multimode.md">uv380-multimode.md</a></td></tr>
+          <tr><td class="t">11-19 02:44</td><td>UV-380</td><td>FuSotto voice demo: two read-speech clips at sotto 1200, sent by the SDR, played by the handheld on battery.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/uv380-multimode.md">uv380-multimode.md</a></td></tr>
+          <tr><td class="t">11-19 05:05</td><td>UV-380 ↔ SDR</td><td>The SDR parrot answers every FuSotto send from the handheld, with 205, 105 and 75 sotto frames, and sends each message back in the same mode.</td><td><a href="https://github.com/baitisj/blowfang/blob/main/docs/uv380-multimode.md">uv380-multimode.md</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Hear the payload</h2>
+    <div class="col stack" style="margin-top:16px">
+      <p>The UV-380 carries sotto at 1200 bit/s: 48 bits every 40 ms. These two read-speech clips are coded at that rate and decoded here in your browser, with sotto's C decoder compiled to WebAssembly. They are codec samples, not off-air recordings.</p>
+      <p class="muted small" id="decode-status">Decoding…</p>
+    </div>
+    <div class="voices">
+      <section class="voice">
+        <h3>Male voice</h3>
+        <div class="clip"><span>Original, 16 kHz</span><audio controls preload="none" src="samples/v38/librispeech_251_m__original16.flac"></audio></div>
+        <div class="clip"><span id="lab-251">sotto 1200 bit/s</span><audio controls preload="none" id="aud-251"></audio></div>
+      </section>
+      <section class="voice">
+        <h3>Female voice</h3>
+        <div class="clip"><span>Original, 16 kHz</span><audio controls preload="none" src="samples/v38/librispeech_3536_f__original16.flac"></audio></div>
+        <div class="clip"><span id="lab-3536">sotto 1200 bit/s</span><audio controls preload="none" id="aud-3536"></audio></div>
+      </section>
+    </div>
+    <p class="muted small" style="margin-top:12px">LibriSpeech readers 251 and 3536 (CC BY 4.0). More rates and comparisons with Codec 2 are on the <a href="index.html">sotto listening page</a>.</p>
+  </section>
+
+  <section>
+    <h2>Not done yet</h2>
+    <ul class="plain col">
+      <li>Stock Fusion and DMR radios can't play sotto. Only radios with open firmware, or an SDR, can. We haven't yet checked how a stock Fusion radio reacts to FuSotto voice frames: whether it shows the call, stays quiet, or plays noise.</li>
+      <li>MMDVM hotspots and repeaters rebuild the voice FEC of every frame they relay, which would scramble a sotto payload. FuSotto won't cross those networks until MMDVMHost learns to leave flagged frames alone.</li>
+      <li>The FICH bit that marks a frame as sotto is provisional.</li>
+      <li>DMR receive on the UV-380 doesn't work yet, so DSotto has only been decoded by the SDR.</li>
+      <li>The UV-K6 receives C4FM frames in emulation, byte for byte, and is now on the bench. It can't play sotto yet.</li>
+      <li>The UV-380 records a message and then sends it, with a 5 s key-up limit (about 8 s of sotto). Talking live while keyed comes later.</li>
+      <li>Every test so far has been on the bench. Range and mobile tests come later.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Take part</h2>
+    <div class="col stack" style="margin-top:16px">
+      <p>The codec, the softmodem and the radio work are all public. The softmodem sends and receives FuSotto through a radio's 9600-baud data port and a sound card, or through an SDR, so you can listen without new hardware.</p>
+    </div>
+    <div class="links">
+      <a class="btn primary" href="https://github.com/baitisj/sotto">sotto codec</a>
+      <a class="btn" href="https://github.com/baitisj/blowfang">Radio firmware and bench tools</a>
+      <a class="btn" href="https://github.com/baitisj/sotto/blob/main/docs/softmodem.md">Softmodem</a>
+      <a class="btn" href="course/">How sotto works</a>
+      <a class="btn" href="progressive.html">Progressive demo</a>
+    </div>
+  </section>
+
+  <footer>
+    <p>FuSotto, DSotto and M17-sotto are names used by this independent open-source project. It is not affiliated with, sponsored by or endorsed by Yaesu, DVSI, TYT, Baofeng or the M17 Project.</p>
+    <p>System Fusion and Fusion are trademarks of Yaesu Musen Co., Ltd. AMBE+2 is a trademark of Digital Voice Systems, Inc. Other product names belong to their owners and are used here only to name the equipment tested.</p>
+    <p>Credits: the UV-380 image is built on <a href="https://github.com/OpenRTX/OpenRTX">OpenRTX</a> (GPL-3.0), and our patch to it keeps that licence. RadioFoundry's MIT-licensed HR-C6000 notes helped map the UV-380's 4FSK modem. sotto uses analysis and synthesis from <a href="https://github.com/drowe67/codec2">Codec 2</a> (LGPL-2.1). sotto and the softmodem are MIT licensed. Test transmissions by AG7EW.</p>
+  </footer>
+</main>
+
+<script>
+  // Bit counts per frame, from the public layouts (docs/softmodem.md, blowfang docs/uv380-multimode.md).
+  const MODES = {
+    ysf: {
+      rows: [
+        { lab: "Stock Fusion · 100 ms C4FM frame", bits: "960 bits", segs: [
+          ["air", "Sync", "40"], ["air", "FICH", "200"], ["closed", "AMBE+2 (DN) or IMBE (Voice FR)", "720"] ] },
+        { lab: "FuSotto · same frame", bits: "960 bits", segs: [
+          ["air", "Sync", "40"], ["air", "FICH", "200"], ["open", "5 × sotto + CRC-8, K=7 code", "720"] ] },
+      ],
+      note: "The sync word and FICH stay standard, so the frame is found and its type read in the usual way. The header and terminator frames carry the callsigns as Fusion radios expect. Only the voice payload changes.",
+    },
+    dmr: {
+      rows: [
+        { lab: "Stock DMR · 30 ms voice burst", bits: "264 bits", segs: [
+          ["closed", "AMBE+2", "108"], ["air", "Sync / EMB", "48"], ["closed", "AMBE+2", "108"] ] },
+        { lab: "DSotto · same burst", bits: "264 bits", segs: [
+          ["open", "sotto, rate ½ code", "108"], ["air", "Sync / EMB", "48"], ["open", "sotto, rate ½ code", "108"] ] },
+      ],
+      note: "The burst's middle (the sync, or the embedded signalling) is untouched, and so are the call's header and terminator. The 216 voice bits that held three AMBE+2 frames hold sotto under our own convolutional code.",
+    },
+    m17: {
+      rows: [
+        { lab: "Stock M17 · 40 ms stream frame", bits: "384 bits", segs: [
+          ["air", "Sync", "16"], ["air", "LICH", "96"], ["open", "Codec 2 3200, coded", "272"] ] },
+        { lab: "M17-sotto · same frame", bits: "384 bits", segs: [
+          ["air", "Sync", "16"], ["air", "LICH", "96"], ["open", "2 × sotto + CRC-16, coded", "272"] ] },
+      ],
+      note: "M17 is already open: its voice is Codec 2. M17-sotto marks its stream as data and tags it SOTTO 1200, so a stock M17 radio is meant to show the caller and stay quiet rather than play sotto as Codec 2.",
+    },
+  };
+  const rowsEl = document.getElementById("rows"), noteEl = document.getElementById("framenote");
+  function render(key) {
+    const m = MODES[key];
+    rowsEl.replaceChildren(...m.rows.map((r, i) => {
+      const wrap = document.createElement("div");
+      const lab = document.createElement("div"); lab.className = "rowlab";
+      lab.innerHTML = `<span>${r.lab}</span><span>${r.bits}</span>`;
+      const bar = document.createElement("div"); bar.className = "bar";
+      for (const [kind, name, n] of r.segs) {
+        const s = document.createElement("div");
+        s.className = `seg ${kind}` + (i === 1 && kind === "open" ? " grow" : "");
+        s.style.flex = `${n} 1 0`;
+        s.title = `${name}: ${n} bits`;
+        s.innerHTML = `<b>${name}</b><span>${n}</span>`;
+        bar.append(s);
+      }
+      wrap.append(lab, bar);
+      return wrap;
+    }));
+    noteEl.textContent = m.note;
+    document.getElementById("frame-panel").setAttribute("aria-labelledby", `tab-${key}`);
+  }
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  for (const t of tabs) {
+    t.addEventListener("click", () => {
+      for (const u of tabs) u.setAttribute("aria-selected", String(u === t));
+      render(t.id.slice(4));
+    });
+    t.addEventListener("keydown", e => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const i = (tabs.indexOf(t) + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
+      tabs[i].focus(); tabs[i].click();
+    });
+  }
+  render("ysf");
+
+  // Decode the two sotto 1200 clips in the browser (docs/sotto.js, the same module index.html uses).
+  (async () => {
+    const status = document.getElementById("decode-status");
+    try {
+      const m = await import("./sotto.js");
+      const sotto = await m.loadSotto("sotto.wasm");
+      for (const id of ["251_m", "3536_f"]) {
+        const r = await fetch(`samples/rates/librispeech_${id}__1200.bit`);
+        if (!r.ok) throw new Error(`clip ${id}: ${r.status}`);
+        const frames = new Uint8Array(await r.arrayBuffer());
+        const { pcm, sampleRate } = sotto.decode(1200, frames);
+        const n = id.split("_")[0];
+        document.getElementById(`aud-${n}`).src = URL.createObjectURL(m.wavBlob(pcm, sampleRate));
+        document.getElementById(`lab-${n}`).textContent = `sotto 1200 bit/s · ${frames.length} bytes for ${(pcm.length / sampleRate).toFixed(1)} s`;
+      }
+      status.textContent = "Decoded in this browser.";
+    } catch (err) {
+      status.textContent = `This browser couldn't run the decoder (${err.message}), so the sotto clips are silent.`;
+    }
+  })();
+</script>
+</body>
+</html>

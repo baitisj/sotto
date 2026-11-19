@@ -77,6 +77,10 @@
     <p style="margin:0;flex:1 1 360px"><b>New: progressive sotto.</b> Watch and hear a clip arrive in scans, like a progressive JPEG: rough after a quarter of the bits, sharper as the rest comes in. Squeeze the link with a resistor, pause it, or feed it your own voice.</p>
     <a class="dl" href="progressive.html" style="background:var(--accent);color:var(--card)">Open the progressive demo</a>
   </div>
+  <div class="try" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between">
+    <p style="margin:0;flex:1 1 360px"><b>On the air: FuSotto.</b> sotto inside standard C4FM, DMR and M17 frames, sent and received by unmodified handhelds. Keep the frame, open the voice.</p>
+    <a class="dl" href="fusotto.html">Read the FuSotto manifesto</a>
+  </div>
   <h2 style="margin-top:24px">Why sotto</h2>
   <p>Open digital voice on ham radio mostly means Codec 2, whose low-rate modes are no longer being developed, while every Fusion, D-STAR and DMR radio carries a closed AMBE vocoder. The newest open voice codecs are neural networks, which need far more processing than the radios people already own. sotto is built for those radios: the TI C5517 DSP inside a Yaesu FTM-300D, and the 168 MHz Cortex-M4 in OpenRTX handhelds such as the TYT MD-UV380, which the M17 project uses. In simulation its v3.8 encoder and decoder fit both chips (on average, C5517: 137 and 55 MHz of 200; Cortex-M4: 118 and 36 MHz of 168), and it is MIT-licensed.</p>
   <p>Is a small codec giving up much? We tested sotto against FARGAN, the neural vocoder in Opus, decoding the same 2400 bit/s bits. Stock FARGAN came out level with sotto's own decoder, at several times the compute and eight times the memory, too much for either radio. Remove sotto's hiss index (the 4-8 kHz band carried in bits sotto already sends) and FARGAN gets worse, so that idea helps a neural decoder too. Listen in <a href="#part4">Part 4</a>; details in <a href="https://github.com/baitisj/sotto/blob/main/docs/fargan-study.md">fargan-study.md</a>.</p>
