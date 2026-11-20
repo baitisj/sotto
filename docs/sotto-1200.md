@@ -3,6 +3,9 @@
 *2026-11-05. Python reference `sim/sotto_lr.py` (`Sotto1200`), float C `c/sotto_lr.c`,
 fixed-point decoder `c/fixed/sotto_fx_lr.c`. Listening round 18: see below.*
 
+*An encoder light enough for the K6 itself (27 MHz of Cortex-M0, 3 KB of state, the same
+superframes): [sotto-slim.md](sotto-slim.md).*
+
 ## Why
 
 The K6 pager's link is FFSK at 1800 baud. 2400 baud isn't reliable on the FD6818. A 2400 bit/s

@@ -78,7 +78,8 @@ FX_ENC_OBJS = fixed/sotto_fx_enc.o fixed/sotto_fx_lr_enc.o
 FX_DEC_OBJS = fixed/sotto_fx_dec.o fixed/sotto_fx_lr.o
 endif
 fixed: fixed/sotto_dec_fx fixed/sotto_enc_fx fixed/sotto_dec_fx_arm fixed/sotto_enc_fx_arm \
-	fixed/sotto_dec_fx_m0 fixed/sotto_enc_fx_m0 fixed/sotto_vlr_dec_fx fixed/sotto_dec_fx_k6
+	fixed/sotto_dec_fx_m0 fixed/sotto_enc_fx_m0 fixed/sotto_vlr_dec_fx fixed/sotto_dec_fx_k6 \
+	fixed/sotto_slim_enc
 fixed/%.o: fixed/%.c fixed/fx.h fixed/fx_tables.h fixed/fx_internal.h sotto.h sotto_lr_tables.h sotto_lr_dec.inc \
 	sotto_vlr.h sotto_vlr_tables.h sotto_vlr_dec.inc
 	$(CC) $(CFLAGS) $(FXFLAGS) -c -o $@ $<
@@ -189,16 +190,40 @@ fixed/sotto_dec_fx_m0: sotto_dec.o $(subst fixed/,fixed/m0/,$(FX_DEC_OBJS) $(FX_
 fixed/sotto_enc_fx_m0: sotto_enc.o $(subst fixed/,fixed/m0/,$(FX_ENC_OBJS) $(FX_OBJS))
 	$(CC) -o $@ $^
 
+# The slim sotto 1200 encoder for a Cortex-M0 with a few KB of RAM (fixed/sotto_fx_slim.c,
+# docs/sotto-slim.md) with its bench driver, which can put the full encoder's analysis or
+# coder in its place: the 8 kHz v3.7 core whatever VARIANT is. SLIMFLAGS=-DSLIM_FULL_SEARCH
+# compares every codebook vector; -DSLIM_TUNE reads tuning knobs from the environment.
+SLIM_SRC = \
+	fixed/slim_enc.c \
+	fixed/sotto_fx_slim.c \
+	fixed/sotto_fx_enc.c \
+	fixed/sotto_fx_lr_enc.c \
+	fixed/fx_math.c \
+	fixed/fx_tables.c
+SLIM_DEPS = \
+	fixed/sotto_slim.h \
+	fixed/slim_cells.h \
+	fixed/fx.h \
+	fixed/fx_tables.h \
+	fixed/fx_internal.h \
+	sotto.h \
+	sotto_lr_tables.h
+fixed/sotto_slim_enc: $(SLIM_SRC) $(SLIM_DEPS)
+	$(CC) -O2 -std=c99 -Wall -Wextra -Wno-unused-parameter -ffp-contract=off -I. -DSOTTO_V36 -DSOTTO_PITCH_THIRD \
+	  $(SLIMFLAGS) -o $@ $(SLIM_SRC)
+
 sotto_codebook_gen.c: ../$(CODEBOOK) ../tools/export_codebook_c.py
 	cd .. && $(PYTHON) tools/export_codebook_c.py $(CBROUND) $(CODEBOOK) c/$@
 
 # The committed tables, written by the generators into directory $(1) (relative to the repo
 # root). After changing a generator or its .npz data, run make tables and commit the result.
-TABLES = sotto_codebook.c sotto_hiss_tables.c fixed/fx_tables.c sotto_vlr_tables.c
+TABLES = sotto_codebook.c sotto_hiss_tables.c fixed/fx_tables.c sotto_vlr_tables.c fixed/slim_cells.h
 gen_tables = cd .. && $(PYTHON) tools/export_codebook_c.py --round 8 $(DEFAULT_CODEBOOK) $(1)/sotto_codebook.c \
 	&& $(PYTHON) tools/export_hiss_c.py $(1)/sotto_hiss_tables.c \
 	&& $(PYTHON) tools/export_vlr_c.py --out $(1)/sotto_vlr_tables.c \
-	&& $(PYTHON) tools/gen_fx_tables.py --codebook $(DEFAULT_CODEBOOK) $(1)/fixed/fx_tables.c
+	&& $(PYTHON) tools/gen_fx_tables.py --codebook $(DEFAULT_CODEBOOK) $(1)/fixed/fx_tables.c \
+	&& $(PYTHON) tools/gen_slim_ivf.py --codebook $(DEFAULT_CODEBOOK) $(1)/fixed/slim_cells.h
 tables:
 	$(call gen_tables,c)
 check-tables:
@@ -261,6 +286,7 @@ clean:
 	rm -f fixed/*.o fixed/sotto_dec_fx fixed/sotto_enc_fx fixed/sotto_dec_fx_arm fixed/sotto_enc_fx_arm
 	rm -f fixed/sotto_dec_fx_m0 fixed/sotto_enc_fx_m0 fixed/sotto_vlr_dec_fx fixed/sotto_dec_fx_k6
 	rm -f fixed/sotto_dec_fx_k6_rowgen
+	rm -f fixed/sotto_slim_enc
 	rm -rf rowgen.chk
 	rm -f fixed/sotto_dec_fx_k6_synthstate
 	rm -rf synthstate.chk
