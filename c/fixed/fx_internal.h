@@ -63,7 +63,9 @@ void sotto_enc_set_no_shape(struct sotto_enc *e, int on);
    fx_shape_err is the squared error of a reconstruction, sum of (c - rec)^2 in dB Q8;
    fx_cb_best is the nearest vector of stage s to residual r (codebook steps Q6, FX_NC values
    and a 0 pad, |r|^2 = rr), the first of equals. hv: scratch for 512 values */
-#define FX_MBEST 8
+#ifndef FX_MBEST
+#define FX_MBEST 8                    /* M-best paths kept by the search (-DFX_MBEST=n: a lighter encoder) */
+#endif
 #define FX_MAXST 5
 int fx_msvq_paths(const int32_t *c, int nst, int16_t path[FX_MBEST][FX_MAXST], int32_t recon[FX_MBEST][FX_NC],
                   int32_t *hv);
