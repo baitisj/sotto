@@ -244,6 +244,11 @@ static void fft256(int16_t *re, int16_t *im) {
 }
 
 /* ------------------------------------------------------------------ envelope */
+/* fx_dct row j (1..19), column i: a platform short of memory may compute it instead
+   (round(32768 sqrt(2/20) cos(pi (2i + 1) j / 40)), 21 distinct magnitudes) */
+#ifndef SLIM_DCT
+#define SLIM_DCT(j, i) fx_dct[(j) * K + (i)]
+#endif
 /* The frame's envelope and energy from the 256 samples at x, for pitch period p8 (8 kHz
    samples, Q4): the shape c (DCT coefficients 1..19, dB Q8) and the energy code. */
 static void envelope(slim_enc_t *e, const int16_t *x, int32_t p8, slim_frame_t *f) {
@@ -302,7 +307,7 @@ static void envelope(slim_enc_t *e, const int16_t *x, int32_t p8, slim_frame_t *
   mean = (sum + (sum >= 0 ? K / 2 : -(K / 2))) / K;
   for (j = 1; j < K; j++) {
     int32_t v = 0;
-    for (i = 0; i < K; i++) v += ((rk[i] - mean) >> 1) * fx_dct[j * K + i];
+    for (i = 0; i < K; i++) v += ((rk[i] - mean) >> 1) * SLIM_DCT(j, i);
     v = (v + 8192) >> 14;
     f->c[j - 1] = (int16_t)(v > 32767 ? 32767 : v < -32767 ? -32767 : v);
   }
@@ -613,6 +618,30 @@ static void put_bits(unsigned char *out, int *pos, int v, int nb) {
 #endif
 #define CBB 20
 
+#ifdef SLIM_IVF
+/* The cells (slim_cells.h), through two hooks a platform may replace to keep the tables
+   elsewhere (the K6 reads them from SPI flash):
+   SLIM_IVF_CEN(s, c0, buf): centroids c0 .. c0 + IVF_BLK - 1 of stage s, IVF_CD bytes each,
+     copied to buf (IVF_BLK * IVF_CD bytes) or pointed at;
+   SLIM_IVF_CELL(s, c, v): the numbers of the vectors in cell c of stage s into v (at most
+     IVF_MAXN), rising; returns how many. */
+#define IVF_BLK 16
+#ifndef SLIM_IVF_CEN
+#define SLIM_IVF_CEN(s, c0, buf) \
+  ((void)(buf), ((s) == 0 ? ivf_cen0 : (s) == 1 ? ivf_cen1 : ivf_cen2) + (c0) * IVF_CD)
+#endif
+#ifndef SLIM_IVF_CELL
+#define SLIM_IVF_CELL(s, c, v) ivf_cell(s, c, v)
+static int ivf_cell(int s, int c, int16_t *v) {
+  const uint16_t *off = s == 0 ? ivf_off0 : s == 1 ? ivf_off1 : ivf_off2;
+  const unsigned char *idx = s == 0 ? ivf_idx0 : s == 1 ? ivf_idx1 : ivf_idx2;
+  int n = off[c + 1] - off[c], lo = s == 0 ? ivf_lo0[c] : s == 1 ? ivf_lo1[c] : n, i;
+  for (i = 0; i < n; i++) v[i] = (int16_t)(idx[off[c] + i] + (i >= lo ? 256 : 0));
+  return n;
+}
+#endif
+#endif
+
 /* sum of y (32 y - t) over a vector's bytes: its squared distance from t, less |t|^2, / 128 */
 static int32_t cb_hn(const signed char *y, const int16_t *t, int n) {
   int32_t hsum = 0;
@@ -646,31 +675,35 @@ static int cb_search(int s, const int16_t *r, int num, int den, int16_t *best, i
 #ifdef SLIM_IVF
   {
     /* the PROBE cells whose centroids are nearest, then their vectors */
-    const signed char *cen = s == 0 ? ivf_cen0 : s == 1 ? ivf_cen1 : ivf_cen2;
-    const uint16_t *off = s == 0 ? ivf_off0 : s == 1 ? ivf_off1 : ivf_off2;
-    int nc = s == 0 ? IVF_C0 : s == 1 ? IVF_C1 : IVF_C2, np = 0, c, j;
+    int nc = s == 0 ? IVF_C0 : s == 1 ? IVF_C1 : IVF_C2, np = 0, c, c0, j, nv;
     int32_t ph[IVF_MAXP];
     unsigned char pc[IVF_MAXP];
+    signed char cbuf[IVF_BLK * IVF_CD];
+    int16_t vl[IVF_MAXN];
     int probe = PROBE > IVF_MAXP ? IVF_MAXP : PROBE;
-    (void)n;
-    for (c = 0; c < nc; c++, cen += IVF_CD) {
-      int32_t hsum = cb_hn(cen, t, IVF_CD);
-      if (np < probe || hsum < ph[np - 1]) {
-        i = np < probe ? np++ : np - 1;
-        while (i > 0 && ph[i - 1] > hsum) ph[i] = ph[i - 1], pc[i] = pc[i - 1], i--;
-        ph[i] = hsum, pc[i] = (unsigned char)c;
+    (void)n, (void)cbuf;
+    for (c0 = 0; c0 < nc; c0 += IVF_BLK) {
+      const signed char *cen = SLIM_IVF_CEN(s, c0, cbuf);
+      for (c = c0; c < c0 + IVF_BLK; c++, cen += IVF_CD) {
+        int32_t hsum = cb_hn(cen, t, IVF_CD);
+        if (np < probe || hsum < ph[np - 1]) {
+          i = np < probe ? np++ : np - 1;
+          while (i > 0 && ph[i - 1] > hsum) ph[i] = ph[i - 1], pc[i] = pc[i - 1], i--;
+          ph[i] = hsum, pc[i] = (unsigned char)c;
+        }
       }
     }
     STAT(0, nc), STAT(1, 1);
-    for (j = 0; j < np; j++)
-      for (c = off[pc[j]]; c < off[pc[j] + 1]; c++) {
+    for (j = 0; j < np; j++) {
+      nv = SLIM_IVF_CELL(s, pc[j], vl);
+      for (c = 0; c < nv; c++) {
         int32_t hsum;
-        v = s == 0 ? ivf_idx0[c] + (c - off[pc[j]] >= ivf_lo0[pc[j]] ? 256 : 0)
-            : s == 1 ? ivf_idx1[c] + (c - off[pc[j]] >= ivf_lo1[pc[j]] ? 256 : 0) : ivf_idx2[c];
+        v = vl[c];
         hsum = cb_h(SLIM_CB_FETCH(s, v, buf), t);
         KEEP(hsum, v)
         STAT(0, 1), STAT(2, 1);
       }
+    }
   }
 #else
   for (v = 0; v < n; v++) {

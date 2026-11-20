@@ -247,3 +247,4 @@ static const unsigned char ivf_idx2[256] = {   /* the vectors' numbers, mod 256 
   64, 86, 107, 115, 127, 136, 159, 180, 187, 191, 194, 237, 242, 19, 23, 37, 93, 160, 170, 225,
   227, 30, 31, 98, 100, 163, 226, 246, 252, 27, 72, 148, 208, 11, 122, 203,
 };
+#define IVF_MAXN 26              /* vectors in the largest cell */

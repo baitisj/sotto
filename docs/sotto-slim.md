@@ -70,7 +70,12 @@ of two costs another 0.03 PESQ.
 
 Everything is 16 x 16 -> 32-bit arithmetic. The state lives in the caller's memory
 (`slim_enc_bytes()`), and the codebook is reached through `SLIM_CB_FETCH(stage, vector, buf)`,
-which the K6 build points at its SPI read.
+which the K6 build points at its SPI read. Three more hooks let a platform keep the rest of the
+read-only data out of RAM, with the same bits out: `SLIM_IVF_CEN(stage, c0, buf)` gives 16 cell
+centroids at a time and `SLIM_IVF_CELL(stage, cell, v)` a cell's vector numbers (the 2.9 KB of
+`slim_cells.h`), and `SLIM_DCT(j, i)` an entry of the 800-byte DCT table, which takes only 21
+distinct magnitudes. The K6's FM receiver module (blowfang `c/k6/mod/fmsotto.c`) reads the
+cells from a deck in its SPI module library and computes the DCT from 21 values.
 
 ## What it costs in quality
 
