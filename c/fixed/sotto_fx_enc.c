@@ -712,6 +712,29 @@ static int32_t odd_even_db(const spec_t *f, uint32_t wo) {
   return fx_log2_to_db_pow(fx_log2_acc((fx_uacc)(odd > 0 ? odd : 1)) - fx_log2_acc((fx_uacc)(even > 0 ? even : 1)));
 }
 
+#if SOTTO_UP && SOTTO_FOLD
+/* sinusoid.odd_peaks_db(w) >= vocoder_lab.UP_ODD (6 dB): w's 1st and 3rd harmonics stand
+   clear of the spectrum halfway between harmonics. Bins round(m w 512), m in halves. */
+#ifndef UP_ODD_MAX_WO
+#define UP_ODD_MAX_WO 214748365u   /* 400 Hz, Q32 turns; c/sotto.c UP_ODD_MAX, 0 = no limit */
+#endif
+static uint32_t odd_peak(const spec_t *f, uint32_t kw) {   /* the peak at (k / 2) w, kw = k w */
+  int c = (int)((kw + (1u << 23)) >> 24), i, lo = c - 1 > 1 ? c - 1 : 1;
+  uint32_t p = f->p[lo];
+  for (i = lo + 1; i <= c + 1; i++) if (f->p[i] > p) p = f->p[i];
+  return p;
+}
+static int odd_peaks_clear(const spec_t *f, uint32_t w) {        /* w <= WO_HI, 7 w < 2^32 */
+  uint32_t a1 = odd_peak(f, 2 * w), a3 = odd_peak(f, 6 * w);
+  fx_uacc m1 = (fx_uacc)odd_peak(f, w) + odd_peak(f, 3 * w);
+  fx_uacc m3 = (fx_uacc)odd_peak(f, 5 * w) + odd_peak(f, 7 * w);
+  /* log2(4 a1 a3 / (m1 m3)) >= 6 dB x 2 as a power ratio: 1.2 / log10(2), Q16 */
+  int32_t l = fx_log2(a1 ? a1 : 1) + fx_log2(a3 ? a3 : 1) + 2 * 65536
+            - fx_log2_acc(m1 ? m1 : 1) - fx_log2_acc(m3 ? m3 : 1);
+  return l >= 261247;
+}
+#endif
+
 /* candidates and costs of frame t */
 #if SOTTO_UP && SOTTO_FOLD
 static int32_t nccf_q15(const struct sotto_enc *e, int32_t t, uint32_t per);
@@ -762,7 +785,7 @@ static void frame_costs(struct sotto_enc *e, int32_t t, int has_next) {
     int32_t cst = f->cost[1 + c];
     if (SOTTO_LOW_RANK) cst += lo[c] - lomin;
 #if SOTTO_UP && SOTTO_FOLD
-    {                                                    /* 1.5 (nccf(2 w or 3 w) - 0.5) */
+    if ((UP_ODD_MAX_WO && w > UP_ODD_MAX_WO) || !odd_peaks_clear(sp, w)) {   /* 1.5 (nccf(2 w or 3 w) - 0.5) */
       int32_t n2 = nccf_q15(e, t, recip48(2 * w)), n3 = nccf_q15(e, t, recip48(3 * w));
       int32_t nm = n2 > n3 ? n2 : n3;
       if (nm > 16384) cst += 3 * (nm - 16384);
