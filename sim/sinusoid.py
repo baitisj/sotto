@@ -138,6 +138,7 @@ def analyse(x, wo_track, voicing=None, do_refine=True):
 
 
 # ---------------------------------------------------------------- pitch tracking
+LOW_FLOOR = 0.0   # low-band energy (of the band energy) that costs nothing
 LOW_BIN0 = 4      # 47 Hz: below it, offset and rumble, not voice (31-47 Hz rumble in EARS p025
                   # moved its "s" at 1.6 s to 430-500 Hz; listening round 25)
 
@@ -314,7 +315,8 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
             # log(fit_error(low=True) / fit_error()), with the residual floored at 2^-20 of the
             # band energy so that near-silent frames give the same answer in fixed point
             r = np.maximum(np.exp(le), 2.0 ** -20)
-            lo = np.log((r + np.array([low_band(Sw[t], w) / band_energy(Sw[t], w) for w in ws])) / r)
+            lb = np.array([low_band(Sw[t], w) / band_energy(Sw[t], w) for w in ws])
+            lo = np.log((r + np.maximum(lb - LOW_FLOOR, 0.0)) / r)
             le = le + lo - lo.min()
         if up:
             buf = xp[t * N:t * N + M_PITCH]

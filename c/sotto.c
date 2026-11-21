@@ -90,12 +90,20 @@
 /* v3.10 encoder: the sub-octave check (odd_even_db) starts at the 1st harmonic, not the 3rd
    (vocoder_lab.SUB_FIRST; Kokoro af_nicole "seven"). -DSOTTO_SUB_FIRST=3: before. */
 #ifndef SOTTO_SUB_FIRST
+#define SOTTO_SUB_FIRST 3 /* 1 doubled the pitch on band-limited mics (listening round 26) */
+#endif
+/* v3.10 encoder: a candidate w whose speech repeats at the period of 2 w or 3 w (nccf above
+   UP_THR) pays UP per unit above it (sinusoid.track_pitch_voicing up, vocoder_lab.UP; Kokoro
+   af_nicole "seven", LibriSpeech 251 "and"). -DSOTTO_UP=0: before. */
+#ifndef SOTTO_UP
 #if SOTTO_LOW_RANK
-#define SOTTO_SUB_FIRST 1
+#define SOTTO_UP 1
 #else
-#define SOTTO_SUB_FIRST 3
+#define SOTTO_UP 0
 #endif
 #endif
+#define UP 1.5
+#define UP_THR 0.5
 
 /* v3.10 encoder: creak at a word's end held at the last clearly periodic pitch
    (sinusoid.fold_subharmonics hold; Kokoro af_sarah "foxtrot"). -DSOTTO_HOLD=0: before. */
@@ -405,6 +413,8 @@ static void amplitudes(const COMP *Sw, double wo, MODEL *m) {
 }
 
 /* candidates and costs of frame t (needs frames t-1..t+1 analysed when they exist) */
+static double nccf_t(const struct sotto_enc *e, long t, double period);
+
 static void frame_costs(struct sotto_enc *e, long t, int has_next) {
   frame_t *f = R(e, t);
   static const double mu[4] = {1.0, 2.0, 0.5, 1.0 / 3};
@@ -437,6 +447,11 @@ static void frame_costs(struct sotto_enc *e, long t, int has_next) {
   for (int c = 0; c < f->nc; c++) {
     double w = f->cand[c], cst = f->cost[1 + c];
     if (SOTTO_LOW_RANK) cst += lo[c] - lomin;
+    if (SOTTO_UP) {
+      double n2 = nccf_t(e, t, 2 * PI_D / (2 * w)), n3 = nccf_t(e, t, 2 * PI_D / (3 * w));
+      double nm = n2 > n3 ? n2 : n3;
+      if (nm - UP_THR > 0) cst += UP * (nm - UP_THR);
+    }
     double oe = odd_even_db(f->Sw, w);
     if (-oe - SUB_DB > 0) cst += SUB * (-oe - SUB_DB) / 10;
     f->cost[1 + c] = cst;

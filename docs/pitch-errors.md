@@ -345,12 +345,24 @@ band energy so near-silent frames agree between float and fixed point.
   whose pitch is under 0.75 of the last clearly periodic frame (NCCF at least 0.7, at most 6
   frames back, no unvoiced frame between), now takes that frame's pitch. Round 25: won foxtrot
   and LibriSpeech 3081, tied Lewis.
-- **Final** (Python, PESQ-NB): 31 usual voices 1200 2.784 to 2.788, 400 2.094 to 2.105; 28
-  Kokoro voices 2.496 to 2.563 and 1.810 to 1.832. The rates page mean goes 2.909 / 2.623 /
-  2.170 / 1.863 to 2.942 / 2.636 / 2.176 / 1.899 (2400 / 1200 / 600 / 400). C is bit-exact
-  with Python on foxtrot, Nicole 01, LibriSpeech 3081 and 3436, and EARS p025. Fixed point
-  matches float on 95.3% of frames over the 16 clean voices (95.2% before), with fixed-encoder
-  PESQ 2.593 against float 2.595.
+- **Listening round 26** (this branch with `SUB_FIRST = 1` against main, 11 pairs): 5 wins
+  (Lewis, Nicole 01 and 05, foxtrot, George), 3 ties (LibriSpeech 3436 and 3081, EARS p025),
+  2 losses. The Speech Commands higher voice's "two" at 1.9 s was coded at 370 Hz for 185 Hz:
+  its mic barely passes the 1st harmonic, so starting the sub-octave check there made the true
+  pitch look like a sub-octave. LibriSpeech 251's "and" at 3.0 s started at half pitch (89 Hz
+  for 188 Hz), where a breathy onset fits a comb at half the pitch better and the low-band
+  term had pushed the high-onset candidate out.
+- **Time-domain sub-octave test instead** (`vocoder_lab.UP = 1.5`, `track_pitch_voicing`
+  `up`, `c/sotto.c` `SOTTO_UP`; `SUB_FIRST` back to 3): a candidate w pays 1.5 per unit that
+  the speech's normalised autocorrelation at the period of 2 w or 3 w exceeds 0.5. It keeps
+  Nicole's "seven", "from" and 04 at 2.9 s right, and puts 251 and the Speech Commands "two"
+  back at their pitch. pYIN gross errors: Nicole 46 to 36, 16 clean voices 85 to 60.
+- **Final** (Python, PESQ-NB): 31 usual voices 1200 2.784 to 2.800, 400 2.094 to 2.100; 28
+  Kokoro voices 2.496 to 2.573 and 1.810 to 1.828. The rates page mean goes 2.909 / 2.623 /
+  2.170 / 1.863 to 2.923 / 2.630 / 2.176 / 1.894 (2400 / 1200 / 600 / 400). C is bit-exact
+  with Python on Nicole 01 and 05, LibriSpeech 251 and 3436, Speech Commands higher4 and
+  foxtrot. Fixed point matches float on 95.2% of frames over the 16 clean voices, as before
+  (fixed encoder PESQ 2.608, float 2.621).
 
 Left for later: af_heart 01 at 2.43-2.5 s is real ~65 Hz creak after an unvoiced gap (NCCF
 0.86 at 65 Hz), so there is nothing to hold it to. Jeff still hears a subtle pitch error in

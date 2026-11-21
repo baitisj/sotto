@@ -61,11 +61,7 @@
 /* v3.10 encoder (c/sotto.c SOTTO_SUB_FIRST): the sub-octave check starts at the 1st harmonic.
    -DSOTTO_SUB_FIRST=3: before */
 #ifndef SOTTO_SUB_FIRST
-#if SOTTO_LOW_RANK
-#define SOTTO_SUB_FIRST 1
-#else
 #define SOTTO_SUB_FIRST 3
-#endif
 #endif
 /* v3.10 encoder (c/sotto.c SOTTO_HOLD): creak at a word's end held at the last clearly
    periodic pitch. -DSOTTO_HOLD=0: before */
@@ -80,6 +76,15 @@
 #define LOW_BIN0 4            /* sinusoid.LOW_BIN0: 47 Hz */
 #else
 #define LOW_BIN0 2
+#endif
+/* v3.10 encoder (c/sotto.c SOTTO_UP): a candidate whose speech repeats at half or a third
+   of its period pays for it. Needs the fold's speech history. -DSOTTO_UP=0: before */
+#ifndef SOTTO_UP
+#if SOTTO_LOW_RANK
+#define SOTTO_UP 1
+#else
+#define SOTTO_UP 0
+#endif
 #endif
 /* v3.9 encoder (c/sotto.c SOTTO_FOLD, sinusoid.fold_subharmonics): short sub-octave runs in
    the decided pitch track lifted back up. -DSOTTO_FOLD=0: before */
@@ -708,6 +713,11 @@ static int32_t odd_even_db(const spec_t *f, uint32_t wo) {
 }
 
 /* candidates and costs of frame t */
+#if SOTTO_UP && SOTTO_FOLD
+static int32_t nccf_q15(const struct sotto_enc *e, int32_t t, uint32_t per);
+static uint32_t recip48(uint32_t x);
+#endif
+
 static void frame_costs(struct sotto_enc *e, int32_t t, int has_next) {
   int i, j, c;
   frame_t *f = R(e, t);
@@ -751,6 +761,13 @@ static void frame_costs(struct sotto_enc *e, int32_t t, int has_next) {
     uint32_t w = f->cand[c];
     int32_t cst = f->cost[1 + c];
     if (SOTTO_LOW_RANK) cst += lo[c] - lomin;
+#if SOTTO_UP && SOTTO_FOLD
+    {                                                    /* 1.5 (nccf(2 w or 3 w) - 0.5) */
+      int32_t n2 = nccf_q15(e, t, recip48(2 * w)), n3 = nccf_q15(e, t, recip48(3 * w));
+      int32_t nm = n2 > n3 ? n2 : n3;
+      if (nm > 16384) cst += 3 * (nm - 16384);
+    }
+#endif
     FX_PROF(13, 1);
     int32_t oe = odd_even_db(sp, w);
     FX_PROF(13, 0);
@@ -1084,6 +1101,48 @@ static int nccf_ge(const struct sotto_enc *e, int32_t t, uint32_t per, int32_t t
   }
   return 0;
 }
+
+#if SOTTO_UP
+static uint32_t isqrt64(uint64_t v) {
+  uint64_t r = 0, b = (uint64_t)1 << 62;
+  while (b > v) b >>= 2;
+  while (b) {
+    if (v >= r + b) v -= r + b, r = (r >> 1) + b;
+    else r >>= 1;
+    b >>= 2;
+  }
+  return (uint32_t)r;
+}
+
+/* sinusoid.nccf(frame t's 320 samples, period), Q15 (0 when not positive), period as Q16
+   samples; the larger at the two whole lags next to it, at 15-bit precision (nccf_ge) */
+static int32_t nccf_q15(const struct sotto_enc *e, int32_t t, uint32_t per) {
+  int c, i;
+  int32_t best = 0;
+  if (per < ((uint32_t)2 << 16)) return 0;
+  int32_t s0 = t * NSAMP - (MPITCH - NSAMP);
+  for (c = 0; c < 2; c++) {
+    int P = (int)(c ? (per + 65535u) >> 16 : per >> 16);
+    fx_acc ab = 0, aa = 0, bb = 0;
+    for (i = 0; i < MPITCH - P; i++) {
+      int32_t ia = s0 + i, ib = s0 + i + P;
+      int32_t a = ia < 0 ? 1 : e->xh[ia % XHN], b = ib < 0 ? 1 : e->xh[ib % XHN];
+      ab += (fx_acc)a * b, aa += (fx_acc)a * a, bb += (fx_acc)b * b;
+    }
+    if (ab <= 0 || aa == 0 || bb == 0) continue;
+    fx_acc m = aa > bb ? aa : bb;
+    int sh = 0;
+    while ((m >> sh) >= ((fx_acc)1 << 15)) sh++;
+    int64_t a2 = aa >> sh, b2 = bb >> sh, x = ab >> sh;
+    if (a2 == 0 || b2 == 0) continue;
+    uint64_t r2 = ((uint64_t)(x * x) << 30) / (uint64_t)(a2 * b2);   /* r^2, Q30 */
+    int32_t r = (int32_t)isqrt64(r2);                                   /* Q15 */
+    if (r > 32768) r = 32768;
+    if (r > best) best = r;
+  }
+  return best;
+}
+#endif
 
 /* sinusoid.refine on frame t's kept 16-bit spectrum (its 31-bit powers are gone by now) */
 static uint32_t refine_kept(const struct sotto_enc *e, int32_t t, uint32_t wo) {
