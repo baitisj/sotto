@@ -295,14 +295,17 @@ band energy so near-silent frames agree between float and fixed point.
 - **PESQ-NB (Python, plain sotto 1200 / 400):** 31 usual voices (samples-clean, samples15,
   samples-sc) 2.784 to 2.793 / 2.094 to 2.094; the 28 Kokoro voices 2.496 to 2.569 / 1.810
   to 1.833 (Nicole +0.50, Eric +0.56, George +0.35 at 1200).
-- **Listening round 23** (sotto 1200, 10 pairs, 2026-11-21): against today's encoder the fix
-  won 1 (am_eric), lost none and tied 3 (Nicole, George, EARS p025). Null pair called correctly.
+- **Listening round 23** (sotto 1200, 10 pairs, 2026-11-21): the fix won its one real pair
+  against today's encoder (am_eric). The render script leaked one variant's settings into the
+  next render, so pairs 1, 5, 8 and 10 (Nicole, George, LibriSpeech 777, EARS p025), keyed as
+  against the old encoder, were the fix twice or the fix against the NCCF option; Jeff called
+  them all no difference. Round 25 redoes them.
 - **The K6's slim encoder** (`c/fixed/sotto_fx_slim.c`) finds pitch in the time domain and
   never had this bug (Nicole 8, George 1, Lewis 6 gross frames). Feeding slim's pitch track
   into the reference coder scored below the fix (2.770 / 2.537 at 1200). One time-domain
   candidate per frame in the reference tracker (`tdc=1`, the shortest-lag NCCF peak within 0.9
-  of the highest) fixed Lewis (58 to 1) but split round 23 (1 win, 1 loss, 1 tie), so it stays
-  off (`vocoder_lab.TDC = 0`).
+  of the highest) fixed Lewis (58 to 1) but split round 23 (1 win, 1 loss, 3 ties against the
+  fix), so it stays off (`vocoder_lab.TDC = 0`).
 - **C:** `c/sotto.c` `SOTTO_LOW_RANK` (bit-exact with Python on Nicole and LibriSpeech 652,
   p051 99.8% as before); `c/fixed/sotto_fx_enc.c` matches the float encoder on 97% of frames,
   as before. `-DSOTTO_LOW_RANK=0` gives the encoder before.
@@ -324,11 +327,11 @@ band energy so near-silent frames agree between float and fixed point.
   2.793 to 2.785, tts 2.569 to 2.571; 400 flat. C bit-exact with Python on Nicole 01, 05 and
   libri3436; fixed point matches float as before. `-DSOTTO_SUB_FIRST=3` gives the encoder before.
 - **Listening round 24** (9 pairs): `SUB_FIRST = 1` won both pairs against the same encoder
-  without it (Nicole "seven", "from") and tied the Speech Commands higher voice. Moving the low
-  band's start to 47 Hz (`LOW_BIN0 = 4`, against 31-47 Hz rumble that pushed EARS p025's "s"
-  at 1.62 s to 430-500 Hz) tied all three of its pairs against 31 Hz, and on Nicole 04 it
-  voiced quiet gaps at ~100 Hz and halved the pitch at 2.9 s; it lost the pair that carried
-  both changes. It stays at 31 Hz. Null pair called correctly.
+  without it (Nicole "seven", "from"). The same render bug made pairs 3, 7, 8 and 9 one version
+  twice, so moving the low band's start to 47 Hz (`LOW_BIN0 = 4`, against 31-47 Hz rumble that
+  pushed EARS p025's "s" at 1.62 s to 430-500 Hz) was never heard on its own. On Nicole 04 it
+  voices quiet gaps at ~100 Hz and halves the pitch at 2.9 s, and the pair that carried both
+  changes lost to 31 Hz. It stays at 31 Hz until round 25.
 
 Left for later: the creak at a word's end. Kokoro af_sarah's "foxtrot" word unit (TTS corpus,
 "kilo. foxtrot, papa.") ends at 1.48-1.53 s with the period falling apart (NCCF under 0.5);
