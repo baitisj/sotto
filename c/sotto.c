@@ -104,6 +104,16 @@
 #endif
 #define UP 1.5
 #define UP_THR 0.5
+/* ... except a candidate whose 1st and 3rd harmonics stand UP_ODD dB clear of the spectrum
+   between harmonics (sinusoid.odd_peaks_db, vocoder_lab.UP_ODD): its odd harmonics are real,
+   and the correlation at half its period is a formant ringing near twice the pitch
+   (LibriSpeech 6313, listening round 28) */
+#ifndef UP_ODD
+#define UP_ODD 6.0
+#endif
+#ifndef UP_ODD_MAX
+#define UP_ODD_MAX 400.0  /* Hz; vocoder_lab.UP_ODD_MAX, 0 = no limit */
+#endif
 
 /* v3.10 encoder: creak at a word's end held at the last clearly periodic pitch
    (sinusoid.fold_subharmonics hold; Kokoro af_sarah "foxtrot"). -DSOTTO_HOLD=0: before. */
@@ -415,6 +425,23 @@ static void amplitudes(const COMP *Sw, double wo, MODEL *m) {
 /* candidates and costs of frame t (needs frames t-1..t+1 analysed when they exist) */
 static double nccf_t(const struct sotto_enc *e, long t, double period);
 
+/* sinusoid.odd_peaks_db */
+static double odd_peak(const COMP *Sw, double f) {
+  int c = (int)(f * NFFT / (2 * PI_D) + 0.5), lo = c - 1 > 1 ? c - 1 : 1;
+  double p = 0;
+  for (int i = lo; i <= c + 1; i++) {
+    double q = (double)Sw[i].real * Sw[i].real + (double)Sw[i].imag * Sw[i].imag;
+    if (i == lo || q > p) p = q;
+  }
+  return p;
+}
+
+static double odd_peaks_db(const COMP *Sw, double w) {
+  double a = odd_peak(Sw, w) * odd_peak(Sw, 3 * w) * 4;
+  double m = (odd_peak(Sw, 0.5 * w) + odd_peak(Sw, 1.5 * w)) * (odd_peak(Sw, 2.5 * w) + odd_peak(Sw, 3.5 * w));
+  return 5 * log10((a + 1e-30) / (m + 1e-30));
+}
+
 static void frame_costs(struct sotto_enc *e, long t, int has_next) {
   frame_t *f = R(e, t);
   static const double mu[4] = {1.0, 2.0, 0.5, 1.0 / 3};
@@ -447,7 +474,7 @@ static void frame_costs(struct sotto_enc *e, long t, int has_next) {
   for (int c = 0; c < f->nc; c++) {
     double w = f->cand[c], cst = f->cost[1 + c];
     if (SOTTO_LOW_RANK) cst += lo[c] - lomin;
-    if (SOTTO_UP) {
+    if (SOTTO_UP && !(UP_ODD_MAX == 0 || w <= UP_ODD_MAX * 2 * PI_D / FS ? odd_peaks_db(f->Sw, w) >= UP_ODD : 0)) {
       double n2 = nccf_t(e, t, 2 * PI_D / (2 * w)), n3 = nccf_t(e, t, 2 * PI_D / (3 * w));
       double nm = n2 > n3 ? n2 : n3;
       if (nm - UP_THR > 0) cst += UP * (nm - UP_THR);

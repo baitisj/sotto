@@ -262,9 +262,23 @@ def odd_even_db(S, w, fmax=1500.0, first=3):
     return 10 * np.log10((odd + 1e-9) / (even + 1e-9))
 
 
+def odd_peaks_db(S, w):
+    """How far w's 1st and 3rd harmonics stand above the spectrum halfway between harmonics
+    (dB, the mean of the two): well above 0 when w's odd harmonics are real, so the voice
+    does not repeat at half w's period even if its time-domain correlation says so (a
+    female voice whose F1 rings near 2 w: LibriSpeech 6313, listening round 28)."""
+    P = np.abs(S) ** 2
+    def peak(f):                                         # the nearest bin and its neighbours
+        c = int(f * NFFT / (2 * np.pi) + 0.5)
+        return P[max(c - 1, 1):c + 2].max()
+    a = peak(w) * peak(3 * w) * 4
+    m = (peak(0.5 * w) + peak(1.5 * w)) * (peak(2.5 * w) + peak(3.5 * w))
+    return 5 * np.log10((a + 1e-30) / (m + 1e-30))
+
+
 def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=WO_MAX_HI,
                         uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias", tilt=0.0,
-                        sub=0.0, sub_db=10.0, lag=None, third=False, x=None, up=0.0, up_thr=0.5, low_rank=False, tdc=0, tdc_thr=0.3, tdc_pref=0.9, sub_first=3):
+                        sub=0.0, sub_db=10.0, lag=None, third=False, x=None, up=0.0, up_thr=0.5, up_odd=None, up_odd_max=0.0, low_rank=False, tdc=0, tdc_thr=0.3, tdc_pref=0.9, sub_first=3):
     """Joint pitch and voicing track over the whole utterance (Viterbi).
 
     States per frame: unvoiced, or voiced at one of the candidates refine(wo0[t+d] * mu)
@@ -287,6 +301,9 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
     half (or a third of) w's period has its pitch there, and w is a subharmonic. The MBE fit
     can't see this when the voice has energy between its harmonics (breathy, diplophonic
     or creaky stretches), where a comb at half the pitch fits better.
+    With `up_odd` set, a candidate whose 1st and 3rd harmonics stand at least up_odd dB
+    above the spectrum between harmonics (odd_peaks_db) doesn't pay: its odd harmonics are
+    real, and the correlation at half its period comes from a formant ringing near 2 w.
     Returns (wo, voiced)."""
     n = len(wo0)
     if up or tdc:
@@ -321,7 +338,9 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
         if up:
             buf = xp[t * N:t * N + M_PITCH]
             le = le + up * np.array([max(0.0, max(nccf(buf, 2 * np.pi / (2 * w)), nccf(buf, 2 * np.pi / (3 * w)))
-                                         - up_thr) for w in ws])
+                                         - up_thr) if up_odd is None or (up_odd_max and w > up_odd_max * 2 * np.pi / FS)
+                                         or odd_peaks_db(Sw[t], w) < up_odd else 0.0
+                                     for w in ws])
         le = le - noise_logerr(ws) if norm == "noise" else le - bias * np.log(ws)
         c = le + prior * (not v0[t])
         if sub:
