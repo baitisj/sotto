@@ -49,6 +49,15 @@
 #define SOTTO_WPICK 0
 #endif
 #endif
+/* v3.10 encoder (c/sotto.c SOTTO_LOW_RANK, sinusoid.low_band): energy below a candidate's first
+   harmonic band counts against it when ranking a frame's candidates. -DSOTTO_LOW_RANK=0: before */
+#ifndef SOTTO_LOW_RANK
+#ifdef SOTTO_PITCH_THIRD
+#define SOTTO_LOW_RANK 1
+#else
+#define SOTTO_LOW_RANK 0
+#endif
+#endif
 /* v3.9 encoder (c/sotto.c SOTTO_FOLD, sinusoid.fold_subharmonics): short sub-octave runs in
    the decided pitch track lifted back up. -DSOTTO_FOLD=0: before */
 #ifndef SOTTO_FOLD
@@ -629,8 +638,9 @@ static uint32_t refine(const spec_t *f, uint32_t wo, uint32_t wo_max) {
   return w < WO_MIN ? WO_MIN : w > wo_max ? wo_max : w;
 }
 
-/* sinusoid.fit_error, as a natural log, Q16 */
-static int32_t ln_fit_error(const spec_t *f, uint32_t wo) {
+/* sinusoid.fit_error, as a natural log, Q16; with lo, also ln(fit_error(low=True) /
+   fit_error()) Q16: what the energy below the first harmonic's band would add */
+static int32_t ln_fit_error(const spec_t *f, uint32_t wo, int32_t *lo) {
   int l, i;
   int L = (int)(1342177280u / wo);                          /* 2500 Hz / f0 */
   if (L < 1) L = 1;
@@ -638,8 +648,17 @@ static int32_t ln_fit_error(const spec_t *f, uint32_t wo) {
   fx_acc err = 0, en = 0;
   for (l = 1; l <= L; l++) err += harm_fit(f, wo, l, NULL);
   for (i = 1; i < hi; i++) en += pw(f, i);
+  if (err <= 0) err = 1;
+  if (lo) {
+    fx_acc b = 0;
+    int a1 = ceil_sh(wo, 24);                               /* ceil(k / 2): band 1's lower edge */
+    for (i = 2; i < a1; i++) b += pw(f, i);                  /* sinusoid.LOW_BIN0 */
+    fx_acc r = err > (en >> 20) ? err : (en >> 20);          /* floor 2^-20 of the band energy */
+    if (r <= 0) r = 1;
+    *lo = ln_q16((fx_uacc)(r + b)) - ln_q16((fx_uacc)r);
+  }
   if (en == 0) return 0;
-  return ln_q16((fx_uacc)(err > 0 ? err : 1)) - ln_q16((fx_uacc)en);
+  return ln_q16((fx_uacc)err) - ln_q16((fx_uacc)en);
 }
 
 /* sinusoid.odd_even_db, dB Q8 */
@@ -694,12 +713,19 @@ static void frame_costs(struct sotto_enc *e, int32_t t, int has_next) {
     }
   }
   f->cost[0] = NAT(-0.5) + NAT(1.0) * (f->v0 > 0);
+  int32_t lo[NCAND], lomin = 0;
   for (c = 0; c < f->nc; c++) {
     uint32_t w = f->cand[c];
     f->lnc[c] = ln_wo(w);
     FX_PROF(9, 1);
-    int32_t cst = ln_fit_error(sp, w) - f->lnc[c] / 2 + NAT(1.0) * (f->v0 == 0);
+    f->cost[1 + c] = ln_fit_error(sp, w, SOTTO_LOW_RANK ? &lo[c] : NULL) - f->lnc[c] / 2 + NAT(1.0) * (f->v0 == 0);
     FX_PROF(9, 0);
+    if (SOTTO_LOW_RANK && (c == 0 || lo[c] < lomin)) lomin = lo[c];
+  }
+  for (c = 0; c < f->nc; c++) {
+    uint32_t w = f->cand[c];
+    int32_t cst = f->cost[1 + c];
+    if (SOTTO_LOW_RANK) cst += lo[c] - lomin;
     FX_PROF(13, 1);
     int32_t oe = odd_even_db(sp, w);
     FX_PROF(13, 0);

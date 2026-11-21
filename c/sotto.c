@@ -75,6 +75,19 @@
 #define SOTTO_FOLD 0
 #endif
 #endif
+/* v3.10 encoder (2026-11-21, docs/pitch-errors.md): energy below a candidate's first harmonic
+   band counts against it when ranking a frame's candidates (sinusoid.low_band,
+   track_pitch_voicing low_rank). Without it a candidate at 3x the pitch skips a strong
+   fundamental and fits for free (Kokoro af_nicole). -DSOTTO_LOW_RANK=0: before. */
+#ifndef SOTTO_LOW_RANK
+#ifdef SOTTO_PITCH_THIRD
+#define SOTTO_LOW_RANK 1
+#else
+#define SOTTO_LOW_RANK 0
+#endif
+#endif
+
+#define LOW_BIN0 2        /* sinusoid.LOW_BIN0 */
 #define FOLD_MAXRUN 12
 #define FOLD_RATIO 0.62
 #define FOLD_KTOL 1.5
@@ -294,8 +307,10 @@ static double harm_fit(const COMP *Sw, const float *W, double wo, int l, double 
   return err;
 }
 
-/* sinusoid.fit_error */
-static double fit_error(const COMP *Sw, const float *W, double wo) {
+/* sinusoid.fit_error; with lo, also log(fit_error(low=True) / fit_error()), the residual floored
+   at 2^-20 of the band energy (track_pitch_voicing low_rank): what the energy
+   below the first harmonic's band (sinusoid.low_band) would add */
+static double fit_error(const COMP *Sw, const float *W, double wo, double *lo) {
   double k = wo * NFFT / (2 * PI_D);
   int L = (int)(2500.0 / wo_hz(wo));
   if (L < 1) L = 1;
@@ -303,6 +318,12 @@ static double fit_error(const COMP *Sw, const float *W, double wo) {
   double err = 1e-9, e = 1e-9;
   for (int l = 1; l <= L; l++) err += harm_fit(Sw, W, wo, l, NULL, 0);
   for (int i = 1; i < hi; i++) e += (double)Sw[i].real * Sw[i].real + (double)Sw[i].imag * Sw[i].imag;
+  if (lo) {
+    double b = 0;
+    for (int i = LOW_BIN0; i < (int)ceil(0.5 * k); i++) b += (double)Sw[i].real * Sw[i].real + (double)Sw[i].imag * Sw[i].imag;
+    double r = err > e * 0x1p-20 ? err : e * 0x1p-20;   /* floor: near-silent frames agree with fixed point */
+    *lo = log((r + b) / r);
+  }
   return err / e;
 }
 
@@ -377,9 +398,16 @@ static void frame_costs(struct sotto_enc *e, long t, int has_next) {
     }
   }
   f->cost[0] = UV_COST + PRIOR * (f->v0 > 0);
+  double lo[NCAND], lomin = 0;
   for (int c = 0; c < f->nc; c++) {
     double w = f->cand[c];
-    double cst = log(fit_error(f->Sw, e->W, w)) - BIAS * log(w) + PRIOR * (f->v0 == 0);
+    double cst = log(fit_error(f->Sw, e->W, w, SOTTO_LOW_RANK ? &lo[c] : NULL)) - BIAS * log(w) + PRIOR * (f->v0 == 0);
+    f->cost[1 + c] = cst;
+    if (SOTTO_LOW_RANK && (c == 0 || lo[c] < lomin)) lomin = lo[c];
+  }
+  for (int c = 0; c < f->nc; c++) {
+    double w = f->cand[c], cst = f->cost[1 + c];
+    if (SOTTO_LOW_RANK) cst += lo[c] - lomin;
     double oe = odd_even_db(f->Sw, w);
     if (-oe - SUB_DB > 0) cst += SUB * (-oe - SUB_DB) / 10;
     f->cost[1 + c] = cst;

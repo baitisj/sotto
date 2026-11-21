@@ -41,6 +41,8 @@ DCT[0] /= np.sqrt(2)                                     # orthonormal DCT-II
 TRACK = {}
 TRACK2 = {}
 FOLD = True     # "tracked4" (the v3.7+ encoders): sinusoid.fold_subharmonics after the tracker
+LOW_RANK = True  # "tracked4": energy below a candidate's first harmonic counts against it (v3.10)
+TDC = 0          # "tracked4": time-domain (NCCF) pitch candidates per frame
 
 
 def analyse(x, pitch="c2"):
@@ -64,7 +66,13 @@ def analyse(x, pitch="c2"):
         if pitch == "tracked4":
             # v3.7: also a third of Codec 2's estimate as a candidate
             opts = {"third": True, **opts}
-        if TRACK2.get("up") or opts.get("up"):
+            if LOW_RANK:
+                # v3.10: a candidate whose first harmonic sits above a strong fundamental no
+                # longer fits for free (sinusoid.low_band; Kokoro voices 2026-11-21)
+                opts = {"low_rank": True, **opts}
+            if TDC:
+                opts = {"tdc": TDC, **opts}
+        if TRACK2.get("up") or opts.get("up") or opts.get("tdc"):
             opts = {"x": xi, **opts}
         wo, v = sn.track_pitch_voicing(Sw, m["Wo"], m["voiced"], **opts)
         if pitch == "tracked4" and FOLD:

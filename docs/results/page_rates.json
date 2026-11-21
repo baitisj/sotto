@@ -2,121 +2,121 @@
  "female_libri198_14s": {
   "seconds": 13.88,
   "2400": {
-   "pesq_nb": 2.724,
+   "pesq_nb": 2.751,
    "bytes": 4164
   },
   "1200": {
-   "pesq_nb": 2.45,
+   "pesq_nb": 2.469,
    "bytes": 2082
   },
   "600": {
-   "pesq_nb": 2.094,
+   "pesq_nb": 2.121,
    "bytes": 1044
   },
   "400": {
-   "pesq_nb": 1.767,
+   "pesq_nb": 1.771,
    "bytes": 696
   }
  },
  "male_libri3436_15s": {
   "seconds": 15.0,
   "2400": {
-   "pesq_nb": 3.368,
+   "pesq_nb": 3.293,
    "bytes": 4500
   },
   "1200": {
-   "pesq_nb": 3.027,
+   "pesq_nb": 3.012,
    "bytes": 2250
   },
   "600": {
-   "pesq_nb": 2.49,
+   "pesq_nb": 2.482,
    "bytes": 1128
   },
   "400": {
-   "pesq_nb": 2.03,
+   "pesq_nb": 2.066,
    "bytes": 750
   }
  },
  "librispeech_3536_f": {
   "seconds": 12.0,
   "2400": {
-   "pesq_nb": 2.85,
+   "pesq_nb": 2.865,
    "bytes": 3600
   },
   "1200": {
-   "pesq_nb": 2.65,
+   "pesq_nb": 2.775,
    "bytes": 1800
   },
   "600": {
-   "pesq_nb": 2.048,
+   "pesq_nb": 2.169,
    "bytes": 900
   },
   "400": {
-   "pesq_nb": 1.809,
+   "pesq_nb": 1.86,
    "bytes": 600
   }
  },
  "librispeech_8842_f": {
   "seconds": 12.0,
   "2400": {
-   "pesq_nb": 2.598,
+   "pesq_nb": 2.71,
    "bytes": 3600
   },
   "1200": {
-   "pesq_nb": 2.269,
+   "pesq_nb": 2.376,
    "bytes": 1800
   },
   "600": {
-   "pesq_nb": 1.922,
+   "pesq_nb": 1.964,
    "bytes": 900
   },
   "400": {
-   "pesq_nb": 1.715,
+   "pesq_nb": 1.77,
    "bytes": 600
   }
  },
  "librispeech_777_m": {
   "seconds": 12.0,
   "2400": {
-   "pesq_nb": 3.143,
+   "pesq_nb": 3.211,
    "bytes": 3600
   },
   "1200": {
-   "pesq_nb": 2.816,
+   "pesq_nb": 2.764,
    "bytes": 1800
   },
   "600": {
-   "pesq_nb": 2.36,
+   "pesq_nb": 2.333,
    "bytes": 900
   },
   "400": {
-   "pesq_nb": 2.011,
+   "pesq_nb": 2.087,
    "bytes": 600
   }
  },
  "librispeech_251_m": {
   "seconds": 12.0,
   "2400": {
-   "pesq_nb": 2.771,
+   "pesq_nb": 2.866,
    "bytes": 3600
   },
   "1200": {
-   "pesq_nb": 2.523,
+   "pesq_nb": 2.535,
    "bytes": 1800
   },
   "600": {
-   "pesq_nb": 2.107,
+   "pesq_nb": 2.094,
    "bytes": 900
   },
   "400": {
-   "pesq_nb": 1.845,
+   "pesq_nb": 1.86,
    "bytes": 600
   }
  },
  "mean": {
-  "2400": 2.909,
-  "1200": 2.623,
-  "600": 2.17,
-  "400": 1.863
+  "2400": 2.949,
+  "1200": 2.655,
+  "600": 2.194,
+  "400": 1.902
  }
 }
