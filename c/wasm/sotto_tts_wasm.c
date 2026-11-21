@@ -21,9 +21,9 @@ EXPORT(tts_text) char *tts_text(void) { return text; }
 EXPORT(tts_text_max) int tts_text_max(void) { return MAXTEXT; }
 
 /* table 0: the diphone table (37 KB), 1: the robot table (493 B); trained 0: rule prosody,
-   1: the trained trees. Returns the number of superframes, or -1. The speech is then in
+   1: the trained trees; nowords 1: callsigns from the table, not the whole-word units. Returns the number of superframes, or -1. The speech is then in
    tts_pcm() (8 kHz, tts_npcm() samples). */
-EXPORT(tts_say) int tts_say(int table, double rate, double pitch, int trained) {
+EXPORT(tts_say) int tts_say(int table, double rate, double pitch, int trained, int nowords) {
   table = table ? 1 : 0;
   if (!tts[table])
     tts[table] = table ? sotto_tts_create(sotto_tts_robot, sotto_tts_robot_len, sotto_tts_prosody, sotto_tts_prosody_len)
@@ -32,6 +32,7 @@ EXPORT(tts_say) int tts_say(int table, double rate, double pitch, int trained) {
   if (!t) return -1;
   text[MAXTEXT - 1] = 0;
   sotto_tts_trained(t, trained);
+  if (sotto_tts_set_words(t, nowords ? NULL : sotto_tts_wordunits, sotto_tts_wordunits_len)) return -1;
   int n = sotto_tts_say(t, text, rate, pitch);
   if (n < 0) return -1;
   free(pcm);

@@ -23,7 +23,7 @@ does the rest.
 
 | | robotic (`tts/data/robot.stt`) | diphone (`tts/data/diphone.stt`) |
 |---|---:|---:|
-| Units | 41 phones x 3 targets | 1,736 phone pairs, 3.9 frames each |
+| Units | 41 phones x 3 targets | 1,634 phone pairs, 4.1 frames each |
 | Shape per frame | 18 bits | 34 bits |
 | Size | **493 bytes** | **37 KB** (23 KB with 18-bit shapes) |
 | Machine word error, everyday sentences | 38% | **8%** |
@@ -52,11 +52,17 @@ text is open ended, such as callsigns, frequencies, times and messages.
 
 ## Where the units come from
 
-`tools/tts_corpus.py` has the Kokoro v1.0 model (Apache-2.0, Jeff's 11-16 pick, voice
-af_heart) speak 49 minutes of text (768 utterances): 40 plain sentences, CMUdict words
-picked greedily until every phone pair English needs occurs at least 6 times, and made-up
-carrier words for the pairs that only occur across word boundaries. (A 25-minute corpus
-with 3 instances per pair scored the same on sentences but worse on the callsign.) Kokoro is given phonemes, not
+`tools/tts_corpus.py` has the Kokoro v1.0 model (Apache-2.0) speak the corpus. The voice is
+af_sarah, Jeff's pick of the 28 English voices on 11-21 (`tools/tts_voices.py` renders them
+all through sotto 1200). With `--sentences`, it first picks real sentences from a pool
+(13,524 short sentences from the World English Bible, Luke left out for listening tests,
+only common words) greedily, each scored by the phone pairs it adds per phone spoken, until
+no sentence adds enough; CMUdict words (common ones first) and made-up carrier words then
+fill the pairs still short of 6 instances. The Sarah corpus is 1,665 sentences and 387 lists,
+122 minutes. (The first corpus, af_heart, was 49 minutes of mostly word lists read with
+list intonation; on the Harvard sentences it scored 28.8% word error against Sarah's
+15.4%.) `--reanalyse` redoes only the sotto analysis from the stored audio, for rebuilding
+the tables after an encoder change. Kokoro is given phonemes, not
 text, and one change to its ONNX graph (its duration predictor's output becomes a second
 output) gives every phone's start and end exactly, with no forced aligner. The audio goes
 through sotto 1200's own analysis. Two corrections:
@@ -66,6 +72,20 @@ through sotto 1200's own analysis. Two corrections:
 - Kokoro gives the silence next to a pause to the phone beside it (a phrase-final F ran 240
   ms). The build trims those edges to where the energy comes within 20 dB of the phone's
   peak.
+
+## Callsign words
+
+Callsign elements (NATO words, digits, "stroke") are not built from diphones. Each is a whole
+recorded word (`tts/data/words.stw`, 37 words, 5 KB, `tools/tts_words.py`): Sarah reads it
+slowly (speed 0.85) in the middle of "kilo. WORD, papa.", Kokoro's durations say where it
+is, and the cut goes at the quietest frame near each end. (Said alone, words came out with
+odd voiced onsets. At a comma Kokoro barely pauses, it lengthens the vowel instead, hence
+the full stop before the word.) Each word keeps its own pitch, checked against pYIN, and is
+stretched into the plan in place of its phones, with silence on either side; elements are
+0.2 s apart. Diphone-built callsigns lost the vowel colour of short words ("golf" came out
+"gulf") and ran together; with the words, callsign word error fell from 40% to 20%, most of
+the rest being ordinary words around the callsign. The C synthesiser takes them with
+`sotto_tts_set_words`; the CLI's `-nowords` leaves them out.
 
 ## Front end
 
@@ -112,6 +132,8 @@ plans.
   mostly at phrase ends, read at half or a third of the true pitch).
 - **Pauses** are Kokoro's medians: 100 ms at a comma, 150 ms at a full stop, 80 ms between
   callsign elements.
+- The trees were trained on af_heart, before the switch to Sarah; they still work, in
+  ratios to the voice's median pitch, but were not retrained.
 - **Yes/no questions** rise from the last accent to the end (x1.5). Kokoro reads its 49
   such questions in the corpus nearly level, so this one is a rule on top of the tree.
 - Both trees walk with integer compares: each node is a feature number, a threshold and an
@@ -130,6 +152,19 @@ Parakeet TDT 0.6B v2 (sherpa-onnx, int8) transcribes the output of the K6's fixe
 sotto 1200 decoder (`build/c37/fixed/sotto_dec_fx`). Harvard sentences lists 1-3 (30
 sentences, 240 words) are hard to guess from context, so they show acoustic errors. Numbers
 and callsigns are compared in spoken form (`tools/tts_eval.py`).
+
+Sarah (11-21, rule prosody, with callsign words; calls = 8 callsign phrases, 74 words):
+
+| Word error | Harvard (240 words) | everyday (221) | radio (42) | calls (74) |
+|---|---:|---:|---:|---:|
+| Kokoro af_sarah, 8 kHz | 3.8% | 0.5% | 0.0% | 9.5% |
+| Kokoro af_sarah through sotto 1200 | 4.6% | 0.5% | 0.0% | 12.2% |
+| **diphone table** (36.6 KB) | **15.4%** | 9.5% | **9.5%** | **20.3%** |
+| diphone table, callsigns from diphones | 15.4% | 9.5% | 11.9% | 40.5% |
+| robotic table (493 bytes) | 45.8% | 34.8% | 23.8% | 25.7% |
+| af_heart diphone table (before), callsigns from diphones | 28.8% | 8.1% | 14.3% | 35.1% |
+
+The af_heart tables (11-21 morning), for the record:
 
 | Word error | Harvard (240 words) | everyday (221) | radio (42) |
 |---|---:|---:|---:|

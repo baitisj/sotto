@@ -113,20 +113,32 @@ def pairs_of(utt):
     return list(zip(seq[:-1], seq[1:]))
 
 
-def choose_texts(d, need=6, seed=1):
+def sentence_utt(d, s):
+    u = []
+    for w, p in tokenize(s):
+        ph = word_phones(d, w.lower().strip("'"))
+        if ph is None:
+            return None
+        u.append((ph, p))
+    return u
+
+
+def choose_texts(d, need=6, seed=1, pool=None):
     """Utterances (lists of (phones, punct)) covering every needed diphone `need` times:
-    the plain sentences, then CMUdict words picked greedily, then made-up carrier words."""
+    the plain sentences, then (with pool, a list of sentences) sentences picked greedily for
+    the most uncovered pairs per phone, then CMUdict words picked greedily, then made-up
+    carrier words."""
     rng = random.Random(seed)
     utts = []
     for s in SENTENCES:
-        u = []
-        for w, p in tokenize(s):
-            ph = word_phones(d, w)
-            if ph is None:
-                raise SystemExit(f"no CMUdict entry for {w}")
-            u.append((ph, p))
+        u = sentence_utt(d, s)
+        if u is None:
+            raise SystemExit(f"no CMUdict entry in: {s}")
         utts.append(u)
     words = [w for w in d if w.isalpha() and 3 <= len(w) <= 9]
+    if pool:                     # sentence mode: only common words (no lists of rare names)
+        import wordfreq
+        words = [w for w in words if wordfreq.zipf_frequency(w, "en") >= 3.0]
     prons = {w: word_phones(d, w) for w in words}
     first = {p[0][0] for p in prons.values()}
     last = {p[-1][0] for p in prons.values()}
@@ -140,6 +152,37 @@ def choose_texts(d, need=6, seed=1):
     for u in utts:
         for pr in pairs_of(u):
             count[pr] = count.get(pr, 0) + 1
+    if pool:
+        import heapq
+        cand = [u for u in (sentence_utt(d, s) for s in pool) if u]
+        prs = [pairs_of(u) for u in cand]
+        nph = [sum(len(ph) for ph, _ in u) for u in cand]
+
+        def sgain(i):
+            seen, g = {}, 0
+            for pr in prs[i]:
+                seen[pr] = seen.get(pr, 0) + 1
+                if pr in target and count.get(pr, 0) + seen[pr] <= need:
+                    g += 1
+            return g / nph[i]
+        heap = [(-sgain(i), rng.random(), i) for i in range(len(cand))]
+        heapq.heapify(heap)
+        picked = 0
+        while heap:
+            g0, r, i = heapq.heappop(heap)
+            if -g0 < 0.02:                  # even the best bound: < 1 new pair in 50 phones
+                break
+            g = sgain(i)
+            if g < 0.02:
+                continue
+            if heap and g < -heap[0][0]:
+                heapq.heappush(heap, (-g, r, i))
+                continue
+            utts.append(cand[i])
+            picked += 1
+            for pr in prs[i]:
+                count[pr] = count.get(pr, 0) + 1
+        print(f"{picked} sentences from the pool of {len(cand)}")
 
     wp = {}
     for w in words:
@@ -315,18 +358,48 @@ def analyse(x8):
                 en10=en.astype(np.float32))
 
 
+def reanalyse(src, dst, jobs):
+    """The corpus src with every utterance's analysis redone from its stored audio."""
+    d = np.load(src, allow_pickle=True)
+    out = {k: d[k] for k in d.files}
+    n = int(d["n"])
+    audio = [d[f"u{i}_pcm"].astype(np.float32) / 32767 for i in range(n)]
+    t0 = time.time()
+    with Pool(jobs) as pool:
+        feats = pool.map(analyse, audio)
+    for i, f in enumerate(feats):
+        for k, v in f.items():
+            out[f"u{i}_{k}"] = v
+    np.savez_compressed(dst, **out)
+    print(f"{dst}: {n} utterances re-analysed in {time.time() - t0:.0f} s")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--models", required=True)
+    ap.add_argument("--models")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--reanalyse", metavar="IN.npz", help="only redo the sotto analysis of an "
+                    "existing corpus's audio (after an encoder change); no Kokoro needed")
     ap.add_argument("--voice", default="af_heart")
     ap.add_argument("--need", type=int, default=6, help="instances wanted per diphone")
     ap.add_argument("--wav", help="also write the 8 kHz corpus audio here (one WAV)")
     ap.add_argument("--jobs", type=int, default=os.cpu_count())
+    ap.add_argument("--sentences", help="a file of sentences (one a line) to cover the pairs "
+                    "with first, before word lists and carriers")
+    ap.add_argument("--dry", action="store_true", help="only report the text choice")
     a = ap.parse_args()
+    if a.reanalyse:
+        return reanalyse(a.reanalyse, a.out, a.jobs)
+    if not a.models:
+        ap.error("--models is needed to make a corpus")
     from scipy.signal import resample_poly
     d = load_cmudict()
-    utts, target, chosen = choose_texts(d, a.need)
+    pool = open(a.sentences).read().splitlines() if a.sentences else None
+    utts, target, chosen = choose_texts(d, a.need, pool=pool)
+    if a.dry:
+        nw = sum(len(u) for u in utts)
+        print(f"{len(utts)} utterances, {nw} words, {len(chosen)} cover words")
+        return
     print(f"{len(utts)} utterances, {len(chosen)} cover words, {len(target)} target diphones")
     kok = Kokoro(a.models, a.voice)
     t0 = time.time()

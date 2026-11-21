@@ -87,6 +87,10 @@ RADIO = ["This is AG7EW.",
          "The frequency is 440.850 megahertz.",
          "Battery low. Please charge the radio.",
          "Message received from AG7EW at nine thirty."]
+# callsigns alone (NATO words and digits, the whole-word units' job)
+CALLS = ["KD7ABC.", "This is W1AW portable.", "N0QZX, this is AG7EW, over.", "VE7XYZ/M.",
+         "K9JFG calling CQ.", "WB6UHV, you are five nine.", "AG7EW, KF7LMP, go ahead.",
+         "This is VA7OSR, clear."]
 
 
 def norm(s):
@@ -160,12 +164,15 @@ def main():
     ap.add_argument("--voice", default="af_heart")
     ap.add_argument("--out")
     ap.add_argument("--json")
+    ap.add_argument("--words", default="auto", help="whole-word callsign units: a words.stw, "
+                    "auto (tts/data/words.stw) or none")
     ap.add_argument("--prosody", nargs="*", default=["rules"], choices=["trees", "rules"],
                     help="score each table with the trained trees, the rules, or both")
     a = ap.parse_args()
     import soundfile as sf
     from tts import synth
     asr = ASR(a.asr)
+    words = None if a.words == "none" else synth.load_words(None if a.words == "auto" else a.words)
     systems = {}
     for t in a.tables:
         tab = synth.load_table(t)
@@ -176,7 +183,7 @@ def main():
                 continue
 
             def run(text, tab=tab, model=model):
-                p, rep = synth.synth_params(text, tab, model=model)
+                p, rep = synth.synth_params(text, tab, model=model, words=words)
                 return synth.decode_c(synth.encode(p)) / 32768.0
             systems[name + ("" if len(a.prosody) == 1 else "_" + pr)] = run
     if a.ref_models:
@@ -187,7 +194,7 @@ def main():
         systems["kokoro_sotto1200"] = lambda text: synth.decode_c(lr.encode(kokoro_say(kok, text))) / 32768.0
     res = {}
     for name, run in systems.items():
-        for setname, S in (("harvard", HARVARD), ("everyday", EVERYDAY), ("radio", RADIO)):
+        for setname, S in (("harvard", HARVARD), ("everyday", EVERYDAY), ("radio", RADIO), ("calls", CALLS)):
             e = n = 0
             rows = []
             for k, s in enumerate(S):

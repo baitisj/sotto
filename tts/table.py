@@ -121,3 +121,50 @@ def read(data):
             split = r.get(4)
             units[pr] = (split, [get_frame(r, shape_bits) for _ in range(n)])
     return dict(kind=kind, shape_bits=shape_bits, f0=f0, dur=dur, units=units)
+
+
+# ------------------------------------------------------------------ whole words
+# tts/data/words.stw: whole-word units for the words a callsign is spelt with (NATO alphabet,
+# digits, "stroke"), each said carefully by the corpus voice, kept with its own pitch:
+#     magic 'STW1', shape bits (8 bits), word count (8 bits), then per word: the text's length
+#     (5 bits) and letters (7 bits each), the frame count (7 bits), and per frame the voicing
+#     code (2 bits), the 7-bit pitch index, the energy code (5 bits) and the shape indices.
+def put_word_frame(w, fr, shape_bits):
+    w.put(fr["code"], 2)
+    w.put(fr["wi"], 7)
+    w.put(fr["ei"], 5)
+    for k, b in enumerate(STAGE_BITS[:2 if shape_bits == 18 else 4]):
+        w.put(fr["si"][k], b)
+
+
+def write_words(shape_bits, words):
+    """words: {text: [frames with code, wi, ei, si]} -> bytes."""
+    w = BitWriter()
+    for c in b"STW1":
+        w.put(c, 8)
+    w.put(shape_bits, 8)
+    w.put(len(words), 8)
+    for text, frames in words.items():
+        w.put(len(text), 5)
+        for c in text.encode():
+            w.put(c, 7)
+        w.put(len(frames), 7)
+        for f in frames:
+            put_word_frame(w, f, shape_bits)
+    return w.bytes()
+
+
+def read_words(data):
+    r = BitReader(data)
+    assert bytes(r.get(8) for _ in range(4)) == b"STW1"
+    shape_bits = r.get(8)
+    words = {}
+    for _ in range(r.get(8)):
+        text = bytes(r.get(7) for _ in range(r.get(5))).decode()
+        frames = []
+        for _ in range(r.get(7)):
+            code, wi, ei = r.get(2), r.get(7), r.get(5)
+            frames.append(dict(code=code, wi=wi, ei=ei,
+                               si=[r.get(b) for b in STAGE_BITS[:2 if shape_bits == 18 else 4]]))
+        words[text] = frames
+    return dict(shape_bits=shape_bits, words=words)

@@ -526,6 +526,9 @@ typedef struct {
 } q_t;
 
 typedef struct { int code, ei, si[4]; } tframe_t;
+typedef struct { int code, wi, ei, si[4]; } wframe_t;     /* a whole-word unit's frame */
+typedef struct { char text[32]; int off, n; } wunit_t;    /* a whole-word unit */
+typedef struct { int i0, u; } span_t;                     /* its first phone, the unit */
 typedef struct { double t, c[NC], ei, w; int has_c, code; } kf_t;
 
 struct sotto_tts {
@@ -538,6 +541,10 @@ struct sotto_tts {
   unsigned pros_len;
   int med, pause[4], dur_tree, pitch_tree, trained;
   double rdur[NP][2];          /* the rule durations (s): stressed, unstressed */
+  /* whole-word callsign units (words.stw), none when nwu is 0 */
+  wunit_t *wu;
+  wframe_t *wf;
+  int nwu, wnst;
   /* per utterance */
   word_t *words;
   int nwords, cwords;
@@ -554,6 +561,8 @@ struct sotto_tts {
   int nsf;
   char *phones, *wtext;
   double *wt0;
+  span_t *sp;                  /* the callsign elements spoken with a whole-word unit */
+  int nsp, csp;
 };
 
 static int add_word(struct sotto_tts *t, const xw_t *x) {
@@ -837,14 +846,109 @@ static int read_table(struct sotto_tts *t, const unsigned char *b, unsigned n) {
 /* synth.shape_of: the sum of the frame's codebook stages, from the fixed-point codebook (8-bit
    values times a Q16 step per stage, as the K6's decoder reads it; within 0.002 dB of the
    float codebook tts/synth.py uses) */
-static void shape_of(const struct sotto_tts *t, const tframe_t *f, double *c) {
+static void shape_sum(int nst, const int *si, double *c) {
   int32_t acc[NC] = {0};
   int16_t buf[FX_CBW];
-  for (int s = 0; s < t->nst; s++) {
-    const int16_t *y = FX_CB_VEC(s, f->si[s], buf);
+  for (int s = 0; s < nst; s++) {
+    const int16_t *y = FX_CB_VEC(s, si[s], buf);
     for (int k = 0; k < NC; k++) acc[k] += (int32_t)FX_CB_VAL(y, k) * fx_cb_step[s];
   }
   for (int k = 0; k < NC; k++) c[k] = acc[k] / 65536.0;
+}
+static void shape_of(const struct sotto_tts *t, const tframe_t *f, double *c) { shape_sum(t->nst, f->si, c); }
+
+/* table.read_words: the whole-word units ("STW1", shape bits, count, then per word its text
+   (5-bit length, 7-bit characters), 7-bit frame count and frames of 2-bit code, 7-bit pitch
+   index, 5-bit energy and the shape's stage indices) */
+static int read_words(struct sotto_tts *t, const unsigned char *b, unsigned n) {
+  br_t r = {b, n, 32};
+  if (n < 6 || memcmp(b, "STW1", 4)) return -1;
+  int sb = get(&r, 8), nw = get(&r, 8), cap = 0, nf = 0;
+  t->wnst = sb == 18 ? 2 : 4;
+  free(t->wu), free(t->wf);
+  t->wu = calloc(nw > 0 ? nw : 1, sizeof *t->wu), t->wf = NULL, t->nwu = 0;
+  if (!t->wu) return -1;
+  for (int w = 0; w < nw; w++) {
+    wunit_t *u = &t->wu[w];
+    int len = get(&r, 5);
+    if (len < 0 || len >= (int)sizeof u->text) return -1;
+    for (int k = 0; k < len; k++) u->text[k] = (char)get(&r, 7);
+    u->n = get(&r, 7), u->off = nf;
+    if (u->n < 0) return -1;
+    for (int k = 0; k < u->n; k++) {
+      GROW(t->wf, nf, cap);
+      wframe_t *f = &t->wf[nf++];
+      f->code = get(&r, 2), f->wi = get(&r, 7), f->ei = get(&r, 5);
+      for (int s = 0; s < 4; s++) f->si[s] = s < t->wnst ? get(&r, STAGE_BITS[s]) : -1;
+      if (f->si[t->wnst - 1] < 0) return -1;
+    }
+  }
+  t->nwu = nw;
+  return 0;
+}
+
+int sotto_tts_set_words(struct sotto_tts *t, const unsigned char *stw, unsigned len) {
+  if (!stw) return t->nwu = 0, 0;
+  if (read_words(t, stw, len)) return t->nwu = 0, -1;
+  return 0;
+}
+
+static const wunit_t *find_wunit(const struct sotto_tts *t, const char *text) {
+  for (int k = 0; k < t->nwu; k++)
+    if (!strcmp(t->wu[k].text, text)) return &t->wu[k];
+  return NULL;
+}
+
+/* synth.fit_words: each callsign element that has a whole-word unit is stretched to the
+   unit's length (its phones keep their proportions); returns the new total time */
+static int fit_words(struct sotto_tts *t, double *total) {
+  t->nsp = 0;
+  for (int i = 0; t->nwu && i < t->nseq; i++) {
+    const q_t *q = &t->seq[i];
+    if (q->p == PAU || q->phrase < 0 || !q->spell) continue;
+    if (i && t->seq[i - 1].p != PAU && t->seq[i - 1].gw == q->gw) continue;   /* not its first phone */
+    const wunit_t *u = find_wunit(t, t->words[q->gw].text);
+    if (!u || !u->n) continue;
+    int j = i;
+    double cur = 0;
+    for (; j < t->nseq && t->seq[j].p != PAU && t->seq[j].gw == q->gw; j++) cur += t->seq[j].dur;
+    for (int k = i; k < j; k++) t->seq[k].dur *= u->n * FRAME / cur;
+    GROW(t->sp, t->nsp, t->csp);
+    t->sp[t->nsp].i0 = i, t->sp[t->nsp++].u = (int)(u - t->wu);
+  }
+  double tm = 0;
+  for (int i = 0; i < t->nseq; i++) {
+    q_t *q = &t->seq[i];
+    q->t0 = tm, q->t1 = tm + q->dur;
+    tm += q->dur;
+  }
+  *total = tm;
+  return 0;
+}
+
+/* synth.splice_words: the fitted elements' frames become the units' own (shape, energy,
+   voicing, and pitch moved by the pitch setting); the pauses either side go silent */
+static void splice_words(struct sotto_tts *t, double pitch) {
+  int dw = (int)rint(127 * log10(pitch)), n = t->nfr;
+  for (int s = 0; s < t->nsp; s++) {
+    int i0 = t->sp[s].i0;
+    const wunit_t *u = &t->wu[t->sp[s].u];
+    int f0 = (int)rint(t->seq[i0].t0 / FRAME);
+    int lo = f0 - (i0 && t->seq[i0 - 1].p == PAU ? (int)rint(t->seq[i0 - 1].dur / FRAME) : 0);
+    int i1 = i0;
+    while (i1 < t->nseq && t->seq[i1].p != PAU) i1++;
+    int hi = f0 + u->n + (i1 < t->nseq ? (int)rint(t->seq[i1].dur / FRAME) : 0);
+    for (int f = lo < 0 ? 0 : lo; f < (hi < n ? hi : n); f++) t->ei[f] = 0, t->code[f] = 0;
+    for (int k = 0; k < u->n; k++) {
+      int f = f0 + k;
+      if (f < 0 || f >= n) continue;
+      const wframe_t *w = &t->wf[u->off + k];
+      shape_sum(t->wnst, w->si, t->c + f * NC);
+      t->ei[f] = w->ei, t->code[f] = w->code;
+      int x = w->wi + dw;
+      t->wi[f] = x < 0 ? 0 : x > 127 ? 127 : x;
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ synthesis (tts/synth.py) */
@@ -1026,6 +1130,7 @@ static int render(struct sotto_tts *t, int n) {
 
 /* ------------------------------------------------------------------ rule prosody (synth.py) */
 #define SLOW 1.15
+#define SPELL_GAP 0.2   /* s between callsign elements (synth.SPELL_GAP) */
 
 /* synth.phone_plan's durations, on the phone sequence (the same phones and pauses); returns
    the end time */
@@ -1044,8 +1149,8 @@ static double rule_durations(struct sotto_tts *t, double rate) {
     for (int i = 0; i < t->nseq; i++) {
       q_t *q = &t->seq[i];
       if (q->phrase != j) continue;
-      if (q->p == PAU) {                  /* a callsign's gap */
-        q->dur = 0.08 / rate;
+      if (q->p == PAU) {                  /* a callsign's gap (synth.SPELL_GAP) */
+        q->dur = SPELL_GAP / rate;
         continue;
       }
       double du = t->rdur[q->p][q->stress > 0 ? 0 : 1];
@@ -1150,7 +1255,7 @@ void sotto_tts_destroy(struct sotto_tts *t) {
   if (!t) return;
   free(t->fr), free(t->words), free(t->phr), free(t->seq), free(t->K);
   free(t->code), free(t->wi), free(t->ei), free(t->c), free(t->sf), free(t->phones);
-  free(t->wtext), free(t->wt0);
+  free(t->wtext), free(t->wt0), free(t->wu), free(t->wf), free(t->sp);
   free(t);
 }
 
@@ -1177,6 +1282,7 @@ int sotto_tts_say(struct sotto_tts *t, const char *text, double rate, double pit
     q->dur = du, q->t0 = tm, q->t1 = tm + du;
     tm += du;
   }
+  if (fit_words(t, &tm)) return -1;
   int n = (int)ceil(tm / FRAME);
   n += n % 2;
   free(t->code), free(t->wi), free(t->ei), free(t->c);
@@ -1229,6 +1335,7 @@ int sotto_tts_say(struct sotto_tts *t, const char *text, double rate, double pit
   }
   free(tt), free(lf);
 code:
+  splice_words(t, pitch);
   /* code: the K6's fixed-point sotto 1200 coder */
   struct sotto_lr_enc *e = sotto_lr_enc_create_frames();
   free(t->sf);

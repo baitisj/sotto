@@ -24,6 +24,7 @@ from .phones import PHONES, is_vowel  # noqa: E402
 
 FRAME = 0.02
 SLOW = 1.15      # the corpus medians run 15% faster than Kokoro reads a plain sentence
+SPELL_GAP = 0.2  # s between callsign elements (radio pacing; 0.08 before the whole-word units)
 AUX = set("is are was were do does did can could will would shall should have has had am may might must".split())
 # phone stand-ins for a pair the diphone table lacks
 SUB = {"AXR": "ER", "ER": "AXR", "AX": "AH", "AH": "AX", "ZH": "SH", "NG": "N", "OY": "AO",
@@ -67,7 +68,7 @@ def phone_plan(text, tab, rate=1.0):
             seq.append(dict(p=p, stress=s, content=content, word=wi, phrase=j, dur=SLOW * d / rate))
             last_of_word = k + 1 == len(flat) or flat[k + 1][0] != wi
             if last_of_word and words[wi].get("spell") and k + 1 < len(flat):
-                seq.append(dict(p="PAU", stress=0, content=False, word=-1, phrase=j, dur=0.08 / rate))
+                seq.append(dict(p="PAU", stress=0, content=False, word=-1, phrase=j, dur=SPELL_GAP / rate))
         pause = 0.22 if ph["end"] == "," else 0.4
         if j == len(phrases) - 1:
             pause = 0.2
@@ -226,10 +227,73 @@ def load_prosody(path=None):
     return _PROSODY[path]
 
 
-def synth_params(text, tab, rate=1.0, pitch=1.0, model=None):
+_WORDS = {}
+
+
+def load_words(path=None):
+    """The whole-word callsign units (tts/data/words.stw), or None."""
+    path = path or os.path.join(HERE, "data", "words.stw")
+    if path not in _WORDS:
+        _WORDS[path] = T.read_words(open(path, "rb").read()) if os.path.exists(path) else None
+    return _WORDS[path]
+
+
+def _word_spans(seq, phrases):
+    """{(phrase, word): [seq indices]} for the callsign elements (spell words)."""
+    out = {}
+    for i, q in enumerate(seq):
+        if q["p"] == "PAU" or q["phrase"] < 0:
+            continue
+        w = phrases[q["phrase"]]["words"][q["word"]]
+        if w.get("spell"):
+            out.setdefault((q["phrase"], q["word"]), []).append(i)
+    return out
+
+
+def fit_words(seq, phrases, words):
+    """Stretch each callsign element that has a whole-word unit to the unit's length; returns
+    [(seq index of its first phone, frames)]."""
+    spans = []
+    for (j, wi), idx in _word_spans(seq, phrases).items():
+        fr = words["words"].get(phrases[j]["words"][wi]["text"])
+        if not fr:
+            continue
+        cur = sum(seq[i]["dur"] for i in idx)
+        for i in idx:
+            seq[i]["dur"] *= len(fr) * FRAME / cur
+        spans.append((idx[0], fr))
+    t = 0.0
+    for q in seq:
+        q["t0"], q["t1"] = t, t + q["dur"]
+        t += q["dur"]
+    return spans
+
+
+def splice_words(spans, seq, words, c, ei, code, wi, pitch):
+    """Overwrite the frames of each fitted callsign element with its whole-word unit."""
+    q = vq()
+    st = words["shape_bits"] == 18 and 2 or 4
+    dw = int(round(127 * np.log10(pitch)))
+    for i0, fr in spans:
+        f0 = int(round(seq[i0]["t0"] / FRAME))
+        # the pauses on either side are silent (no diphone tails into or out of the word)
+        lo = f0 - (int(round(seq[i0 - 1]["dur"] / FRAME)) if i0 and seq[i0 - 1]["p"] == "PAU" else 0)
+        i1 = next((i for i in range(i0, len(seq)) if seq[i]["p"] == "PAU"), len(seq))
+        hi = f0 + len(fr) + (int(round(seq[i1]["dur"] / FRAME)) if i1 < len(seq) else 0)
+        for f in range(max(0, lo), min(len(code), hi)):
+            ei[f], code[f] = 0, 0
+        for k, f in enumerate(fr):
+            if 0 <= f0 + k < len(code):
+                c[f0 + k] = sum(q.cb[s][f["si"][s]] for s in range(st))
+                ei[f0 + k], code[f0 + k] = f["ei"], f["code"]
+                wi[f0 + k] = min(127, max(0, f["wi"] + dw))
+
+
+def synth_params(text, tab, rate=1.0, pitch=1.0, model=None, words="auto"):
     """Text -> sotto 1200 parameter dict (per 20 ms frame) and a report. model: None (the
     rules, the default: Jeff preferred them by ear on Luke 2), a prosody.Model, or "auto"
-    (tts/data/prosody.bin)."""
+    (tts/data/prosody.bin). words: whole-word callsign units, "auto" (tts/data/words.stw if
+    present) or None (callsigns from the table like any other word)."""
     import sotto_lr, vocoder_lab as vl
     if model == "auto":
         model = load_prosody()
@@ -241,6 +305,9 @@ def synth_params(text, tab, rate=1.0, pitch=1.0, model=None):
         model.time(seq, rate, feats)
     else:
         seq, phrases = phone_plan(text, tab, rate)
+    if words == "auto":
+        words = load_words()
+    spans = fit_words(seq, phrases, words) if words else []
     n = int(np.ceil(seq[-1]["t1"] / FRAME))
     n += n % 2
     if tab["kind"] == "robot":
@@ -255,6 +322,8 @@ def synth_params(text, tab, rate=1.0, pitch=1.0, model=None):
         f0 = f0_track(seq, phrases, tab["f0"] * pitch, n)
     lr = sotto_lr.Sotto1200()
     wi = np.array([lr.wo_index(2 * np.pi * f / 8000) for f in f0])
+    if spans:
+        splice_words(spans, seq, words, c, ei, code, wi, pitch)
     shape = np.hstack([np.zeros((n, 1)), c]) @ vl.DCT
     p = dict(code=code, wi=wi, ei=np.clip(ei, 0, 31), shape=shape)
     rep = dict(phones=" ".join(q["p"] + (str(q["stress"]) if q["stress"] else "") for q in seq),

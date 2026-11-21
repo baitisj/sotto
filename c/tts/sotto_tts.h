@@ -23,14 +23,20 @@ extern "C" {
 
 struct sotto_tts;
 
-extern const unsigned char sotto_tts_robot[], sotto_tts_diphone[], sotto_tts_prosody[];
-extern const unsigned sotto_tts_robot_len, sotto_tts_diphone_len, sotto_tts_prosody_len;
+extern const unsigned char sotto_tts_robot[], sotto_tts_diphone[], sotto_tts_prosody[], sotto_tts_wordunits[];
+extern const unsigned sotto_tts_robot_len, sotto_tts_diphone_len, sotto_tts_prosody_len, sotto_tts_wordunits_len;
 
 /* table: a robot.stt or diphone.stt image; prosody: prosody.bin, or NULL for the rules only.
    Both must outlive the synthesiser. NULL on a bad image or no memory. */
 struct sotto_tts *sotto_tts_create(const unsigned char *table, unsigned table_len,
                                    const unsigned char *prosody, unsigned prosody_len);
 void sotto_tts_destroy(struct sotto_tts *t);
+
+/* Whole-word callsign units (words.stw, e.g. sotto_tts_wordunits): each NATO word, digit and
+   "stroke" of a callsign is spoken from its own recording instead of from diphones. NULL turns
+   them off (the default after create). The image must outlive the synthesiser. 0, or -1 on a
+   bad image (units off). */
+int sotto_tts_set_words(struct sotto_tts *t, const unsigned char *stw, unsigned len);
 
 /* Prosody: 0 (the default) the rules (durations from the table, rule intonation), 1 the
    trained trees (needs prosody.bin). */
