@@ -138,7 +138,8 @@ def analyse(x, wo_track, voicing=None, do_refine=True):
 
 
 # ---------------------------------------------------------------- pitch tracking
-LOW_BIN0 = 2      # 31 Hz: the DC bin and its neighbour hold offset and rumble, not voice
+LOW_BIN0 = 4      # 47 Hz: below it, offset and rumble, not voice (31-47 Hz rumble in EARS p025
+                  # moved its "s" at 1.6 s to 430-500 Hz; listening round 25)
 
 
 def low_band(Sw, wo):
@@ -368,11 +369,12 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
     return wo, voiced
 
 
-FOLD = dict(maxrun=12, ratio=0.62, k_tol=1.5, glide=1.3, fold_nc=0.45, bridge_nc=0.5)
+FOLD = dict(maxrun=12, ratio=0.62, k_tol=1.5, glide=1.3, fold_nc=0.45, bridge_nc=0.5,
+            hold=0.75, hold_nc=0.7, hold_run=6)
 
 
 def fold_subharmonics(Sw, x, wo, voiced, maxrun=12, ratio=0.62, k_tol=1.5, glide=1.3,
-                      fold_nc=0.45, bridge_nc=0.5):
+                      fold_nc=0.45, bridge_nc=0.5, hold=0.0, hold_nc=0.7, hold_run=6):
     """Lift short sub-octave runs in a decided pitch track back to the voice's pitch (v3.9
     encoder, docs/pitch-errors.md; listening round 22 won 4-0 with 4 ties).
 
@@ -388,14 +390,34 @@ def fold_subharmonics(Sw, x, wo, voiced, maxrun=12, ratio=0.62, k_tol=1.5, glide
     bridge_nc, creak), it takes refine(anchor). Causal: each frame needs only the frames
     decided before it and its own samples, so a streaming encoder applies it as it decides
     frames, with no extra delay. Voicing is unchanged. x: the int-scaled speech spectra() was
-    given. Returns the new Wo track."""
+    given. Returns the new Wo track.
+
+    With `hold` set (v3.10, listening round 25: won Kokoro af_sarah's "foxtrot" and
+    LibriSpeech 3081, tied Lewis), creak at a word's end is held too: a voiced frame whose own
+    period is weakly periodic (nccf < bridge_nc) and whose pitch has slid below `hold` times
+    that of the last clearly periodic voiced frame (nccf >= hold_nc, at most `hold_run`
+    frames back, no unvoiced frame between) takes that frame's pitch. The tracker follows such
+    a slide down step by step (179, 161, 127, 115, 108 Hz), each step too small for a fold."""
     wo = np.asarray(wo, float)
     n = len(wo)
     vo = np.asarray(voiced) > 0
     xp = np.concatenate([np.ones(M_PITCH - N), np.asarray(x, float), np.zeros(n * N)])
     out = wo.copy()
     run, a_wo, k0 = 0, 0.0, 0
+    s_wo, s_age = 0.0, 99          # creak hold: last clearly periodic voiced frame, frames since
     for u in range(1, n):
+        if hold:
+            s_age += 1
+            if not vo[u]:
+                s_age = 99
+            else:
+                buf = xp[u * N:u * N + M_PITCH]
+                ncu = nccf(buf, 2 * np.pi / wo[u])
+                if ncu >= hold_nc:
+                    s_wo, s_age = wo[u], 0
+                elif s_age <= hold_run and wo[u] < hold * s_wo and ncu < bridge_nc:
+                    out[u] = s_wo
+                    continue
         if run and not (vo[u] and run < maxrun and wo[u] < glide * wo[u - 1]
                         and a_wo / k_tol <= k0 * wo[u] <= a_wo * k_tol):
             run = 0

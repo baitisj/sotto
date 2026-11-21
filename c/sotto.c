@@ -97,13 +97,30 @@
 #endif
 #endif
 
-#define LOW_BIN0 2        /* sinusoid.LOW_BIN0 */
+/* v3.10 encoder: creak at a word's end held at the last clearly periodic pitch
+   (sinusoid.fold_subharmonics hold; Kokoro af_sarah "foxtrot"). -DSOTTO_HOLD=0: before. */
+#ifndef SOTTO_HOLD
+#if SOTTO_LOW_RANK
+#define SOTTO_HOLD 1
+#else
+#define SOTTO_HOLD 0
+#endif
+#endif
+
+#if SOTTO_LOW_RANK
+#define LOW_BIN0 4        /* sinusoid.LOW_BIN0: 47 Hz */
+#else
+#define LOW_BIN0 2
+#endif
 #define FOLD_MAXRUN 12
 #define FOLD_RATIO 0.62
 #define FOLD_KTOL 1.5
 #define FOLD_GLIDE 1.3
 #define FOLD_NC 0.45
 #define BRIDGE_NC 0.5
+#define HOLD 0.75
+#define HOLD_NC 0.7
+#define HOLD_RUN 6
 #define XH 2048           /* speech history, samples (> (LAG + 2) * NSAMP + MPITCH) */
 
 /* v3.6: energy field from the rate-K envelope (vocoder_lab.SottoV36). Build with
@@ -261,6 +278,8 @@ struct sotto_enc {
   float xh[XH];
   double raw1, out1, out2, fold_a;   /* frame t-1's tracker pitch, t-1's and t-2's output */
   int vo1, vo2, fold_run, fold_k;
+  double hold_wo;                    /* the creak hold's anchor pitch, and frames since it */
+  int hold_age;
 };
 
 #define R(e, t) (&(e)->ring[(t) % RING])
@@ -569,7 +588,20 @@ static double nccf_t(const struct sotto_enc *e, long t, double period) {
    (voiced or not) -> the pitch it is coded with */
 static double fold_step(struct sotto_enc *e, long t, double wd, int vo) {
   double out = wd;
-  if (t >= 1) {
+  int held = 0;
+  if (t >= 1 && SOTTO_FOLD && SOTTO_HOLD) {
+    e->hold_age++;
+    if (!vo)
+      e->hold_age = 99;
+    else {
+      double nc = nccf_t(e, t, 2 * PI_D / wd);
+      if (nc >= HOLD_NC)
+        e->hold_wo = wd, e->hold_age = 0;
+      else if (e->hold_age <= HOLD_RUN && wd < HOLD * e->hold_wo && nc < BRIDGE_NC)
+        out = e->hold_wo, held = 1;
+    }
+  }
+  if (t >= 1 && !held) {
     if (e->fold_run && !(vo && e->fold_run < FOLD_MAXRUN && wd < FOLD_GLIDE * e->raw1 &&
                          e->fold_a / FOLD_KTOL <= e->fold_k * wd && e->fold_k * wd <= e->fold_a * FOLD_KTOL))
       e->fold_run = 0;
@@ -708,6 +740,7 @@ struct sotto_enc *sotto_enc_create(void) {
   for (int i = 0; i < MPITCH; i++) e->Sn[i] = 1.0f;
   e->prev_f0 = 1 / P_MAX_S;
   e->peak = -1e9;
+  e->hold_age = 99;
   return e;
 }
 

@@ -333,10 +333,28 @@ band energy so near-silent frames agree between float and fixed point.
   voices quiet gaps at ~100 Hz and halves the pitch at 2.9 s, and the pair that carried both
   changes lost to 31 Hz. It stays at 31 Hz until round 25.
 
-Left for later: the creak at a word's end. Kokoro af_sarah's "foxtrot" word unit (TTS corpus,
-"kilo. foxtrot, papa.") ends at 1.48-1.53 s with the period falling apart (NCCF under 0.5);
-every variant voices it at 127, 115, 112 Hz where it was 180 Hz, an octave drop on the ear.
-af_heart 01 at 2.43-2.5 s is the same kind.
+- **Listening round 25** (11 pairs, every WAV re-rendered and checked against the key): this
+  branch (31 Hz low band, `SUB_FIRST = 1`) against today's encoder won 3 (George, Nicole 04,
+  Nicole "seven"), tied LibriSpeech 3436 and lost EARS p025, whose "s" at 1.6 s warbled.
+  Starting the low band at 47 Hz won p025 and tied Nicole 04, so `LOW_BIN0 = 4` (the C ports
+  follow `SOTTO_LOW_RANK`). Null pair called correctly.
+- **Creak hold** (`sinusoid.FOLD` `hold=0.75`, `c/sotto.c` `SOTTO_HOLD`): Kokoro af_sarah's
+  "foxtrot" word unit ends at 1.48-1.53 s with the period falling apart (NCCF under 0.5) and
+  the tracker sliding 179, 161, 127, 115, 108 Hz, an octave drop on the ear that no single step
+  is big enough for the fold to catch. A voiced frame whose own period is weakly periodic, and
+  whose pitch is under 0.75 of the last clearly periodic frame (NCCF at least 0.7, at most 6
+  frames back, no unvoiced frame between), now takes that frame's pitch. Round 25: won foxtrot
+  and LibriSpeech 3081, tied Lewis.
+- **Final** (Python, PESQ-NB): 31 usual voices 1200 2.784 to 2.788, 400 2.094 to 2.105; 28
+  Kokoro voices 2.496 to 2.563 and 1.810 to 1.832. The rates page mean goes 2.909 / 2.623 /
+  2.170 / 1.863 to 2.942 / 2.636 / 2.176 / 1.899 (2400 / 1200 / 600 / 400). C is bit-exact
+  with Python on foxtrot, Nicole 01, LibriSpeech 3081 and 3436, and EARS p025. Fixed point
+  matches float on 95.3% of frames over the 16 clean voices (95.2% before), with fixed-encoder
+  PESQ 2.593 against float 2.595.
+
+Left for later: af_heart 01 at 2.43-2.5 s is real ~65 Hz creak after an unvoiced gap (NCCF
+0.86 at 65 Hz), so there is nothing to hold it to. Jeff still hears a subtle pitch error in
+Lewis's "is alpha" and a little roughness in Nicole's "seven".
 
 ## Still open
 

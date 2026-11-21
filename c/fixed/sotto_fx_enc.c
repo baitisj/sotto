@@ -67,6 +67,20 @@
 #define SOTTO_SUB_FIRST 3
 #endif
 #endif
+/* v3.10 encoder (c/sotto.c SOTTO_HOLD): creak at a word's end held at the last clearly
+   periodic pitch. -DSOTTO_HOLD=0: before */
+#ifndef SOTTO_HOLD
+#if SOTTO_LOW_RANK
+#define SOTTO_HOLD 1
+#else
+#define SOTTO_HOLD 0
+#endif
+#endif
+#if SOTTO_LOW_RANK
+#define LOW_BIN0 4            /* sinusoid.LOW_BIN0: 47 Hz */
+#else
+#define LOW_BIN0 2
+#endif
 /* v3.9 encoder (c/sotto.c SOTTO_FOLD, sinusoid.fold_subharmonics): short sub-octave runs in
    the decided pitch track lifted back up. -DSOTTO_FOLD=0: before */
 #ifndef SOTTO_FOLD
@@ -146,6 +160,8 @@ struct sotto_enc {
   int16_t xh[XHN];
   uint32_t raw1, out1, out2, fold_a;   /* frame t-1's tracker pitch, t-1's and t-2's output */
   int16_t vo1, vo2, fold_run, fold_k;
+  uint32_t hold_wo;                    /* the creak hold's anchor pitch, and frames since it */
+  int16_t hold_age;
 #endif
 };                            /* followed by the scratch when the encoder has its own */
 
@@ -661,7 +677,7 @@ static int32_t ln_fit_error(const spec_t *f, uint32_t wo, int32_t *lo) {
   if (lo) {
     fx_acc b = 0;
     int a1 = ceil_sh(wo, 24);                               /* ceil(k / 2): band 1's lower edge */
-    for (i = 2; i < a1; i++) b += pw(f, i);                  /* sinusoid.LOW_BIN0 */
+    for (i = LOW_BIN0; i < a1; i++) b += pw(f, i);
     fx_acc r = err > (en >> 20) ? err : (en >> 20);          /* floor 2^-20 of the band energy */
     if (r <= 0) r = 1;
     *lo = ln_q16((fx_uacc)(r + b)) - ln_q16((fx_uacc)r);
@@ -1083,7 +1099,20 @@ static uint32_t refine_kept(const struct sotto_enc *e, int32_t t, uint32_t wo) {
 /* sinusoid.fold_subharmonics, one decided frame at a time (c/sotto.c fold_step) */
 static uint32_t fold_step(struct sotto_enc *e, int32_t t, uint32_t wd, int vo) {
   uint32_t out = wd;
+  int held = 0;
+#if SOTTO_HOLD
   if (t >= 1) {
+    if (e->hold_age < 99) e->hold_age++;
+    if (!vo)
+      e->hold_age = 99;
+    else if (nccf_ge(e, t, recip48(wd), 179))                  /* 0.7 */
+      e->hold_wo = wd, e->hold_age = 0;
+    else if (e->hold_age <= 6 && (fx_uacc)wd * 4 < (fx_uacc)e->hold_wo * 3 &&
+             !nccf_ge(e, t, recip48(wd), 128))                 /* 0.75 of it, nccf < 0.5 */
+      out = e->hold_wo, held = 1;
+  }
+#endif
+  if (t >= 1 && !held) {
     if (e->fold_run) {
       fx_uacc kw = (fx_uacc)e->fold_k * wd;
       if (!(vo && e->fold_run < FOLD_MAXRUN && (fx_uacc)wd * 10 < (fx_uacc)e->raw1 * 13 &&
@@ -1281,6 +1310,9 @@ struct sotto_enc *sotto_enc_create_scratch(int32_t *scratch) {
   for (i = 0; i < HIST; i++) e->hist[i] = 1;
   e->prev_bin = 16;                                          /* 50 Hz */
   e->peak = INT32_MIN / 2;
+#if SOTTO_FOLD
+  e->hold_age = 99;
+#endif
   return e;
 }
 
