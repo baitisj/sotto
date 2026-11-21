@@ -138,14 +138,36 @@ def analyse(x, wo_track, voicing=None, do_refine=True):
 
 
 # ---------------------------------------------------------------- pitch tracking
-def fit_error(Sw, wo, fmax=2500.0):
+LOW_FLOOR = 0.0   # low-band energy (of the band energy) that costs nothing
+LOW_BIN0 = 4      # 47 Hz: below it, offset and rumble, not voice (31-47 Hz rumble in EARS p025
+                  # moved its "s" at 1.6 s to 430-500 Hz; listening round 25)
+
+
+def low_band(Sw, wo):
+    """Energy below the band of wo's first harmonic (bins LOW_BIN0 .. ceil(k/2) - 1, k = wo in
+    bins): no harmonic of wo can explain it, yet fit_error leaves it out of the residual."""
+    k = wo * NFFT / (2 * np.pi)
+    return np.sum(np.abs(Sw[LOW_BIN0:max(LOW_BIN0, int(np.ceil(0.5 * k)))]) ** 2)
+
+
+def band_energy(Sw, wo, fmax=2500.0):
+    """fit_error's denominator: the spectral energy up to the top of harmonic floor(fmax/f0)'s band"""
+    L = max(1, int(fmax / (wo * FS / (2 * np.pi))))
+    hi = int(np.ceil((L + 0.5) * wo * NFFT / (2 * np.pi)))
+    return np.sum(np.abs(Sw[1:hi]) ** 2) + 1e-9
+
+
+def fit_error(Sw, wo, fmax=2500.0, low=False):
     """Normalised MBE fit error over 0..fmax Hz: residual after fitting one windowed
-    sinusoid per harmonic of wo, divided by the spectral energy in that range."""
+    sinusoid per harmonic of wo, divided by the spectral energy in that range. With `low`,
+    the energy below the first harmonic's band (low_band) counts as residual too."""
     f0 = wo * FS / (2 * np.pi)
     L = max(1, int(fmax / f0))
     k = wo * NFFT / (2 * np.pi)
     hi = int(np.ceil((L + 0.5) * k))
     err = 1e-9
+    if low:
+        err += low_band(Sw, wo)
     for l in range(1, L + 1):
         al, bl = int(np.ceil((l - 0.5) * k)), int(np.ceil((l + 0.5) * k))
         off = int(NFFT / 2 - l * k + 0.5)
@@ -242,7 +264,7 @@ def odd_even_db(S, w, fmax=1500.0, first=3):
 
 def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=WO_MAX_HI,
                         uv_cost=-0.5, prior=1.0, switch=1.5, jump=4.0, norm="bias", tilt=0.0,
-                        sub=0.0, sub_db=10.0, lag=None, third=False, x=None, up=0.0, up_thr=0.5):
+                        sub=0.0, sub_db=10.0, lag=None, third=False, x=None, up=0.0, up_thr=0.5, low_rank=False, tdc=0, tdc_thr=0.3, tdc_pref=0.9, sub_first=3):
     """Joint pitch and voicing track over the whole utterance (Viterbi).
 
     States per frame: unvoiced, or voiced at one of the candidates refine(wo0[t+d] * mu)
@@ -267,7 +289,7 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
     or creaky stretches), where a comb at half the pitch fits better.
     Returns (wo, voiced)."""
     n = len(wo0)
-    if up:
+    if up or tdc:
         xp = np.concatenate([np.ones(M_PITCH - N), np.asarray(x, float), np.zeros(n * N)])
     v0 = np.asarray(voiced0) > 0
     cands, costs = [], []
@@ -282,8 +304,20 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
                     if w * FS / (2 * np.pi) >= fmin or (d == 0 and mu == 1.0):
                         if all(abs(np.log(w / u)) > 0.01 for u in ws):
                             ws.append(w)
+        if tdc:
+            for P in nccf_peaks(xp[t * N:t * N + M_PITCH], tdc, tdc_thr, pref=tdc_pref):
+                w = refine(Sw[t], float(np.clip(2 * np.pi / P, WO_MIN, wo_max)), wo_max)
+                if all(abs(np.log(w / u)) > 0.01 for u in ws):
+                    ws.append(w)
         ws = np.array(ws)
         le = np.array([np.log(fit_error(Sw[t], w)) for w in ws])
+        if low_rank:
+            # log(fit_error(low=True) / fit_error()), with the residual floored at 2^-20 of the
+            # band energy so that near-silent frames give the same answer in fixed point
+            r = np.maximum(np.exp(le), 2.0 ** -20)
+            lb = np.array([low_band(Sw[t], w) / band_energy(Sw[t], w) for w in ws])
+            lo = np.log((r + np.maximum(lb - LOW_FLOOR, 0.0)) / r)
+            le = le + lo - lo.min()
         if up:
             buf = xp[t * N:t * N + M_PITCH]
             le = le + up * np.array([max(0.0, max(nccf(buf, 2 * np.pi / (2 * w)), nccf(buf, 2 * np.pi / (3 * w)))
@@ -291,7 +325,7 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
         le = le - noise_logerr(ws) if norm == "noise" else le - bias * np.log(ws)
         c = le + prior * (not v0[t])
         if sub:
-            oe = np.array([odd_even_db(Sw[t], w) for w in ws])
+            oe = np.array([odd_even_db(Sw[t], w, first=sub_first) for w in ws])
             c = c + sub * np.maximum(0.0, -oe - sub_db) / 10
         if tilt:
             # fricatives (s, sh, th) put most energy above 2 kHz; penalise voicing there
@@ -337,11 +371,12 @@ def track_pitch_voicing(Sw, wo0, voiced0, lam=3.0, bias=0.5, fmin=70.0, wo_max=W
     return wo, voiced
 
 
-FOLD = dict(maxrun=12, ratio=0.62, k_tol=1.5, glide=1.3, fold_nc=0.45, bridge_nc=0.5)
+FOLD = dict(maxrun=12, ratio=0.62, k_tol=1.5, glide=1.3, fold_nc=0.45, bridge_nc=0.5,
+            hold=0.75, hold_nc=0.7, hold_run=6)
 
 
 def fold_subharmonics(Sw, x, wo, voiced, maxrun=12, ratio=0.62, k_tol=1.5, glide=1.3,
-                      fold_nc=0.45, bridge_nc=0.5):
+                      fold_nc=0.45, bridge_nc=0.5, hold=0.0, hold_nc=0.7, hold_run=6):
     """Lift short sub-octave runs in a decided pitch track back to the voice's pitch (v3.9
     encoder, docs/pitch-errors.md; listening round 22 won 4-0 with 4 ties).
 
@@ -357,14 +392,34 @@ def fold_subharmonics(Sw, x, wo, voiced, maxrun=12, ratio=0.62, k_tol=1.5, glide
     bridge_nc, creak), it takes refine(anchor). Causal: each frame needs only the frames
     decided before it and its own samples, so a streaming encoder applies it as it decides
     frames, with no extra delay. Voicing is unchanged. x: the int-scaled speech spectra() was
-    given. Returns the new Wo track."""
+    given. Returns the new Wo track.
+
+    With `hold` set (v3.10, listening round 25: won Kokoro af_sarah's "foxtrot" and
+    LibriSpeech 3081, tied Lewis), creak at a word's end is held too: a voiced frame whose own
+    period is weakly periodic (nccf < bridge_nc) and whose pitch has slid below `hold` times
+    that of the last clearly periodic voiced frame (nccf >= hold_nc, at most `hold_run`
+    frames back, no unvoiced frame between) takes that frame's pitch. The tracker follows such
+    a slide down step by step (179, 161, 127, 115, 108 Hz), each step too small for a fold."""
     wo = np.asarray(wo, float)
     n = len(wo)
     vo = np.asarray(voiced) > 0
     xp = np.concatenate([np.ones(M_PITCH - N), np.asarray(x, float), np.zeros(n * N)])
     out = wo.copy()
     run, a_wo, k0 = 0, 0.0, 0
+    s_wo, s_age = 0.0, 99          # creak hold: last clearly periodic voiced frame, frames since
     for u in range(1, n):
+        if hold:
+            s_age += 1
+            if not vo[u]:
+                s_age = 99
+            else:
+                buf = xp[u * N:u * N + M_PITCH]
+                ncu = nccf(buf, 2 * np.pi / wo[u])
+                if ncu >= hold_nc:
+                    s_wo, s_age = wo[u], 0
+                elif s_age <= hold_run and wo[u] < hold * s_wo and ncu < bridge_nc:
+                    out[u] = s_wo
+                    continue
         if run and not (vo[u] and run < maxrun and wo[u] < glide * wo[u - 1]
                         and a_wo / k_tol <= k0 * wo[u] <= a_wo * k_tol):
             run = 0
@@ -382,6 +437,28 @@ def fold_subharmonics(Sw, x, wo, voiced, maxrun=12, ratio=0.62, k_tol=1.5, glide
             out[u] = refine(Sw[u], float(np.clip(k0 * wo[u], WO_MIN, WO_MAX_HI)), WO_MAX_HI)
         elif nccf(buf, 2 * np.pi / wo[u]) < bridge_nc:
             out[u] = refine(Sw[u], float(np.clip(a_wo, WO_MIN, WO_MAX_HI)), WO_MAX_HI)
+    return out
+
+
+def nccf_peaks(buf, npk, thr, lo=16, hi=160, pref=0.0):
+    """periods (samples) of the npk highest local maxima of the normalised autocorrelation
+    of buf over lags lo..hi that reach thr, highest first; each maximum is refined to a
+    fractional lag by a parabola through its neighbours"""
+    buf = buf - buf.mean()
+    r = np.zeros(hi + 2)
+    for P in range(lo - 1, hi + 2):
+        a, b = buf[:-P], buf[P:]
+        d = np.sqrt(np.dot(a, a) * np.dot(b, b))
+        r[P] = np.dot(a, b) / d if d > 0 else 0.0
+    pk = [P for P in range(lo, hi + 1) if r[P] >= thr and r[P] > r[P - 1] and r[P] >= r[P + 1]]
+    pk.sort(key=lambda P: -r[P])
+    if pref and pk:
+        top = r[pk[0]]
+        pk = sorted([P for P in pk if r[P] >= pref * top])[:1] + pk
+    out = []
+    for P in pk[:npk]:
+        den = r[P - 1] - 2 * r[P] + r[P + 1]
+        out.append(P + (0.5 * (r[P - 1] - r[P + 1]) / den if den < 0 else 0.0))
     return out
 
 

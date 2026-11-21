@@ -226,7 +226,10 @@ def test_hiss_no_bits_frames_stay_level_in_background_hiss():
     at a voiced onset in steady background hiss it used to jump with that band (Ragtime: sotto
     400 about 10 dB too loud). The decoder now caps it at the last coded frame's level."""
     assert _hiss_burst_db("400", CAP_DB=1e9, RES_CAP=1e9) > 9    # the old decoder
-    assert _hiss_burst_db("400") < 6
+    # 8 dB since the v3.10 encoder (2026-11-21): it starts the voiced onset at 4.1 s as the clean
+    # clip does, and the cap then holds this clip to 7.5 dB (6.4-7.9 over other clips and noise
+    # seeds, before and after that encoder)
+    assert _hiss_burst_db("400") < 8
 
 
 def test_creak_tail_keeps_the_modal_frame():
