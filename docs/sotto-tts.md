@@ -88,15 +88,35 @@ through sotto 1200's own analysis. Two corrections:
 
 ## Prosody
 
-- **Durations.** Each phone's median duration in the corpus, stressed and unstressed, is
-  kept in the table (84 bytes). Function words are 0.85 times as long, and the last
-  syllable of a phrase 1.35 times.
-- **Pitch.** The voice's median pitch (188 Hz) falls 15% over each phrase. Each stressed
-  content word gets a peak, each a little lower than the one before. A statement ends
-  falling, a comma rises a little, and a yes/no question (starting with an auxiliary) ends
-  rising. On the diphone table, flat pitch gives 46% word error against the rules' 33%
-  (before joint selection), and Kokoro's own pitch and timing gave only 3 points better
-  than the rules.
+Durations and pitch come from two small regression trees (`tts/prosody.py`,
+`tts/data/prosody.bin`, 3.6 KB), trained by `tools/tts_prosody.py` on the same Kokoro voice
+reading sentences: the Gospel of John and the first 600 verses of Acts (World English Bible,
+1,477 verses, 172 minutes; Luke is kept out for listening tests). The 49-minute unit corpus is
+mostly word lists read with list intonation, so it isn't used for this. Kokoro was given the
+phones the front end makes, so its timings line up phone for phone with the synthesiser's own
+plans.
+
+- **Durations.** A 256-leaf tree predicts each phone's log duration from 28 features: the
+  phone and its class, stress, content or function word, its place in the syllable, word and
+  phrase, the classes of its neighbours, and the phrase type. Held-out error 0.26 (log)
+  against 0.54 for one mean per corpus.
+- **Pitch.** A 128-leaf tree predicts three log-pitch targets per vowel (20%, 50% and 80%
+  through it, as a ratio to the voice's 191 Hz median) from 20 features: stress, accent
+  counts before and after, the syllable's place in word and phrase, the phrase type and
+  whether it is the last phrase. Held-out error 0.13 against 0.17. The pitch track is the
+  sotto 1200 analysis's, with its subharmonic errors fixed first (5-10% of voiced frames,
+  mostly at phrase ends, read at half or a third of the true pitch).
+- **Pauses** are Kokoro's medians: 100 ms at a comma, 150 ms at a full stop, 80 ms between
+  callsign elements.
+- **Yes/no questions** rise from the last accent to the end (x1.5). Kokoro reads its 49
+  such questions in the corpus nearly level, so this one is a rule on top of the tree.
+- Both trees walk with integer compares: each node is a feature number, a threshold and an
+  offset (5 bytes), each leaf 1 or 3 values in 1/256 units.
+
+The earlier rules (`python -m tts.synth --rules`, `synth_params(model=None)`) are kept: each
+phone's corpus median duration, a declining baseline with a peak per stressed content word, a
+final fall, a comma rise and a question rise. Flat pitch gives 46% word error against the
+rules' 33% (before joint selection), so pitch matters to the recogniser.
 
 ## Scores
 
@@ -112,6 +132,15 @@ and callsigns are compared in spoken form (`tools/tts_eval.py`).
 | **diphone table** (37 KB) | 28.8% | **8.1%** | **9.5%** |
 | diphone table, 18-bit shapes (23 KB) | 22.1% | 7.2% | 23.8% |
 | **robotic table** (493 bytes) | 50.4% | 38.0% | 54.8% |
+| diphone table, trained prosody | 25.0% | 13.6% | 21.4% |
+| robotic table, trained prosody | 65.4% | 45.2% | 66.7% |
+
+The rows above the last two use the rule prosody. Over all 503 words the trained trees and
+the rules are level on the diphone table (99 and 91 errors; trees with rule pitch 105, rules
+with tree pitch 101, trees with their pitch swings made 1.5 times wider 94), and the
+recogniser's mistakes move from sentence to sentence rather than shrinking. The spectral
+shapes are what limit it (below), so the trees are the default for how they sound:
+Kokoro's timing, phrase-final lengthening and pitch movement instead of rule-made ones.
 
 With 503 words in all, the two diphone tables are level (18% and 16%); differences of a
 few points between runs are noise. The 34-bit table is the default because it said the
@@ -130,12 +159,45 @@ energy (8.8%) and voicing (7.1%) cost little.
 - **Decoder:** already on the radio.
 - **Tables:** robot.stt fits in RAM. diphone.stt, lexicon and rules belong in the SPI
   module library as data decks.
-- **Synthesis:** front end, durations and pitch are a few hundred lines of integer code.
+- **Synthesis:** `c/tts/sotto_tts.c` (below); the prosody trees are 3.6 KB of integer
+  compares.
   The one heavy step is the codebook search: the prototype re-quantises the interpolated
   shapes with the reference encoder's search (`Sotto1200.encode_params`). On the K6 that
   is the slim encoder's search (`c/fixed/sotto_fx_slim.c`, about 150 SPI codebook reads per
   superframe), or none at all if the diphone frames' stored indices are copied straight
   into A frames and only B's 8-bit residual is searched (not tried yet).
+
+## In C, and on a web page
+
+`c/tts/sotto_tts.c` is the synthesiser in C (about 1,100 lines, C99): the front end, the
+letter-to-sound rules, the lexicon, the prosody trees, both tables, keyframes and frames. It
+hands each 20 ms frame to the K6's fixed-point sotto 1200 coder (`sotto_lr_enc_push` in
+`c/fixed/sotto_fx_lr_enc.c`), so the superframes are what the radio would send. The data
+(rules, lexicon, tables, trees) is linked in from `c/tts/sotto_tts_data.c`, which
+`tools/tts_cdata.py` writes from `tts/`.
+
+- **Same as Python.** `tools/tts_ccheck.py` runs both on ten test sentences: phones, voicing,
+  pitch and energy codes match exactly, shapes to 0.002 dB (C reads the fixed-point codebook).
+  The front end gives the same words and phones on the 6,000 most frequent English words. The
+  superframes differ only where the fixed-point and float coders pick differently between
+  near-equal shapes (a few in a hundred).
+- **Same as the radio.** `sotto_tts -pcm` decodes with the fixed-point decoder; its samples
+  are identical to `build/c37/fixed/sotto_dec_fx -1200`'s.
+- **Web page.** `docs/tts.html` with `docs/sotto_tts.wasm` (205 KB: the code, both tables,
+  the lexicon and rules, the trees, the fixed-point codebook, coder and decoder). Type text,
+  pick the table, rate and pitch, and it plays the decoded speech, highlighting each word,
+  with the superframes shown in hex. `node c/wasm/check_tts.mjs` checks the module against
+  the native tool (same superframes, same samples).
+
+The synthesis itself is still floating point (interpolation, `exp` for the trees' log
+durations and pitch); on the K6 those become a few integer tables.
+
+```sh
+make -C c/tts                          # sotto_tts: text -> .sot, -pcm for 8 kHz samples
+c/tts/sotto_tts -pcm out.raw "This is AG7EW." out.sot
+python tools/tts_ccheck.py [--robot]   # C against Python
+make -C c/wasm install-tts check-tts   # docs/sotto_tts.wasm and its check (clang, wasm-ld, wasi-libc)
+```
 
 ## Use
 
@@ -149,7 +211,10 @@ sh ../blowfang/tools/tts_models.sh MODELS          # Kokoro v1.0 from GitHub rel
 python tools/tts_corpus.py --models MODELS --out corpus.npz
 python tools/tts_build.py corpus.npz
 python tools/tts_lexicon.py
-python tools/tts_eval.py --asr PARAKEET_DIR [--ref-models MODELS]
+python tools/tts_eval.py --asr PARAKEET_DIR [--ref-models MODELS] [--prosody trees rules]
+python tools/tts_prosody.py corpus --models MODELS --out prosody_corpus.pkl   # 40 min
+python tools/tts_prosody.py train prosody_corpus.pkl                         # tts/data/prosody.bin
+python tools/tts_cdata.py                                                     # c/tts/sotto_tts_data.c
 ```
 
 ## Next

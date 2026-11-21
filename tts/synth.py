@@ -8,9 +8,9 @@ with the reference encoder's quantiser, and any sotto 1200 decoder (the K6's fix
 here: the v3.7 fixed-point build, build/c37/fixed/sotto_dec_fx) turns it into speech.
 
 Steps: text -> phrases of words -> phones with stress (tts.frontend) -> durations and an
-intonation contour (rules below) -> keyframes from the unit table (tts.table): each phone's
-2-3 targets (robotic table) or the diphones that meet in each phone's middle (diphone table)
--> frames every 20 ms, interpolated between keyframes -> superframes.
+intonation contour (the trained trees in tts/prosody.py, or the rules below) -> keyframes
+from the unit table (tts.table): each phone's 2-3 targets (robotic table) or the diphones
+that meet in each phone's middle (diphone table) -> frames every 20 ms, interpolated between keyframes -> superframes.
 SPDX-License-Identifier: MIT
 """
 import argparse, os, subprocess, sys, tempfile
@@ -214,10 +214,32 @@ def render(K, n):
 
 
 # ------------------------------------------------------------------ top level
-def synth_params(text, tab, rate=1.0, pitch=1.0):
-    """Text -> sotto 1200 parameter dict (per 20 ms frame) and a report."""
+_PROSODY = {}
+
+
+def load_prosody(path=None):
+    """The trained duration and pitch trees (tts/prosody.py), or None if there are none."""
+    path = path or os.path.join(HERE, "data", "prosody.bin")
+    if path not in _PROSODY:
+        from . import prosody
+        _PROSODY[path] = prosody.Model(open(path, "rb").read()) if os.path.exists(path) else None
+    return _PROSODY[path]
+
+
+def synth_params(text, tab, rate=1.0, pitch=1.0, model="auto"):
+    """Text -> sotto 1200 parameter dict (per 20 ms frame) and a report. model: a
+    prosody.Model, "auto" (tts/data/prosody.bin if present) or None (the rules)."""
     import sotto_lr, vocoder_lab as vl
-    seq, phrases = phone_plan(text, tab, rate)
+    if model == "auto":
+        model = load_prosody()
+    if model is not None:
+        from . import prosody
+        phrases = frontend.text_to_phrases(text)
+        seq = prosody.phone_sequence(phrases)
+        feats = prosody.features(seq)
+        model.time(seq, rate, feats)
+    else:
+        seq, phrases = phone_plan(text, tab, rate)
     n = int(np.ceil(seq[-1]["t1"] / FRAME))
     n += n % 2
     if tab["kind"] == "robot":
@@ -226,7 +248,10 @@ def synth_params(text, tab, rate=1.0, pitch=1.0):
         K, subs = keyframes_diphone(seq, tab)
     c, ei, code = render(K, n)
     code = fix_voicing(code, ei)
-    f0 = f0_track(seq, phrases, tab["f0"] * pitch, n)
+    if model is not None:
+        f0 = model.f0_track(seq, n, FRAME, pitch, feats)
+    else:
+        f0 = f0_track(seq, phrases, tab["f0"] * pitch, n)
     lr = sotto_lr.Sotto1200()
     wi = np.array([lr.wo_index(2 * np.pi * f / 8000) for f in f0])
     shape = np.hstack([np.zeros((n, 1)), c]) @ vl.DCT
@@ -280,9 +305,10 @@ def main():
     ap.add_argument("--sot", help="write the sotto 1200 superframes (6 bytes per 40 ms)")
     ap.add_argument("--rate", type=float, default=1.0)
     ap.add_argument("--pitch", type=float, default=1.0)
+    ap.add_argument("--rules", action="store_true", help="rule prosody, not the trained trees")
     a = ap.parse_args()
     tab = load_table(a.table)
-    p, rep = synth_params(a.text, tab, a.rate, a.pitch)
+    p, rep = synth_params(a.text, tab, a.rate, a.pitch, None if a.rules else "auto")
     bits = encode(p)
     print(rep["phones"])
     print(f"{rep['seconds']:.2f} s, {len(bits)} superframes ({6 * len(bits)} bytes), "

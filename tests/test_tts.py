@@ -1,6 +1,8 @@
 """sotto-tts (tts/): the front end, the table format and the synthesiser on the committed
 tables. SPDX-License-Identifier: MIT"""
 import os
+import shutil
+import subprocess
 import sys
 
 import pytest
@@ -58,3 +60,33 @@ def test_synth_makes_superframes(name):
     assert 2.0 < rep["seconds"] < 6.0
     # the question ends higher than the statement does
     assert p["wi"][-12:].max() > p["wi"][len(p["wi"]) // 3]
+
+
+# ------------------------------------------------------------------ the C port (c/tts)
+def test_c_data_is_current():
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "tts_cdata.py"), "--check"], check=True)
+
+
+@pytest.fixture(scope="module")
+def c_tool():
+    subprocess.run(["make", "-C", os.path.join(ROOT, "c", "tts")], check=True, capture_output=True)
+    return os.path.join(ROOT, "c", "tts", "sotto_tts")
+
+
+@pytest.mark.parametrize("robot", [False, True])
+def test_c_matches_python(c_tool, robot):
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import tts_ccheck
+    argv = sys.argv
+    sys.argv = ["tts_ccheck.py", "--exe", c_tool] + (["--robot"] if robot else [])
+    try:
+        assert tts_ccheck.main() == 0
+    finally:
+        sys.argv = argv
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs node")
+def test_page_wasm_matches_c(c_tool):
+    """docs/sotto_tts.wasm (the page's) gives the native tool's superframes and samples."""
+    subprocess.run(["node", os.path.join(ROOT, "c", "wasm", "check_tts.mjs"),
+                    os.path.join(ROOT, "docs", "sotto_tts.wasm"), c_tool], check=True)

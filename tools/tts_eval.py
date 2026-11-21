@@ -160,6 +160,8 @@ def main():
     ap.add_argument("--voice", default="af_heart")
     ap.add_argument("--out")
     ap.add_argument("--json")
+    ap.add_argument("--prosody", nargs="*", default=["trees"], choices=["trees", "rules"],
+                    help="score each table with the trained trees, the rules, or both")
     a = ap.parse_args()
     import soundfile as sf
     from tts import synth
@@ -168,11 +170,15 @@ def main():
     for t in a.tables:
         tab = synth.load_table(t)
         name = os.path.splitext(os.path.basename(t))[0]
+        for pr in a.prosody:
+            model = synth.load_prosody() if pr == "trees" else None
+            if pr == "trees" and model is None:
+                continue
 
-        def run(text, tab=tab):
-            p, rep = synth.synth_params(text, tab)
-            return synth.decode_c(synth.encode(p)) / 32768.0
-        systems[name] = run
+            def run(text, tab=tab, model=model):
+                p, rep = synth.synth_params(text, tab, model=model)
+                return synth.decode_c(synth.encode(p)) / 32768.0
+            systems[name + ("" if len(a.prosody) == 1 else "_" + pr)] = run
     if a.ref_models:
         import tts_corpus, sotto_lr
         kok = tts_corpus.Kokoro(a.ref_models, a.voice)
