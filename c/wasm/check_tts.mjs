@@ -18,23 +18,23 @@ const texts = ["This is AG7EW on 440.850 MHz.", "Is the repeater on, please?",
                "KD7ABC/P calling CQ, over. The birch canoe slid on the smooth planks."];
 const dir = mkdtempSync(join(tmpdir(), "tts-"));
 let bad = 0;
-for (const table of [0, 1]) {
+for (const [table, trained] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
   for (const s of texts) {
     const mem = () => new Uint8Array(x.memory.buffer);
     const enc = new TextEncoder().encode(s);
     mem().set(enc, x.tts_text());
     mem()[x.tts_text() + enc.length] = 0;
-    const n = x.tts_say(table, 1.0, 1.0);
+    const n = x.tts_say(table, 1.0, 1.0, trained);
     const sf = mem().slice(x.tts_superframes(table), x.tts_superframes(table) + 6 * n);
     const pcm = new Int16Array(x.memory.buffer, x.tts_pcm(), x.tts_npcm()).slice();
-    execFileSync(exe, [...(table ? ["-robot"] : []), "-pcm", join(dir, "o.raw"), s, join(dir, "o.sot")]);
+    execFileSync(exe, [...(table ? ["-robot"] : []), ...(trained ? ["-trained"] : []), "-pcm", join(dir, "o.raw"), s, join(dir, "o.sot")]);
     const rsf = readFileSync(join(dir, "o.sot"));
     const rb = readFileSync(join(dir, "o.raw"));
     const rpcm = new Int16Array(rb.buffer, rb.byteOffset, rb.length / 2);
     const same = Buffer.compare(Buffer.from(sf), rsf) === 0 && pcm.length === rpcm.length &&
                  pcm.every((v, i) => v === rpcm[i]);
     if (!same) bad++;
-    console.log(`${same ? "ok  " : "DIFF"} table ${table} ${n} superframes ${pcm.length} samples: ${s}`);
+    console.log(`${same ? "ok  " : "DIFF"} table ${table} ${trained ? "trained" : "rules  "} ${n} superframes ${pcm.length} samples: ${s}`);
   }
 }
 process.exit(bad ? 1 : 0);

@@ -7,8 +7,8 @@
  *
  * The steps are the Python prototype's (docs/sotto-tts.md): text -> phrases of words -> phones
  * with stress (NRL letter-to-sound rules and a small CMUdict lexicon; callsigns in NATO
- * phonetics) -> durations and pitch from the trained regression trees (tts/data/prosody.bin)
- * -> keyframes from a unit table (robot.stt or diphone.stt) -> 20 ms frames -> the fixed-point
+ * phonetics) -> durations and pitch by rule, or from the trained regression trees
+ * (tts/data/prosody.bin) -> keyframes from a unit table (robot.stt or diphone.stt) -> 20 ms frames -> the fixed-point
  * sotto 1200 coder (c/fixed/sotto_fx_lr_enc.c, the K6's). Any sotto 1200 decoder plays them.
  * The synthesiser itself uses floating point; the tables, trees and coder are the K6's.
  * The data (rules, lexicon, tables, trees) is linked in from sotto_tts_data.c, which
@@ -26,11 +26,15 @@ struct sotto_tts;
 extern const unsigned char sotto_tts_robot[], sotto_tts_diphone[], sotto_tts_prosody[];
 extern const unsigned sotto_tts_robot_len, sotto_tts_diphone_len, sotto_tts_prosody_len;
 
-/* table: a robot.stt or diphone.stt image; prosody: prosody.bin. Both must outlive the
-   synthesiser. NULL on a bad image or no memory. */
+/* table: a robot.stt or diphone.stt image; prosody: prosody.bin, or NULL for the rules only.
+   Both must outlive the synthesiser. NULL on a bad image or no memory. */
 struct sotto_tts *sotto_tts_create(const unsigned char *table, unsigned table_len,
                                    const unsigned char *prosody, unsigned prosody_len);
 void sotto_tts_destroy(struct sotto_tts *t);
+
+/* Prosody: 0 (the default) the rules (durations from the table, rule intonation), 1 the
+   trained trees (needs prosody.bin). */
+void sotto_tts_trained(struct sotto_tts *t, int on);
 
 /* Synthesises text (ASCII); rate > 1 speaks faster, pitch scales the voice's pitch.
    Returns the number of superframes (6 bytes each, 40 ms), or -1 on no memory. */

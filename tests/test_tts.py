@@ -74,11 +74,12 @@ def c_tool():
 
 
 @pytest.mark.parametrize("robot", [False, True])
-def test_c_matches_python(c_tool, robot):
+@pytest.mark.parametrize("trained", [False, True])
+def test_c_matches_python(c_tool, robot, trained):
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     import tts_ccheck
     argv = sys.argv
-    sys.argv = ["tts_ccheck.py", "--exe", c_tool] + (["--robot"] if robot else [])
+    sys.argv = ["tts_ccheck.py", "--exe", c_tool] + (["--robot"] if robot else []) + (["--trained"] if trained else [])
     try:
         assert tts_ccheck.main() == 0
     finally:

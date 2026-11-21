@@ -536,7 +536,8 @@ struct sotto_tts {
   /* prosody */
   const unsigned char *pros;
   unsigned pros_len;
-  int med, pause[4], dur_tree, pitch_tree;
+  int med, pause[4], dur_tree, pitch_tree, trained;
+  double rdur[NP][2];          /* the rule durations (s): stressed, unstressed */
   /* per utterance */
   word_t *words;
   int nwords, cwords;
@@ -803,7 +804,8 @@ static int read_table(struct sotto_tts *t, const unsigned char *b, unsigned n) {
   int sb = get(&r, 8);
   t->nst = sb == 18 ? 2 : 4;
   t->f0 = get(&r, 16);
-  r.p += NP * 16;                      /* the rule durations: the trees replace them */
+  for (int p = 0; p < NP; p++)
+    for (int k = 0; k < 2; k++) t->rdur[p][k] = get(&r, 8) * 0.005;
   int cap = 0, nf = 0;
   for (int i = 0; i < NP * NP; i++) t->unit_off[i] = -1, t->unit_n[i] = 0;
   static unsigned char present[NP * NP];
@@ -1022,16 +1024,120 @@ static int render(struct sotto_tts *t, int n) {
   return 0;
 }
 
+/* ------------------------------------------------------------------ rule prosody (synth.py) */
+#define SLOW 1.15
+
+/* synth.phone_plan's durations, on the phone sequence (the same phones and pauses); returns
+   the end time */
+static double rule_durations(struct sotto_tts *t, double rate) {
+  double tm = 0;
+  for (int j = 0; j < t->nphr; j++) {
+    int nk = 0, last_v = -1;              /* the phrase's last vowel, counting its phones */
+    for (int i = 0; i < t->nseq; i++) {
+      const q_t *q = &t->seq[i];
+      if (q->phrase != j || q->p == PAU) continue;
+      if (vowel(q->p)) last_v = nk;
+      nk++;
+    }
+    if (last_v < 0) last_v = nk;
+    int k = 0;
+    for (int i = 0; i < t->nseq; i++) {
+      q_t *q = &t->seq[i];
+      if (q->phrase != j) continue;
+      if (q->p == PAU) {                  /* a callsign's gap */
+        q->dur = 0.08 / rate;
+        continue;
+      }
+      double du = t->rdur[q->p][q->stress > 0 ? 0 : 1];
+      if (!q->content) du *= 0.85;
+      if (k >= last_v) du *= 1.35;
+      q->dur = SLOW * du / rate;
+      k++;
+    }
+  }
+  for (int i = 0; i < t->nseq; i++) {
+    q_t *q = &t->seq[i];
+    if (q->phrase < 0)                    /* the start, and each phrase's closing pause */
+      q->dur = q->end == '^' ? 0.12 : q->end == '$' ? 0.2 : q->end == ',' ? 0.22 : 0.4;
+    if (q->dur < 0.03) q->dur = 0.03;
+    q->t0 = tm, q->t1 = tm + q->dur;
+    tm += q->dur;
+  }
+  return tm;
+}
+
+typedef struct { double t, v; } pt_t;
+static int add_pt(pt_t **P, int *n, int *cap, double tm, double v) {
+  GROW(*P, *n, *cap);
+  (*P)[*n].t = tm, (*P)[(*n)++].v = v;
+  return 0;
+}
+
+/* synth.f0_track: a falling baseline per phrase, a peak on each accent, and the phrase's
+   ending (fall, comma rise or yes/no question rise); sets t->wi */
+static int rule_pitch(struct sotto_tts *t, int n, double f0) {
+  pt_t *P = NULL;
+  int np = 0, cap = 0;
+  for (int j = 0; j < t->nphr; j++) {
+    int first = -1, last = -1;
+    for (int i = 0; i < t->nseq; i++)
+      if (t->seq[i].phrase == j) {
+        if (first < 0) first = i;
+        last = i;
+      }
+    if (first < 0) continue;
+    double t0 = t->seq[first].t0, t1 = t->seq[last].t1, span = t1 - t0 > 0.2 ? t1 - t0 : 0.2;
+#define BASE(x) (f0 * (1.02 - 0.15 * ((x) - t0) / span))
+    if (add_pt(&P, &np, &cap, t0, BASE(t0))) return free(P), -1;
+    int k = 0;
+    for (int i = first; i <= last; i++) {
+      const q_t *q = &t->seq[i];
+      if (q->phrase != j || q->p == PAU || !vowel(q->p) || q->stress != 1 || !q->content) continue;
+      double pk = f0 * (1.32 - 0.07 * k > 1.12 ? 1.32 - 0.07 * k : 1.12);
+      if (add_pt(&P, &np, &cap, q->t0, BASE(q->t0) * 1.02) ||
+          add_pt(&P, &np, &cap, 0.5 * (q->t0 + q->t1), pk * (1.0 - 0.15 * (q->t0 - t0) / span)))
+        return free(P), -1;
+      k++;
+    }
+#undef BASE
+    const phrase_t *ph = &t->phr[j];
+    int yesno = ph->end == '?' && ph->nw && in_list(AUX, t->words[ph->w0].text);
+    if (add_pt(&P, &np, &cap, t1, f0 * (ph->end == ',' ? 1.1 : yesno ? 1.5 : 0.76))) return free(P), -1;
+  }
+  /* pts.sort(): by time, then value */
+  for (int i = 1; i < np; i++) {
+    pt_t x = P[i];
+    int j = i;
+    while (j > 0 && (P[j - 1].t > x.t || (P[j - 1].t == x.t && P[j - 1].v > x.v))) P[j] = P[j - 1], j--;
+    P[j] = x;
+  }
+  double *tt = malloc((np + 1) * sizeof *tt), *lf = malloc((np + 1) * sizeof *lf);
+  if (!tt || !lf) return free(P), free(tt), free(lf), -1;
+  for (int i = 0; i < np; i++) tt[i] = P[i].t, lf[i] = log(P[i].v);
+  double lw0 = log(2 * PI_D / 160), lw1 = log(2 * PI_D / 16);
+  for (int f = 0; f < n; f++) {
+    double hz = np ? exp(interp(f * FRAME, tt, lf, np)) : f0;
+    double wo = 2 * PI_D * hz / 8000;
+    double x = rint((log(wo) - lw0) / (lw1 - lw0) * 127);
+    t->wi[f] = x < 0 ? 0 : x > 127 ? 127 : (int)x;
+  }
+  free(P), free(tt), free(lf);
+  return 0;
+}
+
+void sotto_tts_trained(struct sotto_tts *t, int on) { t->trained = on; }
+
 /* ------------------------------------------------------------------ API */
 struct sotto_tts *sotto_tts_create(const unsigned char *table, unsigned table_len,
                                    const unsigned char *prosody, unsigned prosody_len) {
   if (parse_rules() || parse_lexicon()) return NULL;
   struct sotto_tts *t = calloc(1, sizeof *t);
   if (!t) return NULL;
-  if (read_table(t, table, table_len) || prosody_len < 10 || memcmp(prosody, "STP1", 4)) {
+  if (read_table(t, table, table_len) || (prosody && (prosody_len < 10 || memcmp(prosody, "STP1", 4)))) {
     sotto_tts_destroy(t);
     return NULL;
   }
+  if (!prosody) return t;
   t->pros = prosody, t->pros_len = prosody_len;
   t->med = (int)ru16(prosody + 4);
   for (int k = 0; k < 4; k++) t->pause[k] = prosody[6 + k];
@@ -1051,10 +1157,11 @@ void sotto_tts_destroy(struct sotto_tts *t) {
 int sotto_tts_say(struct sotto_tts *t, const char *text, double rate, double pitch) {
   t->nsf = 0;
   if (text_to_phrases(t, text) || phone_sequence(t)) return -1;
-  /* durations: prosody.Model.time */
-  int d[28], pf[20];
+  int d[28], pf[20], trees = t->trained && t->pros;
   double tm = 0, v[3];
-  for (int i = 0; i < t->nseq; i++) {
+  if (!trees) tm = rule_durations(t, rate);
+  /* durations: prosody.Model.time */
+  for (int i = 0; trees && i < t->nseq; i++) {
     q_t *q = &t->seq[i];
     double du;
     if (q->p == PAU) {
@@ -1081,6 +1188,10 @@ int sotto_tts_say(struct sotto_tts *t, const char *text, double rate, double pit
   t->nk = 0;
   int subs = 0;
   if ((t->kind == 0 ? keyframes_robot(t) : keyframes_diphone(t, &subs)) || render(t, n)) return -1;
+  if (!trees) {
+    if (rule_pitch(t, n, t->f0 * pitch)) return -1;
+    goto code;
+  }
   /* pitch: prosody.Model.f0_track */
   int nt = 0, *tq = malloc((3 * t->nseq + 1) * sizeof *tq);
   double *tt = malloc((3 * t->nseq + 1) * sizeof *tt), *lf = malloc((3 * t->nseq + 1) * sizeof *lf);
@@ -1117,6 +1228,7 @@ int sotto_tts_say(struct sotto_tts *t, const char *text, double rate, double pit
     t->wi[f] = x < 0 ? 0 : x > 127 ? 127 : (int)x;
   }
   free(tt), free(lf);
+code:
   /* code: the K6's fixed-point sotto 1200 coder */
   struct sotto_lr_enc *e = sotto_lr_enc_create_frames();
   free(t->sf);

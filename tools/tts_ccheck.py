@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare the C synthesiser (c/tts/sotto_tts) with the Python prototype (tts/synth.py).
 
-    make -C c/tts && python tools/tts_ccheck.py [--robot]
+    make -C c/tts && python tools/tts_ccheck.py [--robot] [--trained]
 
 Per sentence: the phones must match, and per 20 ms frame the voicing code, pitch index and
 energy code; the shape coefficients within 0.01 dB (C reads the K6's fixed-point codebook) (the largest difference is printed). The
@@ -32,6 +32,7 @@ SENTENCES = [
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--robot", action="store_true")
+    ap.add_argument("--trained", action="store_true", help="the trained trees, not the rule prosody")
     ap.add_argument("--exe", default=os.path.join(ROOT, "c", "tts", "sotto_tts"))
     a = ap.parse_args()
     from tts import synth
@@ -40,12 +41,12 @@ def main():
     with tempfile.TemporaryDirectory() as d:
         for s in SENTENCES:
             pp, sot = os.path.join(d, "p.txt"), os.path.join(d, "o.sot")
-            subprocess.run([a.exe] + (["-robot"] if a.robot else []) + ["-params", pp, s, sot],
+            subprocess.run([a.exe] + (["-robot"] if a.robot else []) + (["-trained"] if a.trained else []) + ["-params", pp, s, sot],
                            check=True, capture_output=True)
             lines = open(pp).read().splitlines()
             cph = lines[0]
             M = np.array([[float(v) for v in l.split()] for l in lines[1:]])
-            p, rep = synth.synth_params(s, tab)
+            p, rep = synth.synth_params(s, tab, model=synth.load_prosody() if a.trained else None)
             ok_ph = cph == rep["phones"]
             n = min(len(M), len(p["code"]))
             same_len = len(M) == len(p["code"])

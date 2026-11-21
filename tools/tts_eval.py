@@ -160,7 +160,7 @@ def main():
     ap.add_argument("--voice", default="af_heart")
     ap.add_argument("--out")
     ap.add_argument("--json")
-    ap.add_argument("--prosody", nargs="*", default=["trees"], choices=["trees", "rules"],
+    ap.add_argument("--prosody", nargs="*", default=["rules"], choices=["trees", "rules"],
                     help="score each table with the trained trees, the rules, or both")
     a = ap.parse_args()
     import soundfile as sf

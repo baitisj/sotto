@@ -1,5 +1,6 @@
 /* sotto_tts: text -> sotto 1200 superframes (c/tts/sotto_tts.c).
- *   sotto_tts [-robot] [-rate R] [-pitch P] [-params OUT.txt] [-pcm OUT.raw] "TEXT" OUT.sot
+ *   sotto_tts [-robot] [-trained] [-rate R] [-pitch P] [-params OUT.txt] [-pcm OUT.raw] "TEXT" OUT.sot
+ * -trained: the trained duration and pitch trees instead of the rule prosody.
  * OUT.sot holds 6 bytes per 40 ms; -pcm decodes them (the fixed-point sotto 1200 decoder, the
  * K6's) to 8 kHz 16-bit mono; -params writes the frames before coding (one line per 20 ms:
  * code wi ei c1..c19) and the phones, for tools/tts_ccheck.py.
@@ -11,11 +12,12 @@
 #include "../sotto.h"
 
 int main(int argc, char **argv) {
-  int robot = 0, i = 1;
+  int robot = 0, trained = 0, i = 1;
   double rate = 1, pitch = 1;
   const char *params = NULL, *pcm = NULL;
   for (; i < argc && argv[i][0] == '-' && argv[i][1]; i++) {
     if (!strcmp(argv[i], "-robot")) robot = 1;
+    else if (!strcmp(argv[i], "-trained")) trained = 1;
     else if (!strcmp(argv[i], "-rate") && i + 1 < argc) rate = atof(argv[++i]);
     else if (!strcmp(argv[i], "-pitch") && i + 1 < argc) pitch = atof(argv[++i]);
     else if (!strcmp(argv[i], "-params") && i + 1 < argc) params = argv[++i];
@@ -23,12 +25,13 @@ int main(int argc, char **argv) {
     else break;
   }
   if (argc - i != 2) {
-    fprintf(stderr, "usage: sotto_tts [-robot] [-rate R] [-pitch P] [-params OUT.txt] [-pcm OUT.raw] \"TEXT\" OUT.sot\n");
+    fprintf(stderr, "usage: sotto_tts [-robot] [-trained] [-rate R] [-pitch P] [-params OUT.txt] [-pcm OUT.raw] \"TEXT\" OUT.sot\n");
     return 2;
   }
   struct sotto_tts *t = robot ? sotto_tts_create(sotto_tts_robot, sotto_tts_robot_len, sotto_tts_prosody, sotto_tts_prosody_len)
                               : sotto_tts_create(sotto_tts_diphone, sotto_tts_diphone_len, sotto_tts_prosody, sotto_tts_prosody_len);
   if (!t) return fprintf(stderr, "sotto_tts: bad table\n"), 1;
+  sotto_tts_trained(t, trained);
   int n = sotto_tts_say(t, argv[i], rate, pitch);
   if (n < 0) return fprintf(stderr, "sotto_tts: out of memory\n"), 1;
   FILE *f = fopen(argv[i + 1], "wb");

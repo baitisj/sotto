@@ -8,7 +8,7 @@ with the reference encoder's quantiser, and any sotto 1200 decoder (the K6's fix
 here: the v3.7 fixed-point build, build/c37/fixed/sotto_dec_fx) turns it into speech.
 
 Steps: text -> phrases of words -> phones with stress (tts.frontend) -> durations and an
-intonation contour (the trained trees in tts/prosody.py, or the rules below) -> keyframes
+intonation contour (the rules below, or the trained trees in tts/prosody.py) -> keyframes
 from the unit table (tts.table): each phone's 2-3 targets (robotic table) or the diphones
 that meet in each phone's middle (diphone table) -> frames every 20 ms, interpolated between keyframes -> superframes.
 SPDX-License-Identifier: MIT
@@ -226,9 +226,10 @@ def load_prosody(path=None):
     return _PROSODY[path]
 
 
-def synth_params(text, tab, rate=1.0, pitch=1.0, model="auto"):
-    """Text -> sotto 1200 parameter dict (per 20 ms frame) and a report. model: a
-    prosody.Model, "auto" (tts/data/prosody.bin if present) or None (the rules)."""
+def synth_params(text, tab, rate=1.0, pitch=1.0, model=None):
+    """Text -> sotto 1200 parameter dict (per 20 ms frame) and a report. model: None (the
+    rules, the default: Jeff preferred them by ear on Luke 2), a prosody.Model, or "auto"
+    (tts/data/prosody.bin)."""
     import sotto_lr, vocoder_lab as vl
     if model == "auto":
         model = load_prosody()
@@ -305,10 +306,10 @@ def main():
     ap.add_argument("--sot", help="write the sotto 1200 superframes (6 bytes per 40 ms)")
     ap.add_argument("--rate", type=float, default=1.0)
     ap.add_argument("--pitch", type=float, default=1.0)
-    ap.add_argument("--rules", action="store_true", help="rule prosody, not the trained trees")
+    ap.add_argument("--trained", action="store_true", help="the trained duration and pitch trees, not the rules")
     a = ap.parse_args()
     tab = load_table(a.table)
-    p, rep = synth_params(a.text, tab, a.rate, a.pitch, None if a.rules else "auto")
+    p, rep = synth_params(a.text, tab, a.rate, a.pitch, "auto" if a.trained else None)
     bits = encode(p)
     print(rep["phones"])
     print(f"{rep['seconds']:.2f} s, {len(bits)} superframes ({6 * len(bits)} bytes), "

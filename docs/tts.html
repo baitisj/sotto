@@ -71,6 +71,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   font: 700 17px/1 var(--display); background: var(--accent); color: var(--accent-ink); border: 0;
   border-radius: 8px; padding: 14px 18px; cursor: pointer; display: flex; gap: 10px; align-items: center; justify-content: center;
 }
+.controls .go { grid-column: 1 / -1; }
 .go:disabled { opacity: 0.55; cursor: progress; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
 .stat { display: grid; gap: 4px; }
@@ -112,6 +113,13 @@ a { color: var(--accent); text-underline-offset: 2px; }
         </div>
       </div>
       <div class="field">
+        <span class="cap">Prosody</span>
+        <div class="seg" role="group" aria-label="Prosody">
+          <button id="p0" aria-pressed="true">Rules<small>84 B</small></button>
+          <button id="p1" aria-pressed="false">Trained<small id="p1b">3.5 KB</small></button>
+        </div>
+      </div>
+      <div class="field">
         <label class="cap" for="rate">Rate <output id="rateo">1.00×</output></label>
         <input id="rate" type="range" min="0.6" max="1.6" step="0.05" value="1">
       </div>
@@ -137,7 +145,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   </section>
 
   <div class="foot">
-    <p>What runs here is C compiled to WebAssembly (<span id="wsize">–</span>): English letter-to-sound rules, a small CMUdict lexicon, duration and pitch trees trained on Kokoro reading sentences (<span id="psize">–</span>), a unit table that stores voicing, energy and sotto codebook indices per 20 ms but never pitch, and the K6's fixed-point sotto 1200 coder and decoder. Callsigns are spoken in NATO phonetics.</p>
+    <p>What runs here is C compiled to WebAssembly (<span id="wsize">–</span>): English letter-to-sound rules, a small CMUdict lexicon, rules for timing and intonation (or, with Trained, duration and pitch trees learnt from Kokoro reading sentences, <span id="psize">–</span>), a unit table that stores voicing, energy and sotto codebook indices per 20 ms but never pitch, and the K6's fixed-point sotto 1200 coder and decoder. Callsigns are spoken in NATO phonetics.</p>
     <p>The diphone table holds 1,736 sound pairs cut from the Kokoro af_heart voice; the robot table holds three averaged frames per phone. Code: <a href="https://github.com/baitisj/sotto/tree/main/c/tts">c/tts</a>, write-up: <a href="https://github.com/baitisj/sotto/blob/main/docs/sotto-tts.md">docs/sotto-tts.md</a>.</p>
   </div>
 </main>
@@ -151,7 +159,7 @@ const PRESETS = [
   ["Luke 2", "Now it happened in those days, that a decree went out from Caesar Augustus that all the world should be enrolled."],
 ];
 const $ = (id) => document.getElementById(id);
-let X = null, table = 0, ctx = null, src = null, raf = 0, last = null;
+let X = null, table = 0, trained = 0, ctx = null, src = null, raf = 0, last = null;
 
 const stub = () => 52;
 async function load() {
@@ -163,6 +171,7 @@ async function load() {
   X._initialize?.();
   $("wsize").textContent = Math.round(bytes.byteLength / 1024) + " KB";
   $("psize").textContent = (X.tts_prosody_bytes() / 1024).toFixed(1) + " KB";
+  $("p1b").textContent = (X.tts_prosody_bytes() / 1024).toFixed(1) + " KB";
   $("t0b").textContent = Math.round(X.tts_table_bytes(0) / 1024) + " KB";
   $("t1b").textContent = X.tts_table_bytes(1) + " B";
 }
@@ -180,7 +189,7 @@ function synth() {
   new Uint8Array(X.memory.buffer).set(enc, X.tts_text());
   new Uint8Array(X.memory.buffer)[X.tts_text() + enc.length] = 0;
   const t0 = performance.now();
-  const n = X.tts_say(table, +$("rate").value, +$("pitch").value);
+  const n = X.tts_say(table, +$("rate").value, +$("pitch").value, trained);
   const ms = performance.now() - t0;
   if (n < 0) throw new Error("The synthesiser ran out of memory; try shorter text.");
   const pcm = new Int16Array(X.memory.buffer, X.tts_pcm(), X.tts_npcm()).slice();
@@ -282,6 +291,12 @@ PRESETS.forEach(([name, text]) => {
   table = k;
   $("t0").setAttribute("aria-pressed", k === 0);
   $("t1").setAttribute("aria-pressed", k === 1);
+  speak();
+});
+[0, 1].forEach((k) => $("p" + k).onclick = () => {
+  trained = k;
+  $("p0").setAttribute("aria-pressed", k === 0);
+  $("p1").setAttribute("aria-pressed", k === 1);
   speak();
 });
 for (const id of ["rate", "pitch"]) {
