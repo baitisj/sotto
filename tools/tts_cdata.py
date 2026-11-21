@@ -4,7 +4,7 @@
     python tools/tts_cdata.py [--out c/tts/sotto_tts_data.c] [--check]
 
 From tts/: the letter-to-sound rules (tts/lts.py RULES_TEXT), the lexicon
-(tts/data/lexicon.txt, CMUdict notice kept), the robot and diphone tables and the prosody trees,
+(tts/data/lexicon.txt, CMUdict notice kept), the robot and diphone tables, the prosody trees, the whole-word callsign units,
 as C arrays.
 SPDX-License-Identifier: MIT
 """
@@ -45,7 +45,7 @@ def main():
            c_string("sotto_tts_rules", lts.RULES_TEXT.strip() + "\n"),
            c_string("sotto_tts_lexicon", lex)]
     for name, f in (("sotto_tts_robot", "robot.stt"), ("sotto_tts_diphone", "diphone.stt"),
-                    ("sotto_tts_prosody", "prosody.bin")):
+                    ("sotto_tts_prosody", "prosody.bin"), ("sotto_tts_wordunits", "words.stw")):
         src.append(c_bytes(name, open(os.path.join(D, f), "rb").read()))
     text = "\n".join(src)
     if a.check:
