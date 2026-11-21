@@ -14,6 +14,8 @@ chain from the same 8 kHz input (x16 downsampled), scored against the same refer
 first seed is written as <voice>__<condition>__codec2_2400.flac for the page's Codec 2 rows.
 
 Usage: python tools/render_page_v38.py --libri DIR [--dev-clean DIR] [--out docs/samples/v38] [--codec2]
+       python tools/render_page_v38.py --originals      (after an encoder change: the sources
+  are the committed <voice>__original16.flac; Codec 2 scores are kept from page_v38.json)
   --libri: 198-209-0000.ogg and 3436-172162-0000.ogg from librosa's example data
   (github.com/librosa/data, audio/), the 16 kHz sources of the page's three fading voices.
   --dev-clean: the LibriSpeech folder (SPEAKERS.TXT, dev-clean/) for the "more voices" part:
@@ -94,10 +96,24 @@ def c_decode(bit_path, good_path=None):
         return np.fromfile(f"{d}/out.raw", "<i2").astype(float) / 32768
 
 
-def main(libri, out, codec2=False, dev_clean=None):
+def originals16(out):
+    """[(voice, 16 kHz clip, conditions, False)] from the committed page originals"""
+    items = []
+    for v, ogg, sec in VOICES:
+        if ogg is None:
+            items.append((v, source16(None, v, None, None), CONDS, False))
+        else:
+            items.append((v, sf.read(os.path.join(out, f"{v}__original16.flac"))[0], CONDS, False))
+    for s in HELD_OUT:
+        f = [g for g in os.listdir(out) if g.startswith(f"librispeech_{s}_") and g.endswith("__original16.flac")]
+        items.append((f[0].split("__")[0], sf.read(os.path.join(out, f[0]))[0], CONDS[:1], False))
+    return items
+
+
+def main(libri, out, codec2=False, dev_clean=None, originals=False):
     os.makedirs(out, exist_ok=True)
     rows = []
-    items = []
+    items = originals16(out) if originals else []
     if libri:
         items += [(v, source16(libri, v, ogg, sec), CONDS, ogg is not None) for v, ogg, sec in VOICES]
     if dev_clean:
@@ -165,11 +181,17 @@ if __name__ == "__main__":
     a.add_argument("--dev-clean")
     a.add_argument("--out", default=os.path.join(ROOT, "docs", "samples", "v38"))
     a.add_argument("--codec2", action="store_true")
+    a.add_argument("--originals", action="store_true")
     a.add_argument("--json", default=os.path.join(ROOT, "docs", "results", "page_v38.json"))
     a = a.parse_args()
-    rows = main(a.libri, a.out, a.codec2, a.dev_clean)
+    rows = main(a.libri, a.out, a.codec2, a.dev_clean, a.originals)
     if os.path.exists(a.json):                 # keep the rows of voices not rendered this time
+        old = {(r["voice"], r["cond"]): r for r in json.load(open(a.json))}
+        for r in rows:                         # and Codec 2's scores when it was not rerun
+            o = old.get((r["voice"], r["cond"]), {})
+            if "codec2_pesq" not in r and "codec2_pesq" in o:
+                r["codec2_pesq"] = o["codec2_pesq"]
         done = {(r["voice"], r["cond"]) for r in rows}
-        rows = [r for r in json.load(open(a.json)) if (r["voice"], r["cond"]) not in done] + rows
+        rows = [r for k, r in old.items() if k not in done] + rows
     with open(a.json, "w") as f:
         json.dump(rows, f, indent=1)
