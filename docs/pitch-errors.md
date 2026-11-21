@@ -357,6 +357,9 @@ band energy so near-silent frames agree between float and fixed point.
   the speech's normalised autocorrelation at the period of 2 w or 3 w exceeds 0.5. It keeps
   Nicole's "seven", "from" and 04 at 2.9 s right, and puts 251 and the Speech Commands "two"
   back at their pitch. pYIN gross errors: Nicole 46 to 36, 16 clean voices 85 to 60.
+- **Listening round 27** (this branch against main, 11 pairs): 7 wins (George, Speech Commands
+  higher4 "two", Nicole 01 and 05, foxtrot, LibriSpeech 3536, Lewis), 3 ties (EARS p025,
+  LibriSpeech 251, Speech Commands higher1), no losses; null pair called correctly.
 - **Final** (Python, PESQ-NB): 31 usual voices 1200 2.784 to 2.800, 400 2.094 to 2.100; 28
   Kokoro voices 2.496 to 2.573 and 1.810 to 1.828. The rates page mean goes 2.909 / 2.623 /
   2.170 / 1.863 to 2.923 / 2.630 / 2.176 / 1.894 (2400 / 1200 / 600 / 400). C is bit-exact
