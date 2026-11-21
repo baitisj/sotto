@@ -83,9 +83,45 @@ objvlr/%.o: ../%.c | objvlr
 objvlr:
 	mkdir -p objvlr
 
+# sotto-tts (../tts, docs/sotto-tts.md): text -> sotto 1200 on the K6's fixed-point coder and
+# decoder (v3.7 core, no SOTTO_V38), for the text-to-speech page docs/tts.html
+TTS_SRCS = sotto_tts_wasm.c \
+           ../tts/sotto_tts.c \
+           ../tts/sotto_tts_data.c \
+               ../fixed/fx_math.c \
+           ../fixed/fx_tables.c \
+           ../fixed/sotto_fx_enc.c \
+           ../fixed/sotto_fx_lr_enc.c \
+           ../fixed/sotto_fx_vlr.c \
+           ../fixed/sotto_fx_dec.c \
+           ../fixed/sotto_fx_lr.c \
+           ../sotto_vlr_tables.c
+TTS_OBJS = $(patsubst %.c,objtts/%.o,$(notdir $(TTS_SRCS)))
+TTS_CFLAGS = $(TARGET) -O2 -std=gnu99 -ffunction-sections -fdata-sections \
+             -DSOTTO_V36 -DSOTTO_PITCH_THIRD -I.. -I../fixed -w
+
+sotto_tts.wasm: $(TTS_OBJS)
+	$(CC_WASM) $(TARGET) -mexec-model=reactor -Wl,--gc-sections -Wl,--strip-all \
+	  -Wl,-z,stack-size=262144 -Wl,--initial-memory=4194304 -Wl,--max-memory=67108864 \
+	  -o $@ $(TTS_OBJS)
+
+objtts/%.o: %.c | objtts
+	$(CC_WASM) $(TTS_CFLAGS) -c -o $@ $<
+objtts/%.o: ../tts/%.c ../tts/sotto_tts.h | objtts
+	$(CC_WASM) $(TTS_CFLAGS) -c -o $@ $<
+objtts/%.o: ../fixed/%.c | objtts
+	$(CC_WASM) $(TTS_CFLAGS) -c -o $@ $<
+objtts/%.o: ../%.c | objtts
+	$(CC_WASM) $(TTS_CFLAGS) -c -o $@ $<
+objtts:
+	mkdir -p objtts
+
 install: sotto.wasm sotto_vlr.wasm
 	cp sotto.wasm ../../docs/sotto.wasm
 	cp sotto_vlr.wasm ../../docs/sotto_vlr.wasm
+
+install-tts: sotto_tts.wasm
+	cp sotto_tts.wasm ../../docs/sotto_tts.wasm
 
 # the native 600 / 400 reference decoder is a VARIANT=v3.7 fixed build (c/ itself is v3.8)
 C37 = ../../build/c37
@@ -97,6 +133,11 @@ $(C37)/fixed/sotto_vlr_dec_fx:
 check: sotto.wasm sotto_vlr.wasm $(C37)/fixed/sotto_vlr_dec_fx
 	cd ../.. && node c/wasm/check_wasm.mjs c/wasm/sotto.wasm c/wasm/sotto_vlr.wasm
 
+# sotto_tts.wasm against the native c/tts/sotto_tts (same superframes and samples)
+check-tts: sotto_tts.wasm
+	$(MAKE) -C ../tts
+	node check_tts.mjs sotto_tts.wasm ../tts/sotto_tts
+
 clean:
-	rm -rf obj objfx objvlr sotto.wasm sotto_fx.wasm sotto_vlr.wasm
-.PHONY: all install check clean
+	rm -rf obj objfx objvlr objtts sotto.wasm sotto_fx.wasm sotto_vlr.wasm sotto_tts.wasm
+.PHONY: all install install-tts check check-tts clean
