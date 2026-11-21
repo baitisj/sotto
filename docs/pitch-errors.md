@@ -407,6 +407,9 @@ added for (LibriSpeech 251 "and", Nicole "seven" and "from", EARS p070 at 4.2 s)
   and 3436, the Speech Commands higher4 and foxtrot (EARS p070 differs in one frame, as it
   did before this change). Fixed point matches float on 95.3% of sotto 1200 superframes over
   the 16 clean voices (95.2% before).
+- **Listening round 29** (sotto 2400, 6313): with this check, her first 4 s come out exactly
+  as the old encoder's; the 4-8 s and 8-12 s pieces tied the old encoder, and "torch" beat
+  main (PR #194); null pair called correctly.
 
 ## Still open
 
