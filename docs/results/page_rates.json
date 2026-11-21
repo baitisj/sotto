@@ -2,76 +2,76 @@
  "female_libri198_14s": {
   "seconds": 13.88,
   "2400": {
-   "pesq_nb": 2.751,
+   "pesq_nb": 2.74,
    "bytes": 4164
   },
   "1200": {
-   "pesq_nb": 2.469,
+   "pesq_nb": 2.493,
    "bytes": 2082
   },
   "600": {
-   "pesq_nb": 2.121,
+   "pesq_nb": 2.104,
    "bytes": 1044
   },
   "400": {
-   "pesq_nb": 1.771,
+   "pesq_nb": 1.8,
    "bytes": 696
   }
  },
  "male_libri3436_15s": {
   "seconds": 15.0,
   "2400": {
-   "pesq_nb": 3.293,
+   "pesq_nb": 3.336,
    "bytes": 4500
   },
   "1200": {
-   "pesq_nb": 3.012,
+   "pesq_nb": 2.995,
    "bytes": 2250
   },
   "600": {
-   "pesq_nb": 2.482,
+   "pesq_nb": 2.485,
    "bytes": 1128
   },
   "400": {
-   "pesq_nb": 2.066,
+   "pesq_nb": 2.044,
    "bytes": 750
   }
  },
  "librispeech_3536_f": {
   "seconds": 12.0,
   "2400": {
-   "pesq_nb": 2.865,
+   "pesq_nb": 2.866,
    "bytes": 3600
   },
   "1200": {
-   "pesq_nb": 2.775,
+   "pesq_nb": 2.779,
    "bytes": 1800
   },
   "600": {
-   "pesq_nb": 2.169,
+   "pesq_nb": 2.177,
    "bytes": 900
   },
   "400": {
-   "pesq_nb": 1.86,
+   "pesq_nb": 1.832,
    "bytes": 600
   }
  },
  "librispeech_8842_f": {
   "seconds": 12.0,
   "2400": {
-   "pesq_nb": 2.71,
+   "pesq_nb": 2.711,
    "bytes": 3600
   },
   "1200": {
-   "pesq_nb": 2.376,
+   "pesq_nb": 2.374,
    "bytes": 1800
   },
   "600": {
-   "pesq_nb": 1.964,
+   "pesq_nb": 1.961,
    "bytes": 900
   },
   "400": {
-   "pesq_nb": 1.77,
+   "pesq_nb": 1.738,
    "bytes": 600
   }
  },
@@ -86,26 +86,26 @@
    "bytes": 1800
   },
   "600": {
-   "pesq_nb": 2.333,
+   "pesq_nb": 2.328,
    "bytes": 900
   },
   "400": {
-   "pesq_nb": 2.087,
+   "pesq_nb": 2.088,
    "bytes": 600
   }
  },
  "librispeech_251_m": {
   "seconds": 12.0,
   "2400": {
-   "pesq_nb": 2.866,
+   "pesq_nb": 2.858,
    "bytes": 3600
   },
   "1200": {
-   "pesq_nb": 2.535,
+   "pesq_nb": 2.524,
    "bytes": 1800
   },
   "600": {
-   "pesq_nb": 2.094,
+   "pesq_nb": 2.07,
    "bytes": 900
   },
   "400": {
@@ -114,9 +114,9 @@
   }
  },
  "mean": {
-  "2400": 2.949,
+  "2400": 2.954,
   "1200": 2.655,
-  "600": 2.194,
-  "400": 1.902
+  "600": 2.188,
+  "400": 1.894
  }
 }

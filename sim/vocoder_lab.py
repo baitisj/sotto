@@ -42,6 +42,7 @@ TRACK = {}
 TRACK2 = {}
 FOLD = True     # "tracked4" (the v3.7+ encoders): sinusoid.fold_subharmonics after the tracker
 LOW_RANK = True  # "tracked4": energy below a candidate's first harmonic counts against it (v3.10)
+SUB_FIRST = 1    # "tracked4": the sub-octave check (odd_even_db) starts at this harmonic (v3.10; was 3)
 TDC = 0          # "tracked4": time-domain (NCCF) pitch candidates per frame
 
 
@@ -70,6 +71,11 @@ def analyse(x, pitch="c2"):
                 # v3.10: a candidate whose first harmonic sits above a strong fundamental no
                 # longer fits for free (sinusoid.low_band; Kokoro voices 2026-11-21)
                 opts = {"low_rank": True, **opts}
+            if SUB_FIRST != 3:
+                # v3.10: the sub-octave check also looks at harmonics 1 and 2, so a pitch half
+                # the true one is caught on a voice whose upper odd harmonics are weak
+                # (Kokoro af_nicole "seven", "from"; listening round 24)
+                opts = {"sub_first": SUB_FIRST, **opts}
             if TDC:
                 opts = {"tdc": TDC, **opts}
         if TRACK2.get("up") or opts.get("up") or opts.get("tdc"):

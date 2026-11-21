@@ -58,6 +58,15 @@
 #define SOTTO_LOW_RANK 0
 #endif
 #endif
+/* v3.10 encoder (c/sotto.c SOTTO_SUB_FIRST): the sub-octave check starts at the 1st harmonic.
+   -DSOTTO_SUB_FIRST=3: before */
+#ifndef SOTTO_SUB_FIRST
+#if SOTTO_LOW_RANK
+#define SOTTO_SUB_FIRST 1
+#else
+#define SOTTO_SUB_FIRST 3
+#endif
+#endif
 /* v3.9 encoder (c/sotto.c SOTTO_FOLD, sinusoid.fold_subharmonics): short sub-octave runs in
    the decided pitch track lifted back up. -DSOTTO_FOLD=0: before */
 #ifndef SOTTO_FOLD
@@ -668,8 +677,8 @@ static int32_t odd_even_db(const spec_t *f, uint32_t wo) {
   if (h < 1) h = 1;
   int L = (int)(805306368u / wo);                           /* 1500 Hz / f0 */
   fx_acc odd = 0, even = 0;
-  uint32_t acc = 3 * wo;                                    /* j wo < 2^31 for j <= L */
-  for (j = 3; j <= L; j++, acc += wo) {
+  uint32_t acc = SOTTO_SUB_FIRST * wo;                      /* j wo < 2^31 for j <= L */
+  for (j = SOTTO_SUB_FIRST; j <= L; j++, acc += wo) {
     int c = (int)(acc >> 23);
     fx_acc p = 0;
     if (c < 256)

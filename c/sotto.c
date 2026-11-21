@@ -87,6 +87,16 @@
 #endif
 #endif
 
+/* v3.10 encoder: the sub-octave check (odd_even_db) starts at the 1st harmonic, not the 3rd
+   (vocoder_lab.SUB_FIRST; Kokoro af_nicole "seven"). -DSOTTO_SUB_FIRST=3: before. */
+#ifndef SOTTO_SUB_FIRST
+#if SOTTO_LOW_RANK
+#define SOTTO_SUB_FIRST 1
+#else
+#define SOTTO_SUB_FIRST 3
+#endif
+#endif
+
 #define LOW_BIN0 2        /* sinusoid.LOW_BIN0 */
 #define FOLD_MAXRUN 12
 #define FOLD_RATIO 0.62
@@ -333,7 +343,7 @@ static double odd_even_db(const COMP *Sw, double w) {
   if (h < 1) h = 1;
   int L = (int)(1500.0 / wo_hz(w));
   double odd = 0, even = 0;
-  for (int j = 3; j <= L; j++) {
+  for (int j = SOTTO_SUB_FIRST; j <= L; j++) {
     int c = (int)(j * w * NFFT / (2 * PI_D));
     double p = 0;
     if (c < NFFT / 2) {

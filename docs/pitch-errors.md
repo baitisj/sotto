@@ -316,10 +316,24 @@ band energy so near-silent frames agree between float and fixed point.
   hiss cap then holds the burst to 7.5 dB (it was 4.4). Over other clips and noise seeds the
   old encoder already reached 6.4-7.9 dB, so the bound is now 8 dB.
 
-Left for later: Nicole's "seven" (01.wav 2.30-2.38 s) still drops to half pitch, where a comb
-at half the pitch fits the breathy noise between harmonics. Starting the sub-octave test at
-the first harmonic (`sub_first=1`) fixes it (Nicole 67 to 43) with PESQ flat, waiting for a
-listening round. Jeff also heard a warbly "s" just before 2 s in EARS p025.
+- **Sub-octave check from the first harmonic** (`vocoder_lab.SUB_FIRST = 1`, `c/sotto.c`
+  `SOTTO_SUB_FIRST`): Nicole's "seven" (01.wav 2.30-2.38 s) and "from" (05.wav 3.40-3.48 s)
+  dropped to half pitch, where a comb at half the pitch fits the breathy noise between
+  harmonics and the odd/even test, starting at the 3rd harmonic, missed the gap at the 1st.
+  Starting at the 1st: Nicole 67 to 43 gross frames, samples-clean 79 to 71, PESQ 1200 usual
+  2.793 to 2.785, tts 2.569 to 2.571; 400 flat. C bit-exact with Python on Nicole 01, 05 and
+  libri3436; fixed point matches float as before. `-DSOTTO_SUB_FIRST=3` gives the encoder before.
+- **Listening round 24** (9 pairs): `SUB_FIRST = 1` won both pairs against the same encoder
+  without it (Nicole "seven", "from") and tied the Speech Commands higher voice. Moving the low
+  band's start to 47 Hz (`LOW_BIN0 = 4`, against 31-47 Hz rumble that pushed EARS p025's "s"
+  at 1.62 s to 430-500 Hz) tied all three of its pairs against 31 Hz, and on Nicole 04 it
+  voiced quiet gaps at ~100 Hz and halved the pitch at 2.9 s; it lost the pair that carried
+  both changes. It stays at 31 Hz. Null pair called correctly.
+
+Left for later: the creak at a word's end. Kokoro af_sarah's "foxtrot" word unit (TTS corpus,
+"kilo. foxtrot, papa.") ends at 1.48-1.53 s with the period falling apart (NCCF under 0.5);
+every variant voices it at 127, 115, 112 Hz where it was 180 Hz, an octave drop on the ear.
+af_heart 01 at 2.43-2.5 s is the same kind.
 
 ## Still open
 
