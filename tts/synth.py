@@ -269,17 +269,23 @@ def fit_words(seq, phrases, words):
     return spans
 
 
+def fr_of(t):
+    """Seconds -> nearest frame, halves up. Word starts often land on exactly half a frame,
+    where float noise would make Python's round() and C's rint() disagree."""
+    return int(np.floor(t / FRAME + 0.5 + 1e-6))
+
+
 def splice_words(spans, seq, words, c, ei, code, wi, pitch):
     """Overwrite the frames of each fitted callsign element with its whole-word unit."""
     q = vq()
     st = words["shape_bits"] == 18 and 2 or 4
     dw = int(round(127 * np.log10(pitch)))
     for i0, fr in spans:
-        f0 = int(round(seq[i0]["t0"] / FRAME))
+        f0 = fr_of(seq[i0]["t0"])
         # the pauses on either side are silent (no diphone tails into or out of the word)
-        lo = f0 - (int(round(seq[i0 - 1]["dur"] / FRAME)) if i0 and seq[i0 - 1]["p"] == "PAU" else 0)
+        lo = f0 - (fr_of(seq[i0 - 1]["dur"]) if i0 and seq[i0 - 1]["p"] == "PAU" else 0)
         i1 = next((i for i in range(i0, len(seq)) if seq[i]["p"] == "PAU"), len(seq))
-        hi = f0 + len(fr) + (int(round(seq[i1]["dur"] / FRAME)) if i1 < len(seq) else 0)
+        hi = f0 + len(fr) + (fr_of(seq[i1]["dur"]) if i1 < len(seq) else 0)
         for f in range(max(0, lo), min(len(code), hi)):
             ei[f], code[f] = 0, 0
         for k, f in enumerate(fr):

@@ -926,6 +926,10 @@ static int fit_words(struct sotto_tts *t, double *total) {
   return 0;
 }
 
+/* synth.fr_of: seconds -> nearest frame, halves up (word starts often sit on exactly half
+   a frame, where float noise would split round() from rint()) */
+static int fr_of(double t) { return (int)floor(t / FRAME + 0.5 + 1e-6); }
+
 /* synth.splice_words: the fitted elements' frames become the units' own (shape, energy,
    voicing, and pitch moved by the pitch setting); the pauses either side go silent */
 static void splice_words(struct sotto_tts *t, double pitch) {
@@ -933,11 +937,11 @@ static void splice_words(struct sotto_tts *t, double pitch) {
   for (int s = 0; s < t->nsp; s++) {
     int i0 = t->sp[s].i0;
     const wunit_t *u = &t->wu[t->sp[s].u];
-    int f0 = (int)rint(t->seq[i0].t0 / FRAME);
-    int lo = f0 - (i0 && t->seq[i0 - 1].p == PAU ? (int)rint(t->seq[i0 - 1].dur / FRAME) : 0);
+    int f0 = fr_of(t->seq[i0].t0);
+    int lo = f0 - (i0 && t->seq[i0 - 1].p == PAU ? fr_of(t->seq[i0 - 1].dur) : 0);
     int i1 = i0;
     while (i1 < t->nseq && t->seq[i1].p != PAU) i1++;
-    int hi = f0 + u->n + (i1 < t->nseq ? (int)rint(t->seq[i1].dur / FRAME) : 0);
+    int hi = f0 + u->n + (i1 < t->nseq ? fr_of(t->seq[i1].dur) : 0);
     for (int f = lo < 0 ? 0 : lo; f < (hi < n ? hi : n); f++) t->ei[f] = 0, t->code[f] = 0;
     for (int k = 0; k < u->n; k++) {
       int f = f0 + k;

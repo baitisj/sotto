@@ -11,7 +11,8 @@ reading of a callsign element; the full stop after "kilo" leaves a real pause be
 Kokoro's duration output says exactly where the word starts and ends. The whole list is
 analysed as sotto 1200 analyses speech (per 20 ms: voicing, pitch, energy, shape), the
 word's frames are cut out and trimmed to its sound, voiced pitch is checked against pYIN
-(an octave or fifth off is replaced), and the word is stored with its own pitch
+(an octave or fifth off is replaced; frames still far from the word's median are held or
+made unvoiced), and the word is stored with its own pitch
 (tts/table.py, write_words). The synthesiser splices these in for callsign
 elements instead of building them from diphones, which made "Golf" sound like "Gulf".
 SPDX-License-Identifier: MIT
@@ -52,6 +53,30 @@ def fix_pitch(p, k0, k1, ref, lr):
     return n
 
 
+def hold_pitch(p, a, b):
+    """Within the word, a voiced frame far below or above the word's median pitch (a creaky
+    or subharmonic tail, as "foxtrot" ended an octave down) is made unvoiced when it is quiet
+    (a release or fade, 8+ energy steps under the word's peak), else given the pitch of the
+    nearest frame that is in range."""
+    v = [k for k in range(a, b) if p["code"][k]]
+    if not v:
+        return 0
+    med = np.median([p["wi"][k] for k in v])
+    span = 127 * np.log10(1.4)                     # x1.4 in pitch-index steps
+    ok = [k for k in v if abs(p["wi"][k] - med) <= span]
+    top = max(p["ei"][a:b])
+    n = 0
+    for k in v:
+        if abs(p["wi"][k] - med) <= span:
+            continue
+        if p["ei"][k] <= top - 8 or not ok:
+            p["code"][k] = 0
+        else:
+            p["wi"][k] = p["wi"][min(ok, key=lambda j: abs(j - k))]
+        n += 1
+    return n
+
+
 def analyse_word(x8, quant, shape_bits, span=None):
     """Frames of the word in x8 (the whole of x8, or the (start, end) span in seconds)."""
     import sotto_lr, vocoder_lab as vl
@@ -71,6 +96,7 @@ def analyse_word(x8, quant, shape_bits, span=None):
     nfix = fix_pitch(p, k0, k1, pyin_f0(x8), lr)
     on = k0 + np.flatnonzero(p["ei"][k0:k1] > 0)
     a, b = max(k0, on[0] - 1), min(k1, on[-1] + 2)
+    nfix += hold_pitch(p, a, b)
     c = (p["shape"][a:b] @ vl.DCT.T)[:, 1:]
     si = quant.search(c, shape_bits)
     return [dict(code=int(p["code"][k]), wi=int(p["wi"][k]), ei=int(p["ei"][k]),

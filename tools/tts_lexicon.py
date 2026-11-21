@@ -26,6 +26,8 @@ MANUAL = {
     "ef": "EH1 F", "aitch": "EY1 CH", "stroke": "S T R OW1 K", "sotto": "S AA1 T OW0",
     "fusotto": "F Y UW1 S AA2 T OW0", "blowfang": "B L OW1 F AE2 NG",
     "kilohertz": "K IH1 L AH0 HH ER2 T S", "gigahertz": "G IH1 G AH0 HH ER2 T S",
+    # the ICAO sounds (Jeff 11-21: LEE-ma, not CMUdict's LY-ma), KEE-loh, FOKS-trot
+    "lima": "L IY1 M AH0", "kilo": "K IY1 L OW2", "foxtrot": "F AA1 K S T R AA2 T",
 }
 RADIO = """repeater frequency megahertz kilohertz gigahertz hertz watts test testing over out
 roger copy station signal battery low channel transmit transmitting receive receiving mode

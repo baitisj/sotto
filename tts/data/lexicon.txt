@@ -353,7 +353,7 @@ forty F AO1 R T IY0
 forward F AO1 R W ER0 D
 four F AO1 R
 fourteen F AO1 R T IY1 N
-foxtrot F AA1 K S T R AA0 T
+foxtrot F AA1 K S T R AA2 T
 frequency F R IY1 K W AH0 N S IY0
 friday F R AY1 D IY0
 friend F R EH1 N D
@@ -456,7 +456,7 @@ juliett JH UW1 L IY0 EH2 T
 july JH UW2 L AY1
 k K EY1
 kay K EY1
-kilo K IH1 L OW2
+kilo K IY1 L OW2
 kilohertz K IH1 L AH0 HH ER2 T S
 kilometers K AH0 L AA1 M AH2 T ER0 Z
 knowledge N AA1 L AH0 JH
@@ -470,7 +470,7 @@ legal L IY1 G AH0 L
 level L EH1 V AH0 L
 levels L EH1 V AH0 L Z
 library L AY1 B R EH0 R IY2
-lima L AY1 M AH0
+lima L IY1 M AH0
 limit L IH1 M AH0 T
 listen L IH1 S AH0 N
 living L IH1 V IH0 NG
