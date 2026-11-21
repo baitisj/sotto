@@ -224,7 +224,39 @@ def triphone_weights():
     return {k: norm(v) for k, v in left.items()}, {k: norm(v) for k, v in right.items()}
 
 
-def diphone_table(U, inst, Q, cen, dur, shape_bits=34, iters=4, max_cand=40):
+VOICED = set("AA AE AH AO AW AX AXR AY EH ER EY IH IY OW OY UH UW L R W Y M N NG".split())
+VOICELESS = set("P T K CH F TH S SH HH PAU".split())
+STOPS = set("P T K B D G".split())
+
+
+def checks(d, a, b, m0, mid, m1, cross):
+    """Extra cost for an instance that would sound wrong whatever its neighbours: frames
+    coded unvoiced inside a vowel or sonorant half (the sotto analysis calls some breathy
+    or list-final vowels unvoiced; "happy" ended in a whispered IY), a stop whose closure
+    is not quiet (the T of "put" ran on at energy 18), and a pair cut across a word
+    boundary (the UW of "you" for "ruin" and "tube")."""
+    t = lambda x: FRAME_T0 + 0.02 * x
+    pen = 0.0
+    for ph, other, lo, hi in ((a, b, m0, mid), (b, a, mid, m1)):
+        if ph == "PAU":
+            continue
+        n = max(1, int(round(hi - lo)))
+        xs = [lo + (hi - lo) * (j + 0.5) / n for j in range(n)]
+        if ph in VOICED:
+            near = (n - 1) if ph == a else 0          # the frame next to the boundary
+            for j, x in enumerate(xs):
+                _, e, v = sample(d, t(x))
+                if v == 0 and e >= 10 and not (j == near and other in VOICELESS):
+                    pen += 3.0
+        if ph in STOPS:
+            e = min(sample(d, t(x))[1] for x in xs)
+            pen += 0.5 * max(0, e - 10)
+    if cross and a != "PAU" and b != "PAU":
+        pen += 2.0
+    return pen
+
+
+def diphone_table(U, inst, Q, cen, dur, shape_bits=34, iters=4, max_cand=40, sources=None):
     """Per phone pair: frames from the middle of the first phone to the middle of the
     second, from one instance in the corpus. The instances are chosen together: each
     pair's pick minimises its duration mismatch plus the shape mismatch at both ends
@@ -254,6 +286,7 @@ def diphone_table(U, inst, Q, cen, dur, shape_bits=34, iters=4, max_cand=40):
             if b != "PAU":
                 own += 4 * abs(np.log(max(eb - sb, 0.5) * 0.02 / dur[b][int(d["st"][k + 1] == 0)]))
             t = lambda x: FRAME_T0 + 0.02 * x
+            own += checks(d, a, b, m0, ea, m1, int(d["wd"][k]) != int(d["wd"][k + 1]))
             lv = sample(d, t(m0))[0] if a != "PAU" else None
             rv = sample(d, t(m1))[0] if b != "PAU" else None
             c0 = own + (np.sqrt(((lv - cen[a]) ** 2).sum()) if lv is not None else 0) + \
@@ -312,6 +345,8 @@ def diphone_table(U, inst, Q, cen, dur, shape_bits=34, iters=4, max_cand=40):
         if b == "PAU":
             fr[-1].update(ei=0, code=0)
         units[(a, b)] = (nl, fr)
+        if sources is not None:
+            sources[f"{a}-{b}"] = dict(utt=c["u"], t0=round(t(m0), 3), t1=round(t(m1), 3))
     return units
 
 
@@ -322,6 +357,8 @@ def main():
     ap.add_argument("--diphone-bits", type=int, default=34, choices=(18, 34))
     ap.add_argument("--robot-bits", type=int, default=18, choices=(18, 34))
     ap.add_argument("--suffix", default="")
+    ap.add_argument("--sources", help="also write where each diphone was cut from (JSON: "
+                    "corpus utterance and times)")
     a = ap.parse_args()
     import sotto_lr
     lr = sotto_lr.Sotto1200()
@@ -333,7 +370,11 @@ def main():
     cen = centres(U, inst)
     Q = Quant()
     rob = robot_table(U, inst, Q, a.robot_bits)
-    dip = diphone_table(U, inst, Q, cen, dur, a.diphone_bits)
+    src = {} if a.sources else None
+    dip = diphone_table(U, inst, Q, cen, dur, a.diphone_bits, sources=src)
+    if a.sources:
+        import json
+        json.dump(src, open(a.sources, "w"), indent=0)
     os.makedirs(a.outdir, exist_ok=True)
     rb = T.write("robot", a.robot_bits, f0, dur, rob)
     db = T.write("diphone", a.diphone_bits, f0, dur, dip)
