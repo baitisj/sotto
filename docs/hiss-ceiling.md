@@ -281,3 +281,12 @@ low-passed, two MP3-cut): v3.9 3, tie 1. Clean voices (cap only): v3.9 4 (6313, 
 v3.8 3 (8842, 251, 2428), ties 4. Fading: v3.9 1, tie 1. The capped frames' 5-8 kHz level lands
 4-8 dB under the original on winners and losers alike, so level alone doesn't explain the three
 v3.8 wins.
+
+**Re-render on the new encoder (2026-11-21).** After the encoder pitch fixes (PR #194) the
+branch was rebased onto main and the 17 rows re-rendered:
+https://claude.ai/artifact/SwckGkSJReZzfYfXmGXg4o, key `cmp-v39b-key.json`. Each WAV was
+checked against a fresh render of its version in a separate process. Clean voices still get
+v3.8's exact bits; the ceilings and their arrival times are as before (3170 now 3.7 s).
+The v3.9 C port written against the old C hiss layer (float and fixed point) no longer
+applies to main's restructured layer; its patches are in
+`/mnt/project-files/vocoder/v39-c-port/` for the redo.
