@@ -90,6 +90,8 @@ jobs:
         run: make PYTHON=false
       - name: WebAssembly codec against the native tools
         run: make -C c/wasm check PYTHON=python
+      - name: WebAssembly sotto-tts against the native tool
+        run: make -C c/wasm check-tts
   # The K6 firmware moved to baitisj/blowfang (2026-11-09). A new file under one of its old paths
   # here would fork it quietly, so this fails and points there. One path per line.
   k6-moved-to-blowfang:
