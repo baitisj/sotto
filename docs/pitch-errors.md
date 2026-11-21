@@ -265,6 +265,112 @@ delay. Voicing is unchanged.
   and it keeps the last (LAG + 2) x 80 + 240 samples, 2,080 bytes more state.
   `-DSOTTO_FOLD=0` gives the encoder before.
 
+## A strong fundamental skipped: the low band (2026-11-21)
+
+Jeff listened to all 28 English Kokoro TTS voices through sotto 1200 and heard many pitch
+errors, worst on af_nicole (a whispery voice) and on bm_george and bm_lewis. Against pYIN, the
+tracker played Nicole at about 430 Hz where she speaks at about 150 Hz: 1,334 of her 1,962
+voiced frames were off by more than 1.6 times. The fold (above) has nothing to do with it:
+turning it off changes almost nothing.
+
+**Cause.** `sinusoid.fit_error` sums the residual over the harmonic bands of a candidate
+(band l spans (l - 1/2) to (l + 1/2) times its pitch), but divides by the energy from bin 1 up.
+The energy below the first band is in neither the residual nor any fitted harmonic, so it
+counts as explained. Nicole's voice is almost a pure fundamental with noise above it. A
+candidate at three times her pitch starts its first band above her fundamental, skips it, and
+fits for free: its error came out lower than the true pitch's.
+
+**Fix (v3.10 encoder).** `track_pitch_voicing(low_rank=True)` (`vocoder_lab.LOW_RANK`, on in
+"tracked4"): each candidate also pays log(fit error with the energy below its first band
+counted as residual / fit error without it), less the smallest such term among the frame's
+candidates. It only ranks candidates against each other, so the best candidate's cost and the
+voicing decision stay as they were. Counting the low band in the cost outright fixed the pitch
+as well, but unvoiced many male frames (the first harmonic's main lobe reaches below half its
+pitch), costing up to 0.19 PESQ on low male voices. The band starts at bin 2 (31 Hz,
+`LOW_BIN0`), so DC offset and rumble don't count, and the residual is floored at 2^-20 of the
+band energy so near-silent frames agree between float and fixed point.
+
+- **pYIN gross errors (> 1.6x), tracker:** Nicole 1,334 to 67 (26 sentences), George 178 to 2,
+  Sarah 14 to 1; Lewis unchanged at 58. The 16 usual voices (`vocoder/samples-clean`): 112 to 79.
+- **PESQ-NB (Python, plain sotto 1200 / 400):** 31 usual voices (samples-clean, samples15,
+  samples-sc) 2.784 to 2.793 / 2.094 to 2.094; the 28 Kokoro voices 2.496 to 2.569 / 1.810
+  to 1.833 (Nicole +0.50, Eric +0.56, George +0.35 at 1200).
+- **Listening round 23** (sotto 1200, 10 pairs, 2026-11-21): the fix won its one real pair
+  against today's encoder (am_eric). The render script leaked one variant's settings into the
+  next render, so pairs 1, 5, 8 and 10 (Nicole, George, LibriSpeech 777, EARS p025), keyed as
+  against the old encoder, were the fix twice or the fix against the NCCF option; Jeff called
+  them all no difference. Round 25 redoes them.
+- **The K6's slim encoder** (`c/fixed/sotto_fx_slim.c`) finds pitch in the time domain and
+  never had this bug (Nicole 8, George 1, Lewis 6 gross frames). Feeding slim's pitch track
+  into the reference coder scored below the fix (2.770 / 2.537 at 1200). One time-domain
+  candidate per frame in the reference tracker (`tdc=1`, the shortest-lag NCCF peak within 0.9
+  of the highest) fixed Lewis (58 to 1) but split round 23 (1 win, 1 loss, 3 ties against the
+  fix), so it stays off (`vocoder_lab.TDC = 0`).
+- **C:** `c/sotto.c` `SOTTO_LOW_RANK` (bit-exact with Python on Nicole and LibriSpeech 652,
+  p051 99.8% as before); `c/fixed/sotto_fx_enc.c` matches the float encoder on 97% of frames,
+  as before. `-DSOTTO_LOW_RANK=0` gives the encoder before.
+- **Goldens:** frames moved on both golden voices. Float-decoder PESQ at 2400 / 1200 / 600 /
+  400: female libri198 2.165 to 2.262, 2.082 to 2.078, 1.796 to 1.813, 1.536 to 1.541; male
+  libri3436 2.779 to 2.723, 2.568 to 2.506, 2.219 to 2.280, 1.863 to 1.867. Plain 2400 male went
+  3.18 to 2.96 on its 6 s golden cut; Python v3.7 on the whole 15 s clip goes 3.330 to 3.343,
+  and the tracker's changes there are a few quiet background frames and a one-frame onset.
+- **Hiss burst test** (`test_hiss_no_bits_frames_stay_level_in_background_hiss`): the new
+  encoder starts kristoff's voiced onset at 4.1 s, as on the clean clip, and the sotto 400
+  hiss cap then holds the burst to 7.5 dB (it was 4.4). Over other clips and noise seeds the
+  old encoder already reached 6.4-7.9 dB, so the bound is now 8 dB.
+
+- **Sub-octave check from the first harmonic** (`vocoder_lab.SUB_FIRST = 1`, `c/sotto.c`
+  `SOTTO_SUB_FIRST`): Nicole's "seven" (01.wav 2.30-2.38 s) and "from" (05.wav 3.40-3.48 s)
+  dropped to half pitch, where a comb at half the pitch fits the breathy noise between
+  harmonics and the odd/even test, starting at the 3rd harmonic, missed the gap at the 1st.
+  Starting at the 1st: Nicole 67 to 43 gross frames, samples-clean 79 to 71, PESQ 1200 usual
+  2.793 to 2.785, tts 2.569 to 2.571; 400 flat. C bit-exact with Python on Nicole 01, 05 and
+  libri3436; fixed point matches float as before. `-DSOTTO_SUB_FIRST=3` gives the encoder before.
+- **Listening round 24** (9 pairs): `SUB_FIRST = 1` won both pairs against the same encoder
+  without it (Nicole "seven", "from"). The same render bug made pairs 3, 7, 8 and 9 one version
+  twice, so moving the low band's start to 47 Hz (`LOW_BIN0 = 4`, against 31-47 Hz rumble that
+  pushed EARS p025's "s" at 1.62 s to 430-500 Hz) was never heard on its own. On Nicole 04 it
+  voices quiet gaps at ~100 Hz and halves the pitch at 2.9 s, and the pair that carried both
+  changes lost to 31 Hz. It stays at 31 Hz until round 25.
+
+- **Listening round 25** (11 pairs, every WAV re-rendered and checked against the key): this
+  branch (31 Hz low band, `SUB_FIRST = 1`) against today's encoder won 3 (George, Nicole 04,
+  Nicole "seven"), tied LibriSpeech 3436 and lost EARS p025, whose "s" at 1.6 s warbled.
+  Starting the low band at 47 Hz won p025 and tied Nicole 04, so `LOW_BIN0 = 4` (the C ports
+  follow `SOTTO_LOW_RANK`). Null pair called correctly.
+- **Creak hold** (`sinusoid.FOLD` `hold=0.75`, `c/sotto.c` `SOTTO_HOLD`): Kokoro af_sarah's
+  "foxtrot" word unit ends at 1.48-1.53 s with the period falling apart (NCCF under 0.5) and
+  the tracker sliding 179, 161, 127, 115, 108 Hz, an octave drop on the ear that no single step
+  is big enough for the fold to catch. A voiced frame whose own period is weakly periodic, and
+  whose pitch is under 0.75 of the last clearly periodic frame (NCCF at least 0.7, at most 6
+  frames back, no unvoiced frame between), now takes that frame's pitch. Round 25: won foxtrot
+  and LibriSpeech 3081, tied Lewis.
+- **Listening round 26** (this branch with `SUB_FIRST = 1` against main, 11 pairs): 5 wins
+  (Lewis, Nicole 01 and 05, foxtrot, George), 3 ties (LibriSpeech 3436 and 3081, EARS p025),
+  2 losses. The Speech Commands higher voice's "two" at 1.9 s was coded at 370 Hz for 185 Hz:
+  its mic barely passes the 1st harmonic, so starting the sub-octave check there made the true
+  pitch look like a sub-octave. LibriSpeech 251's "and" at 3.0 s started at half pitch (89 Hz
+  for 188 Hz), where a breathy onset fits a comb at half the pitch better and the low-band
+  term had pushed the high-onset candidate out.
+- **Time-domain sub-octave test instead** (`vocoder_lab.UP = 1.5`, `track_pitch_voicing`
+  `up`, `c/sotto.c` `SOTTO_UP`; `SUB_FIRST` back to 3): a candidate w pays 1.5 per unit that
+  the speech's normalised autocorrelation at the period of 2 w or 3 w exceeds 0.5. It keeps
+  Nicole's "seven", "from" and 04 at 2.9 s right, and puts 251 and the Speech Commands "two"
+  back at their pitch. pYIN gross errors: Nicole 46 to 36, 16 clean voices 85 to 60.
+- **Listening round 27** (this branch against main, 11 pairs): 7 wins (George, Speech Commands
+  higher4 "two", Nicole 01 and 05, foxtrot, LibriSpeech 3536, Lewis), 3 ties (EARS p025,
+  LibriSpeech 251, Speech Commands higher1), no losses; null pair called correctly.
+- **Final** (Python, PESQ-NB): 31 usual voices 1200 2.784 to 2.800, 400 2.094 to 2.100; 28
+  Kokoro voices 2.496 to 2.573 and 1.810 to 1.828. The rates page mean goes 2.909 / 2.623 /
+  2.170 / 1.863 to 2.923 / 2.630 / 2.176 / 1.894 (2400 / 1200 / 600 / 400). C is bit-exact
+  with Python on Nicole 01 and 05, LibriSpeech 251 and 3436, Speech Commands higher4 and
+  foxtrot. Fixed point matches float on 95.2% of frames over the 16 clean voices, as before
+  (fixed encoder PESQ 2.608, float 2.621).
+
+Left for later: af_heart 01 at 2.43-2.5 s is real ~65 Hz creak after an unvoiced gap (NCCF
+0.86 at 65 Hz), so there is nothing to hold it to. Jeff still hears a subtle pitch error in
+Lewis's "is alpha" and a little roughness in Nicole's "seven".
+
 ## Still open
 
 **Creaky phrase ends.** In LibriSpeech 3081 at 9.5-11 s, pYIN hears 60-65 Hz creak and sotto

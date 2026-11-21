@@ -75,12 +75,60 @@
 #define SOTTO_FOLD 0
 #endif
 #endif
+/* v3.10 encoder (2026-11-21, docs/pitch-errors.md): energy below a candidate's first harmonic
+   band counts against it when ranking a frame's candidates (sinusoid.low_band,
+   track_pitch_voicing low_rank). Without it a candidate at 3x the pitch skips a strong
+   fundamental and fits for free (Kokoro af_nicole). -DSOTTO_LOW_RANK=0: before. */
+#ifndef SOTTO_LOW_RANK
+#ifdef SOTTO_PITCH_THIRD
+#define SOTTO_LOW_RANK 1
+#else
+#define SOTTO_LOW_RANK 0
+#endif
+#endif
+
+/* v3.10 encoder: the sub-octave check (odd_even_db) starts at the 1st harmonic, not the 3rd
+   (vocoder_lab.SUB_FIRST; Kokoro af_nicole "seven"). -DSOTTO_SUB_FIRST=3: before. */
+#ifndef SOTTO_SUB_FIRST
+#define SOTTO_SUB_FIRST 3 /* 1 doubled the pitch on band-limited mics (listening round 26) */
+#endif
+/* v3.10 encoder: a candidate w whose speech repeats at the period of 2 w or 3 w (nccf above
+   UP_THR) pays UP per unit above it (sinusoid.track_pitch_voicing up, vocoder_lab.UP; Kokoro
+   af_nicole "seven", LibriSpeech 251 "and"). -DSOTTO_UP=0: before. */
+#ifndef SOTTO_UP
+#if SOTTO_LOW_RANK
+#define SOTTO_UP 1
+#else
+#define SOTTO_UP 0
+#endif
+#endif
+#define UP 1.5
+#define UP_THR 0.5
+
+/* v3.10 encoder: creak at a word's end held at the last clearly periodic pitch
+   (sinusoid.fold_subharmonics hold; Kokoro af_sarah "foxtrot"). -DSOTTO_HOLD=0: before. */
+#ifndef SOTTO_HOLD
+#if SOTTO_LOW_RANK
+#define SOTTO_HOLD 1
+#else
+#define SOTTO_HOLD 0
+#endif
+#endif
+
+#if SOTTO_LOW_RANK
+#define LOW_BIN0 4        /* sinusoid.LOW_BIN0: 47 Hz */
+#else
+#define LOW_BIN0 2
+#endif
 #define FOLD_MAXRUN 12
 #define FOLD_RATIO 0.62
 #define FOLD_KTOL 1.5
 #define FOLD_GLIDE 1.3
 #define FOLD_NC 0.45
 #define BRIDGE_NC 0.5
+#define HOLD 0.75
+#define HOLD_NC 0.7
+#define HOLD_RUN 6
 #define XH 2048           /* speech history, samples (> (LAG + 2) * NSAMP + MPITCH) */
 
 /* v3.6: energy field from the rate-K envelope (vocoder_lab.SottoV36). Build with
@@ -238,6 +286,8 @@ struct sotto_enc {
   float xh[XH];
   double raw1, out1, out2, fold_a;   /* frame t-1's tracker pitch, t-1's and t-2's output */
   int vo1, vo2, fold_run, fold_k;
+  double hold_wo;                    /* the creak hold's anchor pitch, and frames since it */
+  int hold_age;
 };
 
 #define R(e, t) (&(e)->ring[(t) % RING])
@@ -294,8 +344,10 @@ static double harm_fit(const COMP *Sw, const float *W, double wo, int l, double 
   return err;
 }
 
-/* sinusoid.fit_error */
-static double fit_error(const COMP *Sw, const float *W, double wo) {
+/* sinusoid.fit_error; with lo, also log(fit_error(low=True) / fit_error()), the residual floored
+   at 2^-20 of the band energy (track_pitch_voicing low_rank): what the energy
+   below the first harmonic's band (sinusoid.low_band) would add */
+static double fit_error(const COMP *Sw, const float *W, double wo, double *lo) {
   double k = wo * NFFT / (2 * PI_D);
   int L = (int)(2500.0 / wo_hz(wo));
   if (L < 1) L = 1;
@@ -303,6 +355,12 @@ static double fit_error(const COMP *Sw, const float *W, double wo) {
   double err = 1e-9, e = 1e-9;
   for (int l = 1; l <= L; l++) err += harm_fit(Sw, W, wo, l, NULL, 0);
   for (int i = 1; i < hi; i++) e += (double)Sw[i].real * Sw[i].real + (double)Sw[i].imag * Sw[i].imag;
+  if (lo) {
+    double b = 0;
+    for (int i = LOW_BIN0; i < (int)ceil(0.5 * k); i++) b += (double)Sw[i].real * Sw[i].real + (double)Sw[i].imag * Sw[i].imag;
+    double r = err > e * 0x1p-20 ? err : e * 0x1p-20;   /* floor: near-silent frames agree with fixed point */
+    *lo = log((r + b) / r);
+  }
   return err / e;
 }
 
@@ -312,7 +370,7 @@ static double odd_even_db(const COMP *Sw, double w) {
   if (h < 1) h = 1;
   int L = (int)(1500.0 / wo_hz(w));
   double odd = 0, even = 0;
-  for (int j = 3; j <= L; j++) {
+  for (int j = SOTTO_SUB_FIRST; j <= L; j++) {
     int c = (int)(j * w * NFFT / (2 * PI_D));
     double p = 0;
     if (c < NFFT / 2) {
@@ -355,6 +413,8 @@ static void amplitudes(const COMP *Sw, double wo, MODEL *m) {
 }
 
 /* candidates and costs of frame t (needs frames t-1..t+1 analysed when they exist) */
+static double nccf_t(const struct sotto_enc *e, long t, double period);
+
 static void frame_costs(struct sotto_enc *e, long t, int has_next) {
   frame_t *f = R(e, t);
   static const double mu[4] = {1.0, 2.0, 0.5, 1.0 / 3};
@@ -377,9 +437,21 @@ static void frame_costs(struct sotto_enc *e, long t, int has_next) {
     }
   }
   f->cost[0] = UV_COST + PRIOR * (f->v0 > 0);
+  double lo[NCAND], lomin = 0;
   for (int c = 0; c < f->nc; c++) {
     double w = f->cand[c];
-    double cst = log(fit_error(f->Sw, e->W, w)) - BIAS * log(w) + PRIOR * (f->v0 == 0);
+    double cst = log(fit_error(f->Sw, e->W, w, SOTTO_LOW_RANK ? &lo[c] : NULL)) - BIAS * log(w) + PRIOR * (f->v0 == 0);
+    f->cost[1 + c] = cst;
+    if (SOTTO_LOW_RANK && (c == 0 || lo[c] < lomin)) lomin = lo[c];
+  }
+  for (int c = 0; c < f->nc; c++) {
+    double w = f->cand[c], cst = f->cost[1 + c];
+    if (SOTTO_LOW_RANK) cst += lo[c] - lomin;
+    if (SOTTO_UP) {
+      double n2 = nccf_t(e, t, 2 * PI_D / (2 * w)), n3 = nccf_t(e, t, 2 * PI_D / (3 * w));
+      double nm = n2 > n3 ? n2 : n3;
+      if (nm - UP_THR > 0) cst += UP * (nm - UP_THR);
+    }
     double oe = odd_even_db(f->Sw, w);
     if (-oe - SUB_DB > 0) cst += SUB * (-oe - SUB_DB) / 10;
     f->cost[1 + c] = cst;
@@ -531,7 +603,20 @@ static double nccf_t(const struct sotto_enc *e, long t, double period) {
    (voiced or not) -> the pitch it is coded with */
 static double fold_step(struct sotto_enc *e, long t, double wd, int vo) {
   double out = wd;
-  if (t >= 1) {
+  int held = 0;
+  if (t >= 1 && SOTTO_FOLD && SOTTO_HOLD) {
+    e->hold_age++;
+    if (!vo)
+      e->hold_age = 99;
+    else {
+      double nc = nccf_t(e, t, 2 * PI_D / wd);
+      if (nc >= HOLD_NC)
+        e->hold_wo = wd, e->hold_age = 0;
+      else if (e->hold_age <= HOLD_RUN && wd < HOLD * e->hold_wo && nc < BRIDGE_NC)
+        out = e->hold_wo, held = 1;
+    }
+  }
+  if (t >= 1 && !held) {
     if (e->fold_run && !(vo && e->fold_run < FOLD_MAXRUN && wd < FOLD_GLIDE * e->raw1 &&
                          e->fold_a / FOLD_KTOL <= e->fold_k * wd && e->fold_k * wd <= e->fold_a * FOLD_KTOL))
       e->fold_run = 0;
@@ -670,6 +755,7 @@ struct sotto_enc *sotto_enc_create(void) {
   for (int i = 0; i < MPITCH; i++) e->Sn[i] = 1.0f;
   e->prev_f0 = 1 / P_MAX_S;
   e->peak = -1e9;
+  e->hold_age = 99;
   return e;
 }
 
