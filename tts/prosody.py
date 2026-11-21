@@ -1,5 +1,6 @@
 """sotto-tts prosody: phone sequences with their context, and the trained duration and
-pitch trees (tools/tts_prosody.py trains them on Kokoro reading sentences).
+pitch trees (tools/tts_prosody.py trains them on Kokoro reading sentences). The synthesiser
+uses its rules by default (tts/synth.py); the trees with --trained / model="auto".
 
     seq = phone_sequence(frontend.text_to_phrases(text))
     m = Model(open("tts/data/prosody.bin", "rb").read())

@@ -88,7 +88,11 @@ through sotto 1200's own analysis. Two corrections:
 
 ## Prosody
 
-Durations and pitch come from two small regression trees (`tts/prosody.py`,
+By default durations and pitch come from rules (below). Two small regression trees are the
+alternative (`--trained`, the page's Trained button). On Luke 2 Jeff preferred the rules by
+ear, and the recogniser scores the two level, so the rules are the default.
+
+The trees (`tts/prosody.py`,
 `tts/data/prosody.bin`, 3.6 KB), trained by `tools/tts_prosody.py` on the same Kokoro voice
 reading sentences: the Gospel of John and the first 600 verses of Acts (World English Bible,
 1,477 verses, 172 minutes; Luke is kept out for listening tests). The 49-minute unit corpus is
@@ -113,9 +117,11 @@ plans.
 - Both trees walk with integer compares: each node is a feature number, a threshold and an
   offset (5 bytes), each leaf 1 or 3 values in 1/256 units.
 
-The earlier rules (`python -m tts.synth --rules`, `synth_params(model=None)`) are kept: each
-phone's corpus median duration, a declining baseline with a peak per stressed content word, a
-final fall, a comma rise and a question rise. Flat pitch gives 46% word error against the
+The rules (the default; 84 bytes of durations in each table's header): each phone's corpus
+median duration, stressed and unstressed, 15% slower than the corpus, function words 0.85
+times as long and the phrase's last syllable 1.35 times; a pitch baseline from the voice's
+median falling 15% over each phrase, a peak on each stressed content word (each a little
+lower than the one before), and a final fall, a comma rise or a yes/no question rise. Flat pitch gives 46% word error against the
 rules' 33% (before joint selection), so pitch matters to the recogniser.
 
 ## Scores
@@ -139,8 +145,8 @@ The rows above the last two use the rule prosody. Over all 503 words the trained
 the rules are level on the diphone table (99 and 91 errors; trees with rule pitch 105, rules
 with tree pitch 101, trees with their pitch swings made 1.5 times wider 94), and the
 recogniser's mistakes move from sentence to sentence rather than shrinking. The spectral
-shapes are what limit it (below), so the trees are the default for how they sound:
-Kokoro's timing, phrase-final lengthening and pitch movement instead of rule-made ones.
+shapes are what limit it (below). By ear (Jeff, Luke 2) the rules sound better, so they stay
+the default.
 
 With 503 words in all, the two diphone tables are level (18% and 16%); differences of a
 few points between runs are noise. The 34-bit table is the default because it said the
@@ -178,14 +184,15 @@ hands each 20 ms frame to the K6's fixed-point sotto 1200 coder (`sotto_lr_enc_p
 
 - **Same as Python.** `tools/tts_ccheck.py` runs both on ten test sentences: phones, voicing,
   pitch and energy codes match exactly, shapes to 0.002 dB (C reads the fixed-point codebook).
-  The front end gives the same words and phones on the 6,000 most frequent English words. The
+  The front end gives the same words and phones on the 6,000 most frequent English words.
+  Both prosodies (rules and trees) are ported and checked. The
   superframes differ only where the fixed-point and float coders pick differently between
   near-equal shapes (a few in a hundred).
 - **Same as the radio.** `sotto_tts -pcm` decodes with the fixed-point decoder; its samples
   are identical to `build/c37/fixed/sotto_dec_fx -1200`'s.
 - **Web page.** `docs/tts.html` with `docs/sotto_tts.wasm` (205 KB: the code, both tables,
   the lexicon and rules, the trees, the fixed-point codebook, coder and decoder). Type text,
-  pick the table, rate and pitch, and it plays the decoded speech, highlighting each word,
+  pick the table, the prosody (rules or trained), rate and pitch, and it plays the decoded speech, highlighting each word,
   with the superframes shown in hex. `node c/wasm/check_tts.mjs` checks the module against
   the native tool (same superframes, same samples).
 
@@ -195,7 +202,7 @@ durations and pitch); on the K6 those become a few integer tables.
 ```sh
 make -C c/tts                          # sotto_tts: text -> .sot, -pcm for 8 kHz samples
 c/tts/sotto_tts -pcm out.raw "This is AG7EW." out.sot
-python tools/tts_ccheck.py [--robot]   # C against Python
+python tools/tts_ccheck.py [--robot] [--trained]   # C against Python
 make -C c/wasm install-tts check-tts   # docs/sotto_tts.wasm and its check (clang, wasm-ld, wasi-libc)
 ```
 
