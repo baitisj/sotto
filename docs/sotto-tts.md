@@ -153,7 +153,9 @@ sotto 1200 decoder (`build/c37/fixed/sotto_dec_fx`). Harvard sentences lists 1-3
 sentences, 240 words) are hard to guess from context, so they show acoustic errors. Numbers
 and callsigns are compared in spoken form (`tools/tts_eval.py`).
 
-Sarah (11-21, rule prosody, with callsign words; calls = 8 callsign phrases, 74 words):
+Sarah, tables rebuilt on the v3.10 encoder with the rough-patch checks (11-21 evening; rule prosody, with callsign words): diphone table 16.7% Harvard, 7.7% everyday, 0.0% radio, 17.6% calls; robot table 41.7%, 39.8%, 35.7%, 28.4%.
+
+Sarah, first build (11-21, rule prosody, with callsign words; calls = 8 callsign phrases, 74 words):
 
 | Word error | Harvard (240 words) | everyday (221) | radio (42) | calls (74) |
 |---|---:|---:|---:|---:|
