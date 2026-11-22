@@ -298,3 +298,27 @@ the two renders is the same: per row, the 5-8 kHz level of v3.8 and of v3.9 re t
 moved by at most 0.6 dB between the renders. So the flip is in the listening, not in the
 v3.9 layers; the encoder's pitch fixes changed the low band under both. Both pages were
 labelled, not blind; blind rounds 14 and 16 had favoured the ceiling (7-0) and the cap (4-0-1).
+
+What row 13 had (2026-11-22). Jeff: v3.9 is "a study in what we shouldn't do", except #13, where
+"the hiss band is significantly more comfortable with smoother transitions." On the page's WAVs,
+in the original's hissy frames, the cap leaves 6-8 kHz 10-30 dB further under 4-6 kHz than the
+original on clean voices (row 2: original -7.8 dB, v3.8 -7.2, v3.9 -27.5); v3.8 tracks the
+original. WB-PESQ with the layers split (`srch` = v3.8 bits with the 250 Hz index search on every
+UU frame, no ceiling, v3.8 decoder):
+
+| | v3.8 | srch | v3.9 no cap | v3.9 |
+|---|---|---|---|---|
+| 11 clean voices, mean | 1.678 | 1.688 | 1.678 | 1.607 |
+| row 12, low-passed 5.5 kHz | 1.353 | 1.362 | 1.509 | 1.528 |
+| row 13, low-passed 5 kHz | 1.615 | 1.610 | 1.786 | 1.805 |
+
+The cap costs 0.07 on every clean voice; row 13's gain is the ceiling's roll-off, not the search.
+So v3.9 is now the ceiling alone (`SottoV39(cap=False)` is the default): clean voices get v3.8's
+exact sound.
+
+Round 30 (2026-11-22, `tools/listening/render_ab30.py`, key ab30/ab-30-key.json): blind v3.8 vs
+ceiling-only v3.9 on main with the half-pitch fix (#196). Eleven band-limited pairs (LibriSpeech
+low-passed at 4.5-6 kHz or MP3-cut; Kokoro TTS phrases low-passed or through 32 kbit/s MP3) and a
+full-band Kokoro null. On full-band Kokoro the ceiling never fires (9 voices checked), nor on the
+flite samples (nothing above 4 kHz). WB-PESQ favours the ceiling on 9 of 11 pairs (+0.06..+0.17),
+the two MP3-cut LibriSpeech voices +0.01.

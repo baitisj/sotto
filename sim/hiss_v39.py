@@ -1,4 +1,4 @@
-"""sotto v3.9 candidate: two layers on top of v3.8's 4-8 kHz hiss (docs/hiss-ceiling.md).
+"""sotto v3.9 candidate: a hiss ceiling on top of v3.8's 4-8 kHz hiss (docs/hiss-ceiling.md).
 
 1. Hiss ceiling (per speaker / microphone, over the side channel). When the input stops at
    some frequency fc between 4.25 and 7.75 kHz (a dull microphone, an MP3 source), the whole
@@ -7,7 +7,8 @@
    with CEIL_MASK, so it needs no type bit and a v3.8 decoder ignores it. With a ceiling in
    force, the encoder picks each UU frame's hiss index against the 250 Hz-bin spectrum the
    decoder will make. A voice without a ceiling gets exactly v3.8's bits.
-2. Non-s cap (decoder only). A UU, mixed or edge frame whose hiss sits more than CAP_MARGIN dB
+2. Non-s cap (decoder only, OFF by default since 2026-11-22: it cost 0.07 WB-PESQ on every
+   clean voice and lost the side-by-side 14-1; cap=True brings it back for comparisons). A UU, mixed or edge frame whose hiss sits more than CAP_MARGIN dB
    under its 2-4 kHz level (sh, f, th, z, v: anything that is not an s) loses CAP_S dB/kHz
    above CAP_FC (at most CAP_DEPTH dB), smoothed over 3 frames. Off while a ceiling is in force.
 Listening rounds 14-17: ceiling 7-0; cap 4-0 (1 tie); soft cap over hard; the cap also on z;
@@ -98,11 +99,11 @@ exec(_src, _ns)
 
 
 class SottoV39(hb.SottoV38):
-    """v3.8 + hiss ceiling + non-s cap. Same 48-bit frame and constructor arguments as
-    SottoV38 (use vowel="speaker": the ceiling rides its side channel). cap=False and
-    ceiling=False switch the layers off for comparisons."""
+    """v3.8 + hiss ceiling. Same 48-bit frame and constructor arguments as SottoV38 (use
+    vowel="speaker": the ceiling rides its side channel). ceiling=False gives v3.8; cap=True
+    adds the old non-s cap for comparisons."""
 
-    def __init__(self, cap=True, ceiling=True, **kw):
+    def __init__(self, cap=False, ceiling=True, **kw):
         super().__init__(**kw)
         self.cap, self.ceiling = cap, ceiling
 
