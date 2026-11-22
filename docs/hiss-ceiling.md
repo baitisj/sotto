@@ -290,3 +290,11 @@ v3.8's exact bits; the ceilings and their arrival times are as before (3170 now 
 The v3.9 C port written against the old C hiss layer (float and fixed point) no longer
 applies to main's restructured layer; its patches are in
 `/mnt/project-files/vocoder/v39-c-port/` for the redo.
+
+**Re-render result (Jeff, 2026-11-22 06:30 UTC):** `sotto-cmp-v39b 1:8 2:8 3:= 4:8 5:8 6:8 7:8
+8:8 9:8 10:8 11:8 12:8 13:9 14:8 15:8 16:8 17:-`. v3.8 14, v3.9 1 (row 13, low-passed at
+5 kHz), tie 1, one unscored. The opposite of the first side-by-side (v3.9 8-3-6). The hiss in
+the two renders is the same: per row, the 5-8 kHz level of v3.8 and of v3.9 re the original
+moved by at most 0.6 dB between the renders. So the flip is in the listening, not in the
+v3.9 layers; the encoder's pitch fixes changed the low band under both. Both pages were
+labelled, not blind; blind rounds 14 and 16 had favoured the ceiling (7-0) and the cap (4-0-1).
