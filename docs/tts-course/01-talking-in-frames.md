@@ -51,14 +51,14 @@ sotto-tts has two tables:
 
 | | Robot table | Diphone table |
 |---|---:|---:|
-| What it stores | 3 frames for each of 41 sounds | 1,634 sound pairs, about 4 frames each |
-| Size | **493 bytes** | **37 KB** |
+| What it stores | 4 frames for each of 41 sounds, plus start and end frames that depend on the neighbours | 1,634 sound pairs, about 4 frames each |
+| Size | **4.1 KB** | **37 KB** |
 | How it sounds | clearly a robot | a person, a little rough |
 
 <audio controls preload="none" src="audio/robot.flac"></audio> [robot.flac](audio/robot.flac): the robot table.
 <audio controls preload="none" src="audio/diphone.flac"></audio> [diphone.flac](audio/diphone.flac): the diphone table.
 
-Both say "The birch canoe slid on the smooth planks." 493 bytes is less than this paragraph takes on disk. 37 KB is about the size of 250 seconds of recorded sotto 1200 speech, so for a fixed handful of messages a recording would be smaller. The engine wins when the text can be *anything*: callsigns, frequencies, times, battery voltages, messages.
+Both say "The birch canoe slid on the smooth planks." 4.1 KB is about two pages of plain text. 37 KB is about the size of 250 seconds of recorded sotto 1200 speech, so for a fixed handful of messages a recording would be smaller. The engine wins when the text can be *anything*: callsigns, frequencies, times, battery voltages, messages.
 
 ## Where does the voice come from?
 

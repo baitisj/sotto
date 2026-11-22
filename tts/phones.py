@@ -20,6 +20,11 @@ FRICATIVES = {"F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH"}
 NASALS = {"M", "N", "NG"}
 LIQUIDS = {"L", "R", "W", "Y"}
 DIPHTHONGS = {"AW", "AY", "EY", "OW", "OY"}
+# The robot table's neighbour classes (tts/table.py): a phone's first target is picked by the
+# class of the phone before it, its last target by the class of the phone after it.
+CLASSES = ["PAU", "IY IH EY EH AE Y", "UW UH OW AO OY AW W", "AA AH AX ER AXR AY R",
+           "P B M F V", "T D N S Z TH DH L", "SH ZH CH JH", "K G NG HH"]
+CLASS = {p: c for c, ps in enumerate(CLASSES) for p in ps.split()}
 VOICED_C = {"B", "D", "G", "JH", "V", "DH", "Z", "ZH", "M", "N", "NG", "L", "R", "W", "Y"}
 
 KOKORO = {

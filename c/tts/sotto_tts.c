@@ -51,6 +51,10 @@ static int voiced_c(int p) {
          p == N || p == NG || p == L || p == R || p == W || p == Y;
 }
 
+/* phones.CLASS: the robot table's neighbour classes */
+static const unsigned char CLASS[NP] = {0, 3, 1, 3, 2, 2, 3, 1, 3, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 6, 5,
+                                        5, 4, 7, 7, 6, 7, 5, 4, 5, 7, 4, 3, 5, 6, 5, 5, 4, 2, 1, 5, 6};
+
 static int phone_id(const char *s, int n) {
   for (int i = 0; i < NP; i++)
     if ((int)strlen(PH[i]) == n && !strncmp(PH[i], s, n)) return i;
@@ -536,6 +540,7 @@ struct sotto_tts {
   int kind, nst, f0;
   tframe_t *fr;
   int unit_off[NP * NP], unit_n[NP * NP], unit_split[NP * NP];   /* robot: index p; -1: none */
+  int ctx[NP][2][8];           /* robot: first / last target by neighbour class; -1: none */
   /* prosody */
   const unsigned char *pros;
   unsigned pros_len;
@@ -805,11 +810,23 @@ static int get(br_t *r, int nb) {
 
 static const int STAGE_BITS[4] = {9, 9, 8, 8};
 
+static int read_frame(struct sotto_tts *t, br_t *r, int *nf, int *cap) {
+  GROW(t->fr, *nf, *cap);
+  tframe_t *f = &t->fr[(*nf)++];
+  f->code = get(r, 2);
+  f->ei = get(r, 5);
+  for (int s = 0; s < 4; s++) f->si[s] = s < t->nst ? get(r, STAGE_BITS[s]) : -1;
+  return f->si[t->nst - 1] < 0 ? -1 : 0;
+}
+
+/* table.read; kind 2 robot (with context targets), 1 diphone */
 static int read_table(struct sotto_tts *t, const unsigned char *b, unsigned n) {
   br_t r = {b, n, 0};
   if (n < 8 || memcmp(b, "STT1", 4)) return -1;
   r.p = 32;
   t->kind = get(&r, 8);
+  if (t->kind != 1 && t->kind != 2) return -1;
+  int robot = t->kind == 2;
   int sb = get(&r, 8);
   t->nst = sb == 18 ? 2 : 4;
   t->f0 = get(&r, 16);
@@ -817,28 +834,32 @@ static int read_table(struct sotto_tts *t, const unsigned char *b, unsigned n) {
     for (int k = 0; k < 2; k++) t->rdur[p][k] = get(&r, 8) * 0.005;
   int cap = 0, nf = 0;
   for (int i = 0; i < NP * NP; i++) t->unit_off[i] = -1, t->unit_n[i] = 0;
+  for (int p = 0; p < NP; p++)
+    for (int k = 0; k < 16; k++) t->ctx[p][k >> 3][k & 7] = -1;
   static unsigned char present[NP * NP];
-  if (t->kind == 1)
+  if (!robot)
     for (int i = 0; i < NP * NP; i++) present[i] = (unsigned char)get(&r, 1);
-  int nu = t->kind == 0 ? NP : NP * NP;
+  int nu = robot ? NP : NP * NP;
   for (int u = 0; u < nu; u++) {
-    int cnt, split = 0;
-    if (t->kind == 0) cnt = get(&r, 3);
-    else {
+    int cnt, split = 0, mask[2] = {0, 0};
+    if (robot) {
+      cnt = get(&r, 3);
+      mask[0] = get(&r, 8), mask[1] = get(&r, 8);
+      if (mask[0] < 0 || mask[1] < 0) return -1;
+    } else {
       if (!present[u]) continue;
       cnt = get(&r, 4);
       split = get(&r, 4);
     }
     if (cnt < 0) return -1;
     t->unit_off[u] = nf, t->unit_n[u] = cnt, t->unit_split[u] = split;
-    for (int k = 0; k < cnt; k++) {
-      GROW(t->fr, nf, cap);
-      tframe_t *f = &t->fr[nf++];
-      f->code = get(&r, 2);
-      f->ei = get(&r, 5);
-      for (int s = 0; s < 4; s++) f->si[s] = s < t->nst ? get(&r, STAGE_BITS[s]) : -1;
-      if (f->si[t->nst - 1] < 0) return -1;
-    }
+    for (int k = 0; k < cnt; k++)
+      if (read_frame(t, &r, &nf, &cap)) return -1;
+    for (int k = 0; k < 16; k++)
+      if (mask[k >> 3] >> (k & 7) & 1) {
+        t->ctx[u][k >> 3][k & 7] = nf;
+        if (read_frame(t, &r, &nf, &cap)) return -1;
+      }
   }
   return 0;
 }
@@ -960,14 +981,13 @@ static int add_key(struct sotto_tts *t, double tm, const tframe_t *f, double w) 
   GROW(t->K, t->nk, t->ck);
   kf_t *k = &t->K[t->nk++];
   k->t = tm, k->w = w, k->ei = f ? f->ei : 0, k->code = f ? f->code : 0;
-  k->has_c = f && (t->kind == 0 || f->ei > 0);
+  k->has_c = f && (t->kind == 2 || f->ei > 0);
   if (k->has_c) shape_of(t, f, k->c);
   return 0;
 }
 
 /* synth.keyframes_robot */
 static int keyframes_robot(struct sotto_tts *t) {
-  const double tau = 0.015;
   for (int i = 0; i < t->nseq; i++) {
     const q_t *q = &t->seq[i];
     if (q->p == PAU) {
@@ -976,11 +996,14 @@ static int keyframes_robot(struct sotto_tts *t) {
     }
     int n = t->unit_n[q->p];
     if (n <= 0) continue;
-    double seg = q->dur / n, e = tau < seg / 4 ? tau : seg / 4;
+    int lc = i > 0 ? CLASS[t->seq[i - 1].p] : 0;
+    int rc = i + 1 < t->nseq ? CLASS[t->seq[i + 1].p] : 0;
+    double seg = q->dur / n;
     for (int j = 0; j < n; j++) {
-      double a = q->t0 + seg * j;
-      const tframe_t *f = &t->fr[t->unit_off[q->p] + j];
-      if (add_key(t, a + e, f, 0) || add_key(t, a + seg - e, f, 0)) return -1;
+      int x = t->unit_off[q->p] + j;
+      if (j == 0 && t->ctx[q->p][0][lc] >= 0) x = t->ctx[q->p][0][lc];
+      if (j == n - 1 && t->ctx[q->p][1][rc] >= 0) x = t->ctx[q->p][1][rc];
+      if (add_key(t, q->t0 + seg * (j + 0.5), &t->fr[x], 0)) return -1;
     }
   }
   return 0;
@@ -1297,7 +1320,7 @@ int sotto_tts_say(struct sotto_tts *t, const char *text, double rate, double pit
   /* keyframes and frames */
   t->nk = 0;
   int subs = 0;
-  if ((t->kind == 0 ? keyframes_robot(t) : keyframes_diphone(t, &subs)) || render(t, n)) return -1;
+  if ((t->kind == 2 ? keyframes_robot(t) : keyframes_diphone(t, &subs)) || render(t, n)) return -1;
   if (!trees) {
     if (rule_pitch(t, n, t->f0 * pitch)) return -1;
     goto code;

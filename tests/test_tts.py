@@ -46,8 +46,8 @@ def test_table_round_trip(name):
     assert table.write(tab["kind"], tab["shape_bits"], tab["f0"], tab["dur"], tab["units"]) == raw
 
 
-def test_robot_table_under_1kb():
-    assert os.path.getsize(os.path.join(DATA, "robot.stt")) < 1024
+def test_robot_table_under_5kb():
+    assert os.path.getsize(os.path.join(DATA, "robot.stt")) < 5 * 1024
 
 
 @pytest.mark.parametrize("name", ["robot.stt", "diphone.stt"])

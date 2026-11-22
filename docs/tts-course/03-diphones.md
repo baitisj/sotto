@@ -55,13 +55,13 @@ One more fix: Kokoro gives the silence after a word to the last phone, so a fina
 
 ## The robot table
 
-The small table takes the opposite approach. For each of the 41 phones it keeps just **3 frames**: the start, the middle and the end. Each one is the **average** over every example of that phone in the whole corpus. Averaging was much better than picking the single most typical example: a speech recogniser's word error fell from 80% to 51%.
+The small table takes the opposite approach. For each of the 41 phones it keeps just **4 frames**, spread evenly through the sound. Each one is the **average** over every example of that phone in the whole corpus. Averaging was much better than picking the single most typical example: a speech recogniser's word error fell from 80% to 51%.
 
-The engine draws straight lines between these targets. There is no coarticulation at all, which is why it sounds like a robot. But it fits in 493 bytes.
+The first version stopped there, at 493 bytes, and it had no coarticulation at all. The second version adds a little. The phones are sorted into 8 rough families (front vowels, back vowels, open vowels, lip sounds, tongue-tip sounds, hushing sounds, back-of-mouth sounds, and silence). For each phone, the table keeps an extra **start frame** for each family that can come before it, averaged over just those examples, and an extra **end frame** for each family that can come after it. So the start of the M in "me" is a different frame from the start of the M in "am". The engine picks the start and end frames that fit the neighbours and draws straight lines between all the frames. That makes the table 4.1 KB, and it halved the recogniser's mistakes on the hard Harvard sentences (42% to 22%). It still sounds like a robot, because one family-average frame is a rough guess at a real glide.
 
 ![Kokoro, the diphone table and the robot table saying the same sentence](figures/compare.svg)
 
-Compare the three spectrograms. The diphone table (middle) has the same bending stripes as Kokoro (top), though the timing differs, because the engine uses its own rules for how long each sound lasts (chapter 5). The robot table (bottom) has flat, blocky stripes: each phone is a steady sound with a quick change to the next.
+Compare the three spectrograms. The diphone table (middle) has the same bending stripes as Kokoro (top), though the timing differs, because the engine uses its own rules for how long each sound lasts (chapter 5). The robot table (bottom) has straighter, blockier stripes: every glide is a straight line from one averaged frame to the next.
 
 ## Try it
 

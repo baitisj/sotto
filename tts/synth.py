@@ -9,7 +9,7 @@ here: the v3.7 fixed-point build, build/c37/fixed/sotto_dec_fx) turns it into sp
 
 Steps: text -> phrases of words -> phones with stress (tts.frontend) -> durations and an
 intonation contour (the rules below, or the trained trees in tts/prosody.py) -> keyframes
-from the unit table (tts.table): each phone's 2-3 targets (robotic table) or the diphones
+from the unit table (tts.table): each phone's targets, the first and last picked by its neighbours (robotic table) or the diphones
 that meet in each phone's middle (diphone table) -> frames every 20 ms, interpolated between keyframes -> superframes.
 SPDX-License-Identifier: MIT
 """
@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "sim"))
 from . import frontend, table as T  # noqa: E402
-from .phones import PHONES, is_vowel  # noqa: E402
+from .phones import CLASS, PHONES, is_vowel  # noqa: E402
 
 FRAME = 0.02
 SLOW = 1.15      # the corpus medians run 15% faster than Kokoro reads a plain sentence
@@ -116,23 +116,29 @@ def f0_track(seq, phrases, f0, n):
 
 
 # ------------------------------------------------------------------ keyframes
-def keyframes_robot(seq, tab, tau=0.015):
-    """Each phone's targets held steady over equal parts of the phone, with quick (2 x tau)
-    glides between them and into the next phone."""
+def keyframes_robot(seq, tab):
+    """Each phone's targets spread over equal parts of the phone, one keyframe at the middle of
+    each part, with straight glides between them. The first target is the one for the class
+    of the phone before (phones.CLASS) and the last the one for the phone after, when the
+    table has them."""
     K = []
     for i, q in enumerate(seq):
         if q["p"] == "PAU":
             K.append(dict(t=q["t0"] + 0.01, c=None, ei=0, code=0))
             K.append(dict(t=q["t1"] - 0.01, c=None, ei=0, code=0))
             continue
-        fr = tab["units"][q["p"]]
+        un = tab["units"][q["p"]]
+        fr = list(un["base"])
         n = len(fr)
+        if not n:
+            continue
+        lc = CLASS[seq[i - 1]["p"]] if i > 0 else 0
+        rc = CLASS[seq[i + 1]["p"]] if i + 1 < len(seq) else 0
+        fr[0] = un["L"].get(lc, fr[0])
+        fr[-1] = un["R"].get(rc, fr[-1])
         seg = q["dur"] / n
-        e = min(tau, seg / 4)
         for j, f in enumerate(fr):
-            a = q["t0"] + seg * j
-            for t in (a + e, a + seg - e):
-                K.append(dict(t=t, c=shape_of(f), ei=f["ei"], code=f["code"]))
+            K.append(dict(t=q["t0"] + seg * (j + 0.5), c=shape_of(f), ei=f["ei"], code=f["code"]))
     return K
 
 

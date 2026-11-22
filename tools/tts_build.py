@@ -3,8 +3,9 @@
 
     python tools/tts_build.py CORPUS.npz [--outdir tts/data] [--diphone-bits 34]
 
-Writes robot.stt (the robotic phoneme table: 3 target frames per phone, each averaged over
-every instance of the phone) and diphone.stt (for every phone pair in the corpus, the frames
+Writes robot.stt (the robotic phoneme table: 4 target frames per phone, each averaged over
+every instance of the phone, plus first and last targets that depend on the neighbouring
+phones' classes) and diphone.stt (for every phone pair in the corpus, the frames
 from the middle of the first phone to the middle of the second, with the instances chosen
 jointly so that the pairs that meet at each phone join well), and prints their sizes. Both share the duration table (median phone durations, stressed and not) and
 the voice's median pitch.
@@ -162,43 +163,45 @@ def centres(U, inst):
     return cen
 
 
-def robot_table(U, inst, Q, shape_bits=34):
-    """3 targets per phone (start, middle, end), each the average over every instance of the
-    phone (falls back to the single most typical instance when there is only one)."""
+def robot_table(U, inst, Q, shape_bits=34, n=4, min_ctx=16):
+    """n targets per phone, spread evenly over it, each the average over every instance of the
+    phone; plus, for each class of neighbour (phones.CLASSES) seen at least min_ctx times, the
+    first target averaged over the instances after a phone of that class and the last target
+    over those before one. The context targets are what carry the glides into and out of
+    each phone (machine listening: errors roughly halved; 3 to 5 targets score alike)."""
+    def avg(S):
+        c = np.mean([x[0] for x in S], 0)
+        e = int(np.median([x[1] for x in S]))
+        v = int(np.bincount([x[2] for x in S]).argmax())
+        q = Q.search(c[None], shape_bits)[0]
+        return dict(code=v, ei=e, si=[int(x) for x in q])
+
     units = {}
     for p, L in inst.items():
         if p == "PAU":
             continue
-        n = 3       # 4 or 5 targets scored the same by machine listening
-        traj, ok = [], []
+        rows = []
         for u, k, a, b, s in L:
             if b - a < 1.5:
                 continue
+            d = U[u]
+            ph = d["ph"]
+            lc = P.CLASS[ph[k - 1]] if k > 0 else 0
+            rc = P.CLASS[ph[k + 1]] if k + 1 < len(ph) else 0
             pos = [a + (b - a) * (j + 0.5) / n for j in range(n)]
-            traj.append(np.concatenate([U[u]["c"][frame_at(U[u], x)] for x in pos]))
-            ok.append((u, pos))
-        if not traj:
+            rows.append((lc, rc, [sample(d, FRAME_T0 + 0.02 * x) for x in pos]))
+        if not rows:            # too short everywhere: the middle of the first instance
             u, k, a, b, s = L[0]
-            ok = [(u, [0.5 * (a + b)] * n)]
-            traj = [np.zeros(1)]
-        traj = np.array(traj)
-        med = traj.mean(0)
-        best = int(np.argmin(((traj - med) ** 2).sum(1)))
-        u, pos = ok[best]
-        if len(ok) > 1:
-            S = [[sample(U[uu], FRAME_T0 + 0.02 * x) for x in pp] for uu, pp in ok]
-            fr = []
-            for j in range(n):
-                c = np.mean([s[j][0] for s in S], 0)
-                e = int(np.median([s[j][1] for s in S]))
-                v = int(np.bincount([s[j][2] for s in S]).argmax())
-                fr.append((c, e, v))
-            si = Q.search(np.array([f[0] for f in fr]), shape_bits)
-            units[p] = [dict(code=v, ei=e, si=[int(x) for x in q]) for (c, e, v), q in zip(fr, si)]
-        elif "c10" in U[u]:
-            units[p] = Q.sampled(U[u], [FRAME_T0 + 0.02 * x for x in pos], shape_bits)
-        else:
-            units[p] = Q.frames(U[u], [frame_at(U[u], x) for x in pos], shape_bits)
+            rows = [(0, 0, [sample(U[u], FRAME_T0 + 0.01 * (a + b))] * n)]
+        un = dict(base=[avg([r[2][j] for r in rows]) for j in range(n)], L={}, R={})
+        for c in range(len(P.CLASSES)):
+            S = [r[2][0] for r in rows if r[0] == c]
+            if len(S) >= min_ctx:
+                un["L"][c] = avg(S)
+            S = [r[2][-1] for r in rows if r[1] == c]
+            if len(S) >= min_ctx:
+                un["R"][c] = avg(S)
+        units[p] = un
     return units
 
 
@@ -355,7 +358,7 @@ def main():
     ap.add_argument("corpus")
     ap.add_argument("--outdir", default=os.path.join(ROOT, "tts", "data"))
     ap.add_argument("--diphone-bits", type=int, default=34, choices=(18, 34))
-    ap.add_argument("--robot-bits", type=int, default=18, choices=(18, 34))
+    ap.add_argument("--robot-bits", type=int, default=34, choices=(18, 34))
     ap.add_argument("--suffix", default="")
     ap.add_argument("--sources", help="also write where each diphone was cut from (JSON: "
                     "corpus utterance and times)")
@@ -382,7 +385,8 @@ def main():
     open(os.path.join(a.outdir, f"diphone{a.suffix}.stt"), "wb").write(db)
     nfr = sum(len(f) for _, f in dip.values())
     print(f"voice f0 {f0:.0f} Hz")
-    print(f"robot.stt   {len(rb):6d} bytes: {sum(len(v) for v in rob.values())} frames for {len(rob)} phones")
+    print(f"robot.stt   {len(rb):6d} bytes: {sum(len(v["base"]) + len(v["L"]) + len(v["R"]) for v in rob.values())} "
+          f"frames for {len(rob)} phones")
     print(f"diphone.stt {len(db):6d} bytes: {len(dip)} diphones, {nfr} frames "
           f"({nfr / len(dip):.1f} per diphone, {a.diphone_bits}-bit shapes)")
 
