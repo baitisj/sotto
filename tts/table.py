@@ -7,9 +7,12 @@ sets it from its intonation rules, which is what makes the tables small.
 
 Layout (all fields LSB-first in one bit stream):
 
-    header   magic 'STT1', kind (0 robot, 1 diphone), shape bits (18 or 34),
-             f0 (Hz), 42 x 2 duration bytes (stressed / unstressed, 5 ms units)
-    robot    per phone: target count (3 bits), then that many frames
+    header   magic 'STT1', kind (2 robot, 1 diphone; 0 was the first robot layout, which
+             had no context frames), shape bits (18 or 34), f0 (Hz), 42 x 2 duration bytes
+             (stressed / unstressed, 5 ms units)
+    robot    per phone: target count (3 bits), an 8-bit mask of the neighbour classes
+             (phones.CLASSES) that have their own first target, the same for the last target,
+             then the targets, the first-target frames (class order), the last-target frames
     diphone  a 42 x 42 presence bitmap, then per present pair (row-major): frame count
              (4 bits), the frame where the second phone starts (4 bits), the frames
 
@@ -66,12 +69,13 @@ def get_frame(r, shape_bits):
 
 
 def write(kind, shape_bits, f0, dur, units):
-    """kind 'robot' (units: {phone: [frames]}) or 'diphone' (units: {(a, b): (split,
+    """kind 'robot' (units: {phone: dict(base=[frames], L={class: frame}, R={class: frame})},
+    L: the first target after a phone of that class, R: the last target before one) or 'diphone' (units: {(a, b): (split,
     [frames])}); dur: {phone: (stressed s, unstressed s)}. Returns bytes."""
     w = BitWriter()
     for c in b"STT1":
         w.put(c, 8)
-    w.put(0 if kind == "robot" else 1, 8)
+    w.put(2 if kind == "robot" else 1, 8)
     w.put(shape_bits, 8)
     w.put(int(round(f0)), 16)
     for p in PHONES:
@@ -80,9 +84,11 @@ def write(kind, shape_bits, f0, dur, units):
         w.put(min(255, int(round(b / 0.005))), 8)
     if kind == "robot":
         for p in PHONES:
-            fr = units.get(p, [])
-            w.put(len(fr), 3)
-            for f in fr:
+            un = units.get(p, dict(base=[], L={}, R={}))
+            w.put(len(un["base"]), 3)
+            for side in "LR":
+                w.put(sum(1 << c for c in un[side]), 8)
+            for f in un["base"] + [un[s][c] for s in "LR" for c in sorted(un[s])]:
                 put_frame(w, f, shape_bits)
     else:
         for a in PHONES:
@@ -103,7 +109,9 @@ def write(kind, shape_bits, f0, dur, units):
 def read(data):
     r = BitReader(data)
     assert bytes(r.get(8) for _ in range(4)) == b"STT1"
-    kind = "robot" if r.get(8) == 0 else "diphone"
+    k = r.get(8)
+    assert k in (1, 2), "robot tables from before the context frames (kind 0) are not read"
+    kind = "robot" if k == 2 else "diphone"
     shape_bits = r.get(8)
     f0 = r.get(16)
     dur = {}
@@ -113,7 +121,11 @@ def read(data):
     if kind == "robot":
         for p in PHONES:
             n = r.get(3)
-            units[p] = [get_frame(r, shape_bits) for _ in range(n)]
+            masks = [r.get(8) for _ in "LR"]
+            un = dict(base=[get_frame(r, shape_bits) for _ in range(n)])
+            for side, m in zip("LR", masks):
+                un[side] = {c: get_frame(r, shape_bits) for c in range(8) if m >> c & 1}
+            units[p] = un
     else:
         present = [(a, b) for a in PHONES for b in PHONES if r.get(1)]
         for pr in present:

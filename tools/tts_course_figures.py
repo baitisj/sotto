@@ -227,7 +227,7 @@ def fig_compare(ref, dtab, rtab):
     clip("robot.flac", yr)
     rows = [("Kokoro af_sarah, then through sotto 1200 (the best the table could hope for)", xs),
             ("sotto-tts, diphone table (37 KB)", yd),
-            ("sotto-tts, robot table (493 bytes)", yr)]
+            (f"sotto-tts, robot table ({os.path.getsize(os.path.join(ROOT, 'tts', 'data', 'robot.stt')):,} bytes)", yr)]
     fig, axs = plt.subplots(3, 1, figsize=(10, 7), sharex=True)
     top = None
     for a, (title, y) in zip(axs, rows):
@@ -361,12 +361,17 @@ def main():
     ap.add_argument("--models", required=True)
     ap.add_argument("--old-table")
     ap.add_argument("--hunt", help="a hunt.json from tools/diphone_hunt.py, for the hunt figure")
+    ap.add_argument("--compare-only", action="store_true", help="only the three-voice figure "
+                    "and its clips (after a table changes)")
     a = ap.parse_args()
     os.makedirs(os.path.join(OUT, "figures"), exist_ok=True)
     os.makedirs(os.path.join(OUT, "audio"), exist_ok=True)
     dtab = synth.load_table(os.path.join(ROOT, "tts", "data", "diphone.stt"))
     rtab = synth.load_table(os.path.join(ROOT, "tts", "data", "robot.stt"))
     ref = Ref(a.models)
+    if a.compare_only:
+        fig_compare(ref, dtab, rtab)
+        return
     fig_pipeline()
     fig_plan(ref, dtab)
     fig_diphones(ref)

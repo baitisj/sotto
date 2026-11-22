@@ -98,7 +98,7 @@ Terms used in this course and in the sotto-tts code, in plain words. Names in `c
 **Prosody** (say *PROSS-uh-dee*): the rhythm and melody of speech: how long each sound lasts, where the pauses go, and where the pitch rises and falls. [5]
 
 ### R
-**Robot table** (`tts/data/robot.stt`, 493 bytes): 3 averaged frames for each phone. Small and clear, but robotic, because it has no coarticulation. [1, 3]
+**Robot table** (`tts/data/robot.stt`, 4.1 KB): 4 averaged frames for each phone, plus start and end frames chosen by the family of the neighbouring phone. Small and clear, but robotic, because one averaged frame per neighbour family is only a rough glide. [1, 3]
 
 ### S
 **Shape** (also *spectral envelope*): which frequencies are loud and which are quiet in a frame; this is what tells one vowel or consonant from another. [1]

@@ -22,7 +22,8 @@ So if the engine says "the birch canoe slid on the smooth planks" (8 words) and 
 |---|---:|---:|---:|---:|
 | Kokoro af_sarah through sotto 1200 | 4.6% | 0.5% | 0.0% | 12.2% |
 | **sotto-tts, diphone table** | **16.7%** | **7.7%** | **0.0%** | **17.6%** |
-| sotto-tts, robot table | 41.7% | 39.8% | 35.7% | 28.4% |
+| sotto-tts, robot table (4.1 KB) | 21.7% | 16.7% | 9.5% | 17.6% |
+| sotto-tts, first robot table (493 bytes) | 41.7% | 39.8% | 35.7% | 28.4% |
 
 The **Harvard sentences** are a famous test set from the 1960s ("The birch canoe slid on the smooth planks"), written so that you can't guess words from the meaning. They are hard on purpose. Everyday and radio phrases are easier because the words are predictable.
 

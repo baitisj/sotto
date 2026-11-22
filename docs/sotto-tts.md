@@ -23,21 +23,31 @@ does the rest.
 
 | | robotic (`tts/data/robot.stt`) | diphone (`tts/data/diphone.stt`) |
 |---|---:|---:|
-| Units | 41 phones x 3 targets | 1,634 phone pairs, 4.1 frames each |
-| Shape per frame | 18 bits | 34 bits |
-| Size | **493 bytes** | **37 KB** (23 KB with 18-bit shapes) |
-| Machine word error, everyday sentences | 38% | **8%** |
-| Machine word error, Harvard sentences | 50% | 29% |
+| Units | 41 phones x 4 targets, plus 604 start/end targets by neighbour class | 1,634 phone pairs, 4.1 frames each |
+| Shape per frame | 34 bits | 34 bits |
+| Size | **4.1 KB** (the first robot table: 493 bytes) | **37 KB** (23 KB with 18-bit shapes) |
+| Machine word error, everyday sentences | 17% (first robot table 40%) | **8%** |
+| Machine word error, Harvard sentences | 22% (first robot table 42%) | 17% |
 
 For scale, 37 KB is about 250 s of sotto 1200 speech (150 bytes a second): a fixed menu of
 recorded prompts is smaller until it passes a few minutes. The synthesiser wins when the
 text is open ended, such as callsigns, frequencies, times and messages.
 
-- **Robotic.** Each phone has 3 targets (its start, middle and end). Each target is the
+- **Robotic.** Each phone has 4 targets spread evenly through it. Each target is the
   average, over every instance of that phone in the corpus, of the envelope at that point,
-  quantised to sotto's codebook. The synthesiser draws straight lines between all the
-  targets in a phrase. Averaging the targets over every instance, instead of taking them
-  from the phone's single most typical instance, cut machine word error from 80% to 51%.
+  quantised to sotto's codebook. Averaging the targets over every instance, instead of
+  taking them from the phone's single most typical instance, cut machine word error from
+  80% to 51%. On top of that (11-22), the phones fall into 8 neighbour classes
+  (`tts/phones.py CLASSES`: pause, front vowels, back vowels, open vowels, labials,
+  alveolars, postalveolars, velars and HH). Each phone keeps its first target again for
+  every class seen before it at least 16 times, averaged over just those instances, and
+  its last target for every class seen after it. The synthesiser puts one keyframe at the
+  middle of each quarter of the phone, using the first and last targets that fit the
+  neighbours, and draws straight lines between them. That table (4,128 bytes, 768 frames)
+  halved machine word error against the first one (493 bytes: 3 held targets with 18-bit
+  shapes): Harvard 41.7% to 21.7%, everyday 39.8% to 16.7%, radio 35.7% to 9.5%, calls
+  28.4% to 17.6%. The context targets did most of it: 34-bit shapes alone helped only
+  everyday sentences, and straight glides without context did nothing.
 - **Diphone.** Each phone pair is stored from the middle of the first phone to the middle
   of the second, so units join where phones are steadiest. The synthesiser places each
   half's frames at the same relative positions within its own (rule-timed) half phones.
@@ -153,7 +163,7 @@ sotto 1200 decoder (`build/c37/fixed/sotto_dec_fx`). Harvard sentences lists 1-3
 sentences, 240 words) are hard to guess from context, so they show acoustic errors. Numbers
 and callsigns are compared in spoken form (`tools/tts_eval.py`).
 
-Sarah, tables rebuilt on the v3.10 encoder with the rough-patch checks (11-21 evening; rule prosody, with callsign words): diphone table 16.7% Harvard, 7.7% everyday, 0.0% radio, 17.6% calls; robot table 41.7%, 39.8%, 35.7%, 28.4%.
+Sarah, tables rebuilt on the v3.10 encoder with the rough-patch checks (11-21 evening; rule prosody, with callsign words): diphone table 16.7% Harvard, 7.7% everyday, 0.0% radio, 17.6% calls; robot table 41.7%, 39.8%, 35.7%, 28.4%. Robot table with neighbour-class targets (11-22, 4.1 KB): 21.7%, 16.7%, 9.5%, 17.6%.
 
 Sarah, first build (11-21, rule prosody, with callsign words; calls = 8 callsign phrases, 74 words):
 
@@ -200,7 +210,7 @@ energy (8.8%) and voicing (7.1%) cost little.
 ## On the K6
 
 - **Decoder:** already on the radio.
-- **Tables:** robot.stt fits in RAM. diphone.stt, lexicon and rules belong in the SPI
+- **Tables:** robot.stt (4.1 KB) fits in RAM, or in a module. diphone.stt, lexicon and rules belong in the SPI
   module library as data decks.
 - **Synthesis:** `c/tts/sotto_tts.c` (below); the prosody trees are 3.6 KB of integer
   compares.
