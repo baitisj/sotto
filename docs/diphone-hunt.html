@@ -1,0 +1,397 @@
+<meta charset="utf-8">
+<title>Diphone Hunt</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap">
+<style>
+/* Layout: a bench instrument. Left, the sorted list of every diphone; right, the one under
+   test, its four renderings, scores and the verdict keys. Phone width stacks them. */
+:root {
+  --bg: #f3f4f1; --panel: #ffffff; --ink: #1d2320; --muted: #5d6762; --line: #d9ddd8;
+  --accent: #b5651d; --accent-ink: #ffffff; --bad: #b3261e; --ok: #2f7a4b; --wave: #2b5d6e;
+  --span: rgba(181, 101, 29, 0.16); --chip: #eceee9;
+  --f-text: "IBM Plex Sans", system-ui, sans-serif;
+  --f-head: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161a18; --panel: #1f2421; --ink: #e5e9e5; --muted: #9aa49e; --line: #333b36;
+  --accent: #e3994f; --accent-ink: #1a1208; --bad: #ef6b61; --ok: #6cc28c; --wave: #79b6c9;
+  --span: rgba(227, 153, 79, 0.18); --chip: #2a302c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #161a18; --panel: #1f2421; --ink: #e5e9e5; --muted: #9aa49e; --line: #333b36;
+  --accent: #e3994f; --accent-ink: #1a1208; --bad: #ef6b61; --ok: #6cc28c; --wave: #79b6c9;
+  --span: rgba(227, 153, 79, 0.18); --chip: #2a302c; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-text); font-size: 14px; line-height: 1.45 }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 28px; max-width: 1280px; margin: 0 auto; display: grid; gap: 14px }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px }
+h1 { font-family: var(--f-head); font-size: 26px; letter-spacing: 0.01em; margin: 0 }
+.sub { color: var(--muted); margin: 0; max-width: 70ch }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 14px; align-items: start }
+@media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr) } .bench { order: -1 } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-width: 0 }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); align-items: center }
+.controls label { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center }
+select, input[type=text], input[type=search] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px }
+input[type=search] { width: 9em }
+.count { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums }
+.list { max-height: 70vh; overflow: auto }
+@media (max-width: 860px) { .list { max-height: 46vh } }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums }
+th, td { padding: 5px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--line) }
+th { position: sticky; top: 0; background: var(--panel); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; cursor: pointer; z-index: 1 }
+th[aria-sort] { color: var(--ink) }
+tbody tr { cursor: pointer }
+tbody tr:hover { background: var(--chip) }
+tbody tr[aria-selected="true"] { background: var(--span); box-shadow: inset 3px 0 0 var(--accent) }
+td.pair { font-family: var(--f-mono); font-weight: 600 }
+td.word { color: var(--muted); max-width: 11em; overflow: hidden; text-overflow: ellipsis }
+.bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent); vertical-align: middle; margin-left: 6px; opacity: 0.75 }
+.num { font-family: var(--f-mono); font-size: 12px }
+.mk { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 9px }
+.mk.bad { background: var(--bad); color: var(--panel) }
+.mk.ok { background: var(--ok); color: var(--panel) }
+.bench { padding: 16px; display: grid; gap: 14px }
+.title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px }
+.title .pair { font-family: var(--f-mono); font-size: 30px; font-weight: 600; color: var(--accent) }
+.title .word { font-size: 20px; font-weight: 500 }
+.title .how { color: var(--muted); font-size: 12px }
+.phones { font-family: var(--f-mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px }
+.phones span { padding: 1px 5px; border-radius: 4px; background: var(--chip) }
+.phones span.hit { background: var(--accent); color: var(--accent-ink) }
+.cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px }
+@media (max-width: 560px) { .cols { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.col { border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; min-width: 0; background: var(--bg) }
+.col button.play { font: 600 13px var(--f-text); display: flex; justify-content: space-between; align-items: center; gap: 6px; width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer }
+.col button.play:hover { border-color: var(--accent) }
+.col button.play.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.key { font-family: var(--f-mono); font-size: 11px; padding: 0 5px; border: 1px solid currentColor; border-radius: 4px; opacity: 0.7 }
+.col canvas { width: 100%; height: 46px; display: block }
+.col .meta { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; font-family: var(--f-mono) }
+.col .meta .dup { color: var(--bad); font-weight: 600 }
+.opts { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 13px }
+.scores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
+@media (max-width: 560px) { .scores { grid-template-columns: minmax(0, 1fr) } }
+.score { border-top: 2px solid var(--line); padding-top: 6px }
+.score b { font-family: var(--f-mono); font-size: 18px; display: block }
+.score small { color: var(--muted); display: block; font-size: 11.5px }
+.verdict { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.verdict button { font: 600 13px var(--f-text); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; display: flex; gap: 8px; align-items: center }
+.verdict button[aria-pressed="true"].b { background: var(--bad); color: var(--panel); border-color: var(--bad) }
+.verdict button[aria-pressed="true"].g { background: var(--ok); color: var(--panel); border-color: var(--ok) }
+.verdict button.w[aria-pressed="true"] { background: var(--chip); border-color: var(--ink) }
+.verdict input { flex: 1 1 14em; min-width: 0 }
+.status { font-size: 12px; color: var(--muted); min-height: 1.4em }
+.help { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px }
+.src { font-size: 12px; color: var(--muted) }
+button:focus-visible, select:focus-visible, input:focus-visible, tr:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px }
+.empty { padding: 24px; color: var(--muted) }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Diphone Hunt</h1>
+    <p class="sub">Every sound pair of the sotto-tts diphone table, heard four ways: Sarah's own reading, that reading through the sotto 1200 reference encoder, through the K6's slim encoder, and spoken by the synthesiser. Sorted worst first by the machine's guess; your ear decides.</p>
+  </header>
+  <div class="main">
+    <section class="panel" aria-label="All diphones">
+      <div class="controls">
+        <label for="sortby">Sort <select id="sortby">
+          <option value="table_damage">Table damage</option>
+          <option value="codec_damage">Reference encoder damage</option>
+          <option value="slim_damage">Slim encoder damage</option>
+          <option value="pitch_gross">Pitch errors</option>
+          <option value="pair">Diphone A–Z</option>
+        </select></label>
+        <label for="show">Show <select id="show">
+          <option value="all">All</option>
+          <option value="unmarked">Not yet heard</option>
+          <option value="bad">Marked bad</option>
+          <option value="ok">Marked fine</option>
+        </select></label>
+        <input type="search" id="find" placeholder="Phone or word" aria-label="Filter by phone or word">
+        <span class="count" id="count"></span>
+      </div>
+      <div class="list" id="list"><div class="empty">Loading the diphones…</div></div>
+    </section>
+    <section class="panel bench" aria-label="Diphone under test" id="bench">
+      <div class="empty">Pick a diphone from the list.</div>
+    </section>
+  </div>
+  <div class="help">
+    <span><span class="key">1</span>–<span class="key">4</span> play a column</span>
+    <span><span class="key">Space</span> play again</span>
+    <span><span class="key">J</span>/<span class="key">K</span> or <span class="key">↓</span>/<span class="key">↑</span> next / previous</span>
+    <span><span class="key">B</span> bad</span><span><span class="key">G</span> fine</span>
+    <span><span class="key">S</span> pair only / whole word</span>
+    <span><span class="key">N</span> note</span>
+  </div>
+</div>
+
+<script>
+const COLS = [
+  { k: "ref", name: "Reference", note: "Sarah, 8 kHz" },
+  { k: "codec", name: "Ref encoder", note: "sotto 1200" },
+  { k: "slim", name: "K6 slim", note: "sotto 1200" },
+  { k: "synth", name: "TTS", note: "diphone table" },
+];
+const $ = (id) => document.getElementById(id);
+let D = null, items = [], view = [], cur = -1, marks = {}, db = null, canWrite = true;
+let spanOnly = false, lastCol = 0, actx = null, playing = null;
+const pcm = {};            // column -> Float32Array (lazy)
+const loading = {};
+
+function store(k, v) { try { localStorage.setItem(k, v) } catch (e) {} }
+function recall(k) { try { return localStorage.getItem(k) } catch (e) { return null } }
+
+const MU = new Float32Array(256);
+for (let i = 0; i < 256; i++) {        // G.711 mu-law byte -> sample
+  const u = ~i & 0xff, e = (u >> 4) & 7, m = u & 15, v = (((m << 3) + 0x84) << e) - 0x84;
+  MU[i] = (u & 0x80 ? -v : v) / 32768;
+}
+function wavDecode(buf) {              // 8 kHz mu-law WAV from tools/diphone_hunt.py
+  const dv = new DataView(buf);
+  for (let p = 12; p + 8 <= buf.byteLength; ) {
+    const id = String.fromCharCode(dv.getUint8(p), dv.getUint8(p + 1), dv.getUint8(p + 2), dv.getUint8(p + 3));
+    const n = dv.getUint32(p + 4, true);
+    if (id === "data") {
+      const u8 = new Uint8Array(buf, p + 8, Math.min(n, buf.byteLength - p - 8)), out = new Float32Array(u8.length);
+      for (let i = 0; i < u8.length; i++) out[i] = MU[u8[i]];
+      return out;
+    }
+    p += 8 + n + (n & 1);
+  }
+  throw new Error("no audio in the WAV");
+}
+async function column(k) {
+  if (pcm[k]) return pcm[k];
+  if (!loading[k]) loading[k] = fetch(k + ".wav").then(r => {
+    if (!r.ok) throw new Error(k + ".wav: " + r.status);
+    return r.arrayBuffer();
+  }).then(b => (pcm[k] = wavDecode(b)));
+  return loading[k];
+}
+function clip(it, k) {
+  const a = pcm[k]; if (!a) return null;
+  const [o, n] = it[k];
+  return a.subarray(o, o + n);
+}
+function spanOf(it, k) { return k === "synth" ? it.sspan : it.span }
+
+async function play(ci) {
+  const it = view[cur]; if (!it) return;
+  const k = COLS[ci].k; lastCol = ci;
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") await actx.resume();
+    await column(k);
+  } catch (e) { $("status").textContent = "Couldn't load the audio: " + e.message; return; }
+  let x = clip(it, k);
+  if (spanOnly) {
+    const fs = D.fs, [a, b] = spanOf(it, k), pad = 0.06;
+    x = x.subarray(Math.max(0, Math.floor((a - pad) * fs)), Math.min(x.length, Math.ceil((b + pad) * fs)));
+  }
+  if (playing) { try { playing.stop() } catch (e) {} }
+  const buf = actx.createBuffer(1, Math.max(1, x.length), D.fs);
+  buf.copyToChannel(x, 0);
+  const s = actx.createBufferSource(); s.buffer = buf; s.connect(actx.destination);
+  document.querySelectorAll(".col button.play").forEach((b, i) => b.classList.toggle("on", i === ci));
+  s.onended = () => { if (playing === s) { playing = null; document.querySelectorAll(".col button.play").forEach(b => b.classList.remove("on")) } };
+  s.start(); playing = s;
+}
+
+function drawWave(cv, it, k) {
+  const x = clip(it, k), ctx = cv.getContext("2d");
+  const w = cv.width = cv.clientWidth * devicePixelRatio, h = cv.height = cv.clientHeight * devicePixelRatio;
+  const css = getComputedStyle(document.documentElement);
+  ctx.clearRect(0, 0, w, h);
+  if (!x) return;
+  const [a, b] = spanOf(it, k), dur = x.length / D.fs;
+  ctx.fillStyle = css.getPropertyValue("--span");
+  ctx.fillRect(a / dur * w, 0, (b - a) / dur * w, h);
+  ctx.fillStyle = css.getPropertyValue("--wave");
+  const step = x.length / w;
+  for (let i = 0; i < w; i++) {
+    let lo = 0, hi = 0;
+    for (let j = Math.floor(i * step); j < Math.floor((i + 1) * step); j++) { const v = x[j]; if (v < lo) lo = v; if (v > hi) hi = v }
+    const y0 = h / 2 - hi * h * 1.6, y1 = h / 2 - lo * h * 1.6;
+    ctx.fillRect(i, Math.max(0, y0), 1, Math.max(1, Math.min(h, y1) - Math.max(0, y0)));
+  }
+}
+
+function fmt(v) { return v == null ? "–" : (Math.round(v * 10) / 10).toFixed(1) }
+
+function renderList() {
+  const sort = $("sortby").value, show = $("show").value, q = $("find").value.trim().toUpperCase();
+  view = items.filter(it => {
+    const m = marks[it.pair];
+    if (show === "unmarked" && m) return false;
+    if (show === "bad" && (!m || m.verdict !== "bad")) return false;
+    if (show === "ok" && (!m || m.verdict !== "ok")) return false;
+    if (q) {
+      const ph = it.pair.split("-");
+      if (!(ph.includes(q) || it.pair === q || it.text.toUpperCase().includes(q))) return false;
+    }
+    return true;
+  });
+  view.sort(sort === "pair" ? (a, b) => a.pair.localeCompare(b.pair) : (a, b) => b[sort] - a[sort] || a.pair.localeCompare(b.pair));
+  const max = {}; ["table_damage", "codec_damage", "slim_damage"].forEach(f => max[f] = Math.max(1, ...items.map(i => i[f])));
+  const bar = (it, f) => `<span class="num">${fmt(it[f])}</span><span class="bar" style="width:${Math.round(28 * it[f] / max[f])}px"></span>`;
+  const rows = view.map((it, i) => {
+    const m = marks[it.pair];
+    const mk = m ? `<span class="mk ${m.verdict}">${m.verdict === "bad" ? "bad" : "fine"}</span>` : "";
+    return `<tr data-i="${i}" aria-selected="${i === cur}"><td class="pair">${it.pair}</td><td class="word">${esc(it.text)}</td>` +
+      `<td>${bar(it, "table_damage")}</td><td>${bar(it, "codec_damage")}</td><td>${bar(it, "slim_damage")}</td>` +
+      `<td class="num">${it.pitch_gross || ""}</td><td>${mk}</td></tr>`;
+  }).join("");
+  const sorted = (f) => sort === f ? ' aria-sort="descending"' : "";
+  $("list").innerHTML = `<table><thead><tr><th data-s="pair"${sorted("pair")}>Pair</th><th>Word</th>` +
+    `<th data-s="table_damage"${sorted("table_damage")}>Table</th><th data-s="codec_damage"${sorted("codec_damage")}>Ref enc</th>` +
+    `<th data-s="slim_damage"${sorted("slim_damage")}>Slim</th><th data-s="pitch_gross"${sorted("pitch_gross")}>Pitch</th><th>Mark</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const nb = Object.values(marks).filter(m => m.verdict === "bad").length, nh = Object.keys(marks).length;
+  $("count").textContent = `${view.length} shown · ${nh} heard · ${nb} bad`;
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])) }
+
+function select(i, scroll) {
+  if (i < 0 || i >= view.length) return;
+  cur = i;
+  document.querySelectorAll("#list tbody tr").forEach(tr => tr.setAttribute("aria-selected", String(+tr.dataset.i === i)));
+  if (scroll) { const tr = document.querySelector(`#list tbody tr[data-i="${i}"]`); if (tr) tr.scrollIntoView({ block: "nearest" }) }
+  renderBench();
+  store("hunt.pair", view[i].pair);
+}
+
+function renderBench() {
+  const it = view[cur];
+  if (!it) { $("bench").innerHTML = '<div class="empty">Pick a diphone from the list.</div>'; return }
+  const [a, b] = it.pair.split("-");
+  const ph = it.phones.split(" ");
+  let hit = -1;
+  const bare = ph.map(p => p.replace(/\d$/, ""));
+  if (a === "PAU") hit = 0; else if (b === "PAU") hit = bare.length - 1;
+  else for (let k = 0; k < bare.length - 1; k++) if (bare[k] === a && bare[k + 1] === b) { hit = k; break }
+  const hitSet = new Set(a === "PAU" || b === "PAU" ? [hit] : [hit, hit + 1]);
+  const seen = {};
+  Object.entries(it.fp).forEach(([k, v]) => (seen[v] = (seen[v] || 0) + 1));
+  const m = marks[it.pair] || {};
+  const which = new Set(m.which || []);
+  const s = it.source ? `Table unit cut from corpus sentence ${it.source.utt}, ${it.source.t0.toFixed(2)}–${it.source.t1.toFixed(2)} s.` : "";
+  $("bench").innerHTML = `
+    <div class="title"><span class="pair">${it.pair}</span><span class="word">“${esc(it.text)}”</span><span class="how">${esc(it.how)}</span></div>
+    <div class="phones" aria-label="Phones">${ph.map((p, k) => `<span class="${hitSet.has(k) ? "hit" : ""}">${p}</span>`).join("")}</div>
+    <div class="cols">${COLS.map((c, i) => `
+      <div class="col">
+        <button class="play" data-c="${i}" type="button"><span>${c.name}</span><span class="key">${i + 1}</span></button>
+        <canvas data-c="${i}" aria-hidden="true"></canvas>
+        <div class="meta"><span>${c.note}</span><span class="${seen[it.fp[c.k]] > 1 ? "dup" : ""}" title="Fingerprint of this clip">${it.fp[c.k]}${seen[it.fp[c.k]] > 1 ? " same!" : ""}</span></div>
+      </div>`).join("")}</div>
+    <div class="opts">
+      <label><input type="checkbox" id="spanonly" ${spanOnly ? "checked" : ""}> Play the pair only (shaded), not the whole word</label>
+    </div>
+    <div class="scores">
+      <div class="score"><b>${fmt(it.table_damage)}</b><small>Table damage: TTS against the reference over the pair. Shape ${fmt(it.table_parts[0])} dB, energy ${fmt(it.table_parts[1])} steps, voicing off at ${it.table_parts[2]} of 6 points.</small></div>
+      <div class="score"><b>${fmt(it.codec_damage)}</b><small>Reference encoder: shape ${fmt(it.codec_parts[0])} dB, energy ${fmt(it.codec_parts[1])}, voicing ${it.codec_parts[2]}/6.${it.pitch_gross ? ` Pitch over 1.4× off pYIN at ${it.pitch_gross} of 6 points.` : ""}</small></div>
+      <div class="score"><b>${fmt(it.slim_damage)}</b><small>K6 slim encoder: shape ${fmt(it.slim_parts[0])} dB, energy ${fmt(it.slim_parts[1])}, voicing ${it.slim_parts[2]}/6.</small></div>
+    </div>
+    <div class="verdict">
+      <button type="button" class="b" id="vbad" aria-pressed="${m.verdict === "bad"}">Bad <span class="key">B</span></button>
+      <button type="button" class="g" id="vok" aria-pressed="${m.verdict === "ok"}">Fine <span class="key">G</span></button>
+      ${COLS.slice(1).map(c => `<button type="button" class="w" data-w="${c.k}" aria-pressed="${which.has(c.k)}" title="Which rendering is bad">${c.name}</button>`).join("")}
+      <input type="text" id="note" placeholder="What you hear (optional)" value="${esc(m.note || "")}" aria-label="Note">
+    </div>
+    <div class="status" id="status">${canWrite ? "" : "Your marks can't be saved from this view."}</div>
+    <div class="src">${s}</div>`;
+  document.querySelectorAll(".col button.play").forEach(bt => bt.onclick = () => play(+bt.dataset.c));
+  $("spanonly").onchange = (e) => { spanOnly = e.target.checked; store("hunt.span", spanOnly ? "1" : "") };
+  $("vbad").onclick = () => mark("bad");
+  $("vok").onclick = () => mark("ok");
+  document.querySelectorAll(".verdict button.w").forEach(bt => bt.onclick = () => toggleWhich(bt.dataset.w));
+  let t = null;
+  $("note").oninput = () => { clearTimeout(t); t = setTimeout(() => saveMark(it.pair, { note: $("note").value }), 700) };
+  drawAll(it);
+}
+async function drawAll(it) {
+  for (let i = 0; i < COLS.length; i++) {
+    try { await column(COLS[i].k) } catch (e) { continue }
+    if (view[cur] !== it) return;
+    const cv = document.querySelector(`.col canvas[data-c="${i}"]`); if (cv) drawWave(cv, it, COLS[i].k);
+  }
+}
+
+async function saveMark(pair, patch) {
+  const prev = marks[pair] || {};
+  const m = { ...prev, ...patch, pair, at: new Date().toISOString() };
+  if (!m.verdict && !m.note && !(m.which && m.which.length)) { delete marks[pair] } else marks[pair] = m;
+  renderListKeep();
+  if (!db) { $("status").textContent = "Saved in this view only (no shared store here)."; return }
+  try {
+    if (marks[pair]) await db.doc("marks/" + pair).set(marks[pair]); else await db.doc("marks/" + pair).delete();
+    $("status").textContent = "Saved.";
+  } catch (e) {
+    if (e && e.code === "invalid_argument") { canWrite = false; $("status").textContent = "Your marks can't be saved from this view." }
+    else $("status").textContent = "Couldn't save the mark (" + (e && e.code || "error") + "). It's kept on this screen.";
+  }
+}
+function mark(v) { const it = view[cur]; if (!it) return; const m = marks[it.pair] || {}; saveMark(it.pair, { verdict: m.verdict === v ? null : v }); renderBench() }
+function toggleWhich(k) { const it = view[cur]; if (!it) return; const s = new Set((marks[it.pair] || {}).which || []); s.has(k) ? s.delete(k) : s.add(k); saveMark(it.pair, { which: [...s], verdict: (marks[it.pair] || {}).verdict || "bad" }); renderBench() }
+function renderListKeep() {
+  const pair = view[cur] && view[cur].pair;
+  const top = $("list").scrollTop;
+  renderList();
+  $("list").scrollTop = top;
+  const i = view.findIndex(v => v.pair === pair);
+  if (i >= 0) { cur = i; document.querySelectorAll("#list tbody tr").forEach(tr => tr.setAttribute("aria-selected", String(+tr.dataset.i === i))) }
+}
+
+$("list").addEventListener("click", (e) => {
+  const th = e.target.closest("th[data-s]");
+  if (th) { $("sortby").value = th.dataset.s; refresh(); return }
+  const tr = e.target.closest("tr[data-i]"); if (tr) select(+tr.dataset.i, false);
+});
+["sortby", "show"].forEach(id => $(id).addEventListener("change", () => { store("hunt." + id, $(id).value); refresh() }));
+$("find").addEventListener("input", () => refresh());
+function refresh() { const pair = view[cur] && view[cur].pair; renderList(); const i = view.findIndex(v => v.pair === pair); cur = -1; select(i >= 0 ? i : 0, true) }
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input[type=text], input[type=search], select")) { if (e.key === "Escape") e.target.blur(); return }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k >= "1" && k <= "4") { play(+k - 1); e.preventDefault() }
+  else if (k === " ") { play(lastCol); e.preventDefault() }
+  else if (k === "j" || k === "arrowdown") { select(cur + 1, true); e.preventDefault() }
+  else if (k === "k" || k === "arrowup") { select(cur - 1, true); e.preventDefault() }
+  else if (k === "b") mark("bad");
+  else if (k === "g") mark("ok");
+  else if (k === "s") { spanOnly = !spanOnly; const c = $("spanonly"); if (c) c.checked = spanOnly; store("hunt.span", spanOnly ? "1" : "") }
+  else if (k === "n") { const n = $("note"); if (n) { n.focus(); e.preventDefault() } }
+});
+
+async function start() {
+  ["sortby", "show"].forEach(id => { const v = recall("hunt." + id); if (v) $(id).value = v });
+  spanOnly = recall("hunt.span") === "1";
+  try {
+    const r = await fetch("hunt.json");
+    if (!r.ok) throw new Error("hunt.json: " + r.status);
+    D = await r.json(); items = D.items;
+  } catch (e) { $("list").innerHTML = `<div class="empty">Couldn't load the diphone list (${esc(e.message)}).</div>`; return }
+  renderList();
+  const want = recall("hunt.pair"), i = view.findIndex(v => v.pair === want);
+  select(i >= 0 ? i : 0, true);
+  column("ref").catch(() => {});
+  if (window.claude && claude.use) {
+    try {
+      const [d, u] = await Promise.all([claude.use("db"), claude.use("user")]);
+      db = d;
+      if (u && u.can) { const w = await u.can("data.write"); if (w === false) canWrite = false }
+      if (db) db.collection("marks").onSnapshot((snap) => {
+        const next = {}; snap.docs.forEach(doc => { const v = doc.data(); if (v) next[doc.id] = v });
+        marks = next; renderListKeep();
+        const it = view[cur]; if (it && document.activeElement && document.activeElement.id !== "note") renderBench();
+      }, () => {});
+    } catch (e) {}
+  }
+}
+start();
+</script>

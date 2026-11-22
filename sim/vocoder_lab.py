@@ -45,6 +45,9 @@ LOW_RANK = True  # "tracked4": energy below a candidate's first harmonic counts 
 SUB_FIRST = 3    # "tracked4": the sub-octave check (odd_even_db) starts at this harmonic (1 doubled the
                  # pitch on band-limited mics: listening round 26, Speech Commands higher4 "two")
 UP = 1.5         # "tracked4": time-domain sub-octave penalty (track_pitch_voicing up; v3.10, round 26)
+UP_ODD = 6.0     # "tracked4": no time-domain penalty on a candidate whose odd harmonics stand this
+                 # many dB clear (sinusoid.odd_peaks_db; LibriSpeech 6313, listening round 28)
+UP_ODD_MAX = 400.0  # "tracked4": ... and only for candidates at or below this (Hz; 0 = all)
 TDC = 0          # "tracked4": time-domain (NCCF) pitch candidates per frame
 
 
@@ -81,7 +84,7 @@ def analyse(x, pitch="c2"):
             if UP:
                 # v3.10: a candidate whose speech repeats at half (or a third of) its period
                 # pays for it (Kokoro af_nicole "seven", "from"; LibriSpeech 251 "and")
-                opts = {"up": UP, **opts}
+                opts = {"up": UP, "up_odd": UP_ODD, "up_odd_max": UP_ODD_MAX, **opts}
             if TDC:
                 opts = {"tdc": TDC, **opts}
         if TRACK2.get("up") or opts.get("up") or opts.get("tdc"):

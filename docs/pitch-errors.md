@@ -371,6 +371,46 @@ Left for later: af_heart 01 at 2.43-2.5 s is real ~65 Hz creak after an unvoiced
 0.86 at 65 Hz), so there is nothing to hold it to. Jeff still hears a subtle pitch error in
 Lewis's "is alpha" and a little roughness in Nicole's "seven".
 
+## A formant mistaken for the pitch: the odd-harmonic check (2026-11-21)
+
+After the merge, sotto 2400's PESQ fell by about 0.1 on two of the listening page's voices
+(LibriSpeech 6313 and 652). **Listening round 28** (sotto 2400, the encoder before PR #194
+against main, 4-second pieces, the same decoder): the old encoder won all three 6313 pieces,
+the three 652 pieces tied, and the null pair was called correctly. Jeff heard the pitch jump
+up on "of security" just before 1 s and on "torch" at 4.75 s.
+
+Both are the time-domain test. At 1.07-1.09 s and 4.69-4.72 s 6313 is at 210-255 Hz with her
+first formant near 500 Hz, so the speech also repeats every 2 ms, half the true period
+(normalised autocorrelation 0.58-0.70 at both lags). The test charged the true pitch and the
+track jumped to 415-500 Hz.
+
+The spectrum tells the cases apart where the correlation can't. `sinusoid.odd_peaks_db(w)`
+is how far the 1st and 3rd harmonics stand above the spectrum halfway between harmonics
+(the mean of the two, in dB; the nearest bin and its neighbours). On 6313's doubled frames it
+is +12 to +15 dB: her fundamental and 3rd harmonic are real. On the frames the test was
+added for (LibriSpeech 251 "and", Nicole "seven" and "from", EARS p070 at 4.2 s) it is -3 to
+-20 dB, since a true half-pitch candidate has nothing at its odd multiples.
+
+- **The fix** (`vocoder_lab.UP_ODD = 6`, `UP_ODD_MAX = 400`; `track_pitch_voicing`
+  `up_odd`, `up_odd_max`; `c/sotto.c` `UP_ODD`, `UP_ODD_MAX`; `c/fixed/sotto_fx_enc.c`
+  `odd_peaks_clear`): a candidate at or below 400 Hz whose odd harmonics stand at least 6 dB
+  clear doesn't pay the time-domain penalty. Above 400 Hz the check would mostly measure
+  fricative noise (it put one 500 Hz frame into EARS p025's /s/), so those candidates pay as
+  before.
+- **What changed:** 6313's ten doubled frames are back at her pitch; Nicole 00-05, LibriSpeech
+  251, the Speech Commands "two" and Sarah's foxtrot are unchanged frame for frame. Elsewhere
+  a few frames move on EARS p051 (11.4 s, about 100 to 200 Hz), p107 and LibriSpeech
+  3536 and 8842. pYIN gross errors over the 16 clean voices go 60 to 56 (6313 4 to 0), the
+  Kokoro voices are unchanged, and PESQ-NB stays flat (31 usual voices 1200 2.800 to 2.802,
+  400 2.100 to 2.106; 28 Kokoro voices 2.573 to 2.569, 1.828 to 1.827).
+- C is bit-exact with Python on 6313, EARS p025 and p051, Nicole 01 and 05, LibriSpeech 251
+  and 3436, the Speech Commands higher4 and foxtrot (EARS p070 differs in one frame, as it
+  did before this change). Fixed point matches float on 95.3% of sotto 1200 superframes over
+  the 16 clean voices (95.2% before).
+- **Listening round 29** (sotto 2400, 6313): with this check, her first 4 s come out exactly
+  as the old encoder's; the 4-8 s and 8-12 s pieces tied the old encoder, and "torch" beat
+  main (PR #194); null pair called correctly.
+
 ## Still open
 
 **Creaky phrase ends.** In LibriSpeech 3081 at 9.5-11 s, pYIN hears 60-65 Hz creak and sotto
