@@ -1,0 +1,30 @@
+# The harmonic-phase voice watermark prototype (watermark/): a synthetic-vowel round trip
+# through the simulated FM repeater, numpy and scipy only, about ten seconds. It needs no
+# codec build, so it runs only when watermark/ or this file changes.
+name: Watermark
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'watermark/**'
+      - '.github/workflows/watermark.yml'
+  pull_request:
+    paths:
+      - 'watermark/**'
+      - '.github/workflows/watermark.yml'
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python packages
+        run: |
+          pip install \
+            numpy \
+            scipy
+      - name: synthetic round trip through the repeater
+        run: python watermark/selftest.py
