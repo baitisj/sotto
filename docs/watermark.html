@@ -102,6 +102,17 @@ button:focus-visible, select:focus-visible, input:focus-visible, .filebtn:focus-
 .log li.future { opacity: 0.35; }
 .log li b { color: var(--ink); font-weight: 600; }
 
+.step { display: flex; flex-direction: column; gap: 0.7rem; padding-bottom: 1rem; border-bottom: 1px solid var(--rule); min-width: 0; }
+.step:last-child { border-bottom: 0; padding-bottom: 0; }
+.step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; }
+.stepnum { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--ink); color: var(--panel); font-family: var(--mono); font-size: 0.8rem; font-weight: 600; }
+.step-head h3 { font-size: 1.05rem; }
+.clipwave { position: relative; height: 64px; border-radius: 8px; background: var(--scope); border: 1px solid var(--rule); overflow: hidden; }
+.clipwave canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cliphead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); left: 0; }
+.clipmsg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 0.9rem; }
+.filebtn.off { opacity: 0.5; cursor: default; }
+.filebtn.off input { cursor: default; }
 .scope-wrap { position: relative; border-radius: 8px; background: var(--scope); border: 1px solid var(--rule); overflow: hidden; touch-action: none; cursor: pointer; }
 #scope { display: block; width: 100%; height: 300px; }
 .transport { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; align-items: center; }
@@ -144,76 +155,91 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
   </header>
 
   <section aria-labelledby="h-try">
-    <h2 id="h-try">Send an ID through a repeater</h2>
+    <h2 id="h-try">Record, embed, decode</h2>
     <div class="console">
-      <div class="row">
-        <div class="field"><span>Voice</span>
-          <div class="seg" role="group" aria-label="Voice">
+      <div class="step" aria-labelledby="h-step1">
+        <div class="step-head">
+          <span class="stepnum">1</span><h3 id="h-step1">Audio</h3>
+          <div class="seg" role="group" aria-label="Audio">
             <button type="button" id="src-251" aria-pressed="true">Male 251</button>
             <button type="button" id="src-3536" aria-pressed="false">Female 3536</button>
-            <button type="button" id="src-rec" aria-pressed="false">Record</button>
-            <button type="button" id="src-file" aria-pressed="false" hidden>File</button>
+            <button type="button" id="src-own" aria-pressed="false">Your own</button>
           </div>
         </div>
-        <label class="filebtn" id="file-label">Open a file…<input type="file" id="file" accept="audio/*"></label>
-        <span class="note" id="src-note"></span>
-      </div>
-      <div class="row">
-        <label class="field"><span>Sender</span>
-          <select id="mode">
-            <option value="mark">marks it with</option>
-            <option value="asis">sends it as it is</option>
-          </select>
-        </label>
-        <label class="field"><span>Call</span><input type="text" id="call" value="AG7EW" maxlength="6" spellcheck="false" autocomplete="off"></label>
-        <label class="field"><span>Tone</span><input type="text" id="code" value="5A" maxlength="2" spellcheck="false" autocomplete="off"></label>
-        <label class="field"><span>Band</span>
-          <select id="band">
-            <option value="0">500-2600 Hz, 4 bits per slot</option>
-            <option value="1">900-2000 Hz, 2 bits per slot</option>
-          </select>
-        </label>
-      </div>
-      <div class="row">
-        <label class="field"><span>Channel</span><select id="channel"></select></label>
-        <button type="button" class="go" id="run">Send and decode</button>
-        <span id="status" role="status"></span>
-      </div>
-      <div class="divider"></div>
-
-      <div class="readout">
-        <div class="id-card" id="idcard" aria-live="polite">
-          <span class="eyebrow">Receiver</span>
-          <span class="big" id="idbig">listening</span>
-          <span class="sub" id="idsub">&nbsp;</span>
+        <div class="clipwave" id="clipwrap"><canvas id="clipwave" aria-label="Waveform of the audio"></canvas><div class="cliphead" id="cliphead" hidden></div><span class="clipmsg" id="clipmsg"></span></div>
+        <div class="row">
+          <button type="button" id="rec" disabled>Record</button>
+          <label class="filebtn off" id="file-label">Open a file…<input type="file" id="file" accept="audio/*" disabled></label>
+          <button type="button" id="clip-play" disabled>Play</button>
+          <span class="note" id="clip-note"></span>
         </div>
-        <ol class="log" id="log"></ol>
       </div>
 
-      <div class="scope-wrap" id="scope-wrap"><canvas id="scope" aria-label="Receiver scope: audio, pitch, slot bits and codeword, with the playhead"></canvas></div>
-      <div class="legend">
-        <span><i style="background:var(--zero)"></i>bit 0</span>
-        <span><i style="background:var(--one)"></i>bit 1</span>
-        <span>slot rows: sub-bands, highest on top</span>
-        <span><i style="background:transparent;outline:2px solid var(--bad);outline-offset:-2px"></i>read wrong (when this page marked it)</span>
-        <span><i style="background:var(--good)"></i>codeword bit agrees with the decoded frame</span>
-      </div>
-      <div class="transport">
-        <button type="button" id="play" disabled>Play</button>
-        <div class="seg listen" role="group" aria-label="What you hear">
-          <button type="button" class="orig" id="hear-orig" aria-pressed="false">Original</button>
-          <button type="button" class="mark" id="hear-mark" aria-pressed="false">Marked</button>
-          <button type="button" id="hear-rx" aria-pressed="true">Through the channel</button>
+      <div class="step" aria-labelledby="h-step2">
+        <div class="step-head">
+          <span class="stepnum">2</span><h3 id="h-step2">Embed an ID</h3>
+          <label class="field"><input type="checkbox" id="embed-on" checked> <span>optional</span></label>
         </div>
-        <span class="time" id="time">0.0 / 0.0 s</span>
+        <div class="row">
+          <label class="field"><span>Call</span><input type="text" id="call" value="AG7EW" maxlength="6" spellcheck="false" autocomplete="off"></label>
+          <label class="field"><span>Tone</span><input type="text" id="code" value="5A" maxlength="2" spellcheck="false" autocomplete="off"></label>
+          <label class="field"><span>Band, both ends</span>
+            <select id="band">
+              <option value="0">500-2600 Hz, 4 bits per slot</option>
+              <option value="1">900-2000 Hz, 2 bits per slot</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <button type="button" id="embed" disabled>Embed</button>
+          <button type="button" id="marked-play" disabled>Play marked</button>
+          <button type="button" id="dl-mark" disabled>Download marked WAV</button>
+          <span class="note" id="embed-note"></span>
+        </div>
       </div>
-      <div class="stats" id="stats"></div>
-      <div class="dl">
-        <button type="button" id="dl-mark" disabled>Download marked WAV</button>
-        <button type="button" id="dl-rx" disabled>Download channel output WAV</button>
+
+      <div class="step" aria-labelledby="h-step3">
+        <div class="step-head">
+          <span class="stepnum">3</span><h3 id="h-step3">Decode</h3>
+        </div>
+        <div class="row">
+          <label class="field"><span>Through</span><select id="channel"></select></label>
+          <button type="button" class="go" id="run" disabled>Decode</button>
+          <span id="status" role="status"></span>
+        </div>
+
+        <div class="readout">
+          <div class="id-card" id="idcard" aria-live="polite">
+            <span class="eyebrow">Receiver</span>
+            <span class="big" id="idbig">waiting</span>
+            <span class="sub" id="idsub">&nbsp;</span>
+          </div>
+          <ol class="log" id="log"></ol>
+        </div>
+
+        <div class="scope-wrap" id="scope-wrap"><canvas id="scope" aria-label="Receiver scope: audio, pitch, slot bits and codeword, with the playhead"></canvas></div>
+        <div class="legend">
+          <span><i style="background:var(--zero)"></i>bit 0</span>
+          <span><i style="background:var(--one)"></i>bit 1</span>
+          <span>slot rows: sub-bands, highest on top</span>
+          <span><i style="background:transparent;outline:2px solid var(--bad);outline-offset:-2px"></i>read wrong (when step 2 marked it)</span>
+          <span><i style="background:var(--good)"></i>codeword bit agrees with the decoded frame</span>
+        </div>
+        <div class="transport">
+          <button type="button" id="play" disabled>Play</button>
+          <div class="seg listen" role="group" aria-label="What you hear">
+            <button type="button" class="orig" id="hear-orig" aria-pressed="false">Original</button>
+            <button type="button" class="mark" id="hear-mark" aria-pressed="false">Marked</button>
+            <button type="button" id="hear-rx" aria-pressed="true">What the receiver hears</button>
+          </div>
+          <span class="time" id="time">0.0 / 0.0 s</span>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div class="dl"><button type="button" id="dl-rx" disabled>Download what the receiver hears (WAV)</button></div>
       </div>
     </div>
-    <p class="note">The receiver never sees the sender's pitch track, the slot timing or the bits. Every 256 ms it re-reads all the audio heard so far: it tracks the pitch, finds the slot grid and the filters' phase bend blindly, and tries all 124 codeword starts. It counts an ID once the same frame decodes twice running. It works ahead of the playhead, and the display follows what had been heard at each moment. Files you open or record never leave the browser.</p>
+    <p class="note">Acoustic coupling: record your voice in step 1, embed, and play the marked audio into a radio's microphone. Then record what comes out of another radio's speaker as a new clip, skip step 2, and decode it with "Direct". Recording keeps the browser's echo cancelling, noise suppression and gain control off.</p>
+    <p class="note">The receiver never sees the sender's pitch track, the slot timing or the bits. Every 256 ms it re-reads all the audio heard so far: it tracks the pitch, finds the slot grid and the filters' phase bend blindly, and tries all 124 codeword starts. It counts an ID once the same frame decodes twice running. It works ahead of the playhead, and the display follows what had been heard at each moment. Audio you open or record never leaves the browser.</p>
   </section>
 
   <section aria-labelledby="h-results">
@@ -288,10 +314,11 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const status = t => { $("status").textContent = t; };
 const pause = () => new Promise(r => setTimeout(r, 30));
 
-let wm = null, srcKey = "251", source = null, sourceName = "", run = null, sweep = {};
+let wm = null, srcKey = "251", source = null, sourceName = "", marked = null, run = null, sweep = {};
+let own = null, ownName = "";
 const cacheVoice = {};
 
-// ------------------------------------------------------------------ sources
+// ------------------------------------------------------------------ step 1: audio
 async function decodeFile(buf) {
   const ac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
   const ab = await ac.decodeAudioData(buf);
@@ -309,100 +336,208 @@ async function loadVoice(key) {
   }).then(decodeFile);
   return cacheVoice[key];
 }
-function setSrcButtons(k) {
-  for (const b of ["251", "3536", "rec", "file"]) $("src-" + b).setAttribute("aria-pressed", b === k);
+function setSource(x, name) {
+  stopAll();
+  source = x; sourceName = name; marked = null; run = null; bufs = null;
+  const ownMode = srcKey === "own";
+  $("rec").disabled = !ownMode || !navigator.mediaDevices?.getUserMedia;
+  $("file").disabled = !ownMode; $("file-label").classList.toggle("off", !ownMode);
+  $("clip-play").disabled = !source;
+  $("clip-note").textContent = source ? `${name}, ${(source.length / FS).toFixed(1)} s` : (ownMode ? `Record up to ${MAX_S} s, or open a file (the first ${MAX_S} s are used).` : "");
+  $("clipmsg").textContent = source ? "" : (ownMode ? "Record or open a file" : "");
+  $("embed").disabled = !source || !$("embed-on").checked;
+  $("run").disabled = !source;
+  embedState();
+  drawClip();
+  render();
 }
 async function chooseVoice(key) {
   if (rec) return;
-  setSrcButtons(key);
-  srcKey = key; sourceName = VOICES[key].label;
-  $("src-note").textContent = "";
+  srcKey = key;
+  for (const b of ["251", "3536", "own"]) $("src-" + b).setAttribute("aria-pressed", b === key);
+  if (key === "own") { setSource(own, ownName); status(own ? "Embed an ID in step 2, or skip it and decode in step 3." : ""); return; }
   status("Loading the voice…");
-  source = await loadVoice(key);
-  await go();
+  const x = await loadVoice(key);
+  if (srcKey !== key) return;
+  setSource(x, VOICES[key].label);
+  // the canned voices run straight through steps 2 and 3
+  if ($("embed-on").checked) await doEmbed();
+  await doDecode();
 }
 $("src-251").onclick = () => chooseVoice("251").catch(fail);
 $("src-3536").onclick = () => chooseVoice("3536").catch(fail);
-$("src-file").onclick = () => { if (fileAudio) { setSrcButtons("file"); srcKey = "file"; source = fileAudio; sourceName = fileName; go().catch(fail); } };
-let fileAudio = null, fileName = "";
+$("src-own").onclick = () => chooseVoice("own").catch(fail);
+
 $("file").onchange = async ev => {
   const f = ev.target.files[0];
   if (!f) return;
   try {
     status("Reading " + f.name + "…");
-    fileAudio = await decodeFile(await f.arrayBuffer());
-    $("src-file").hidden = false; $("src-file").textContent = f.name.length > 18 ? f.name.slice(0, 16) + "…" : f.name;
-    setSrcButtons("file"); srcKey = "file"; source = fileAudio; sourceName = fileName = f.name;
-    $("src-note").textContent = fileAudio.length / FS >= MAX_S - 0.01 ? `first ${MAX_S} s` : "";
-    await go();
+    own = await decodeFile(await f.arrayBuffer()); ownName = f.name;
+    setSource(own, ownName);
+    status("Embed an ID in step 2, or skip it and decode in step 3.");
   } catch (e) { fail(new Error(`Couldn't read ${f.name} as audio (${e.message}). WAV, FLAC, MP3 and Ogg work in most browsers.`)); }
+  ev.target.value = "";
 };
 
-// microphone: record up to 20 s
+// microphone: up to MAX_S seconds, raw (no echo cancelling, noise suppression or AGC)
 let rec = null;
-$("src-rec").onclick = async () => {
+$("rec").onclick = async () => {
   if (rec) { rec.stop(); return; }
-  if (!navigator.mediaDevices?.getUserMedia) { fail(new Error("This browser offers no microphone here; open a recording instead.")); return; }
   try {
+    stopAll();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     const ac = new AudioContext(), node = ac.createScriptProcessor(4096, 1, 1), chunks = [];
     const srcN = ac.createMediaStreamSource(stream), t0 = performance.now();
-    node.onaudioprocess = e => { chunks.push(Float32Array.from(e.inputBuffer.getChannelData(0))); if (performance.now() - t0 > 20000) rec.stop(); };
+    let last = 0;
+    node.onaudioprocess = e => {
+      chunks.push(Float32Array.from(e.inputBuffer.getChannelData(0)));
+      const el = (performance.now() - t0) / 1000;
+      if (el - last > 0.2) { last = el; drawClip(chunks, el); $("clip-note").textContent = `recording ${el.toFixed(1)} s`; }
+      if (el > MAX_S) rec?.stop();
+    };
     srcN.connect(node); node.connect(ac.destination);
-    setSrcButtons("rec");
-    $("src-rec").innerHTML = '<span class="rec-dot"></span>Stop';
-    status("Recording: talk for 5-20 s, with vowels. Press Stop when done.");
+    $("rec").innerHTML = '<span class="rec-dot"></span>Stop';
+    for (const id of ["src-251", "src-3536", "file", "clip-play", "embed", "run"]) $(id).disabled = true;
+    $("file-label").classList.add("off");
+    source = null; marked = null; run = null; bufs = null;
+    embedState(); render();
+    $("clipmsg").textContent = "";
+    status("");
     rec = {
       stop: async () => {
+        if (!rec) return;
+        rec = null;
         node.disconnect(); srcN.disconnect(); stream.getTracks().forEach(t => t.stop());
         const n = chunks.reduce((a, c) => a + c.length, 0), x = new Float32Array(n);
         let p = 0; for (const c of chunks) { x.set(c, p); p += c.length; }
-        const fs = ac.sampleRate; ac.close(); rec = null;
-        $("src-rec").textContent = "Record";
-        if (n < fs) { fail(new Error("That was under a second. Record again and talk for a few seconds.")); return; }
-        source = levelTo(resampleTo8k(x, fs)); srcKey = "rec"; sourceName = "your recording";
-        await go().catch(fail);
+        const fs = ac.sampleRate; ac.close();
+        $("rec").textContent = "Record";
+        $("src-251").disabled = $("src-3536").disabled = false;
+        if (n < fs) { setSource(own, ownName); fail(new Error("That was under a second. Record again for a few seconds, with vowels.")); return; }
+        own = levelTo(resampleTo8k(x, fs)); ownName = "your recording";
+        setSource(own, ownName);
+        status("Embed an ID in step 2, or skip it and decode in step 3.");
       },
     };
   } catch (e) { fail(new Error("The microphone isn't available (" + e.message + "). Open a recording with “Open a file” instead.")); }
 };
 
-// ------------------------------------------------------------------ run
-for (const [k, c] of Object.entries(CHANNELS)) $("channel").add(new Option(c.label, k));
-$("channel").value = "rpt40";
-$("run").onclick = () => go().catch(fail);
-$("mode").onchange = () => { const m = $("mode").value === "mark"; $("call").disabled = $("code").disabled = !m; };
+// waveform of the step 1 audio (or the recording so far)
+function drawClip(chunks, seconds) {
+  const cv = $("clipwave"), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, Math.round(r.width * dpr)); cv.height = Math.max(1, Math.round(r.height * dpr));
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, r.width, r.height);
+  let x = source, D;
+  if (chunks) {
+    const n = chunks.reduce((a, c) => a + c.length, 0); x = new Float32Array(n);
+    let p = 0; for (const c of chunks) { x.set(c, p); p += c.length; }
+    D = Math.max(MAX_S / 4, seconds);
+  }
+  if (!x || !x.length) return;
+  const W = r.width, H = r.height, cols = Math.max(1, Math.floor(W)), len = chunks ? Math.round(x.length * Math.min(1, seconds / D)) : x.length;
+  const total = chunks ? Math.round(x.length * D / seconds) : x.length;
+  let pk = 1e-6; for (let i = 0; i < len; i += 5) pk = Math.max(pk, Math.abs(x[i]));
+  g.fillStyle = css("--zero");
+  for (let c = 0; c < cols; c++) {
+    const a = Math.floor(c / cols * total), b = Math.min(len, Math.floor((c + 1) / cols * total));
+    if (a >= len) break;
+    let m = 0; for (let i = a; i < b; i++) m = Math.max(m, Math.abs(x[i]));
+    const h = m / pk * H * 0.46;
+    g.fillRect(c, H / 2 - h, 1, Math.max(1, 2 * h));
+  }
+}
 
-function fail(e) { console.error(e); status(e.message || String(e)); $("run").disabled = false; }
-
+// ------------------------------------------------------------------ step 2: embed
 function settings() {
   const code = parseInt($("code").value, 16);
   const call = $("call").value.toUpperCase().replace(/[^A-Z0-9\/.\- ]/g, "").slice(0, 6) || "AG7EW";
-  return { mark: $("mode").value === "mark", call, code: Number.isFinite(code) ? code & 255 : 0x5a,
+  return { mark: $("embed-on").checked, call, code: Number.isFinite(code) ? code & 255 : 0x5a,
            band: +$("band").value, channel: $("channel").value };
 }
+function embedState() {
+  const on = $("embed-on").checked;
+  for (const id of ["call", "code"]) $(id).disabled = !on;
+  $("embed").disabled = !on || !source;
+  $("marked-play").disabled = $("dl-mark").disabled = !marked;
+  $("embed-note").textContent = !on ? "Skipped: step 3 decodes the audio as it is."
+    : marked ? `${marked.s.call} 0x${hex(marked.s.code)} in ${Math.round(100 * marked.share)}% of the slots (${(marked.ms / 1000).toFixed(1)} s).`
+    : source ? "Not embedded yet." : "";
+}
+function staleMark() { marked = null; run = null; bufs = null; stopAll(); embedState(); render(); }
+$("embed-on").onchange = staleMark;
+for (const id of ["call", "code"]) $(id).oninput = staleMark;
+$("band").onchange = staleMark;
+async function doEmbed() {
+  if (!source) return;
+  stopAll();
+  const s = settings();
+  $("embed-note").textContent = "Embedding…";
+  await pause();
+  const t0 = performance.now(), m = wm.mark(source, s.call, s.code, s.band);
+  marked = { ...m, s, ms: performance.now() - t0, share: m.used.reduce((a, b) => a + b, 0) / Math.max(1, m.used.length) };
+  run = null; bufs = null;
+  embedState(); render();
+}
+$("embed").onclick = () => doEmbed().catch(fail);
 
-async function process(x, s) {
-  const t0 = performance.now();
-  const marked = s.mark ? wm.mark(x, s.call, s.code, s.band) : null;
-  const tm = performance.now();
-  const heard = wm.channel(marked ? marked.y : x, s.channel, 1);
-  const rx = wm.receive(heard, s.band);
-  return { x, s, marked, heard, rx, ms: [tm - t0, performance.now() - tm] };
+// one-shot players for steps 1 and 2 (to hear them, or to play them into a radio)
+let clip = null;
+function playClip(x, btn, label) {
+  const was = clip && clip.btn === btn;
+  stopAll();
+  if (was || !x) return;
+  const a = audio(), b = a.createBuffer(1, x.length, FS), ch = b.getChannelData(0);
+  for (let i = 0; i < x.length; i++) ch[i] = Math.max(-1, Math.min(1, 2 * x[i]));
+  const s = a.createBufferSource(); s.buffer = b; s.connect(a.destination);
+  a.resume(); s.start();
+  const t0 = a.currentTime;
+  clip = { s, btn, label, t0, dur: x.length / FS };
+  btn.textContent = "Stop";
+  s.onended = () => { if (clip && clip.s === s) stopAll(); };
+  const step = () => {
+    if (!clip || clip.s !== s) return;
+    $("cliphead").style.left = (100 * Math.min(1, (a.currentTime - t0) / clip.dur)) + "%";
+    $("cliphead").hidden = false;
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+$("clip-play").onclick = () => playClip(source, $("clip-play"), "Play");
+$("marked-play").onclick = () => playClip(marked?.y, $("marked-play"), "Play marked");
+function stopAll() {
+  if (clip) { try { clip.s.stop(); } catch (e) {} clip.btn.textContent = clip.label; clip = null; }
+  $("cliphead").hidden = true;
+  stopAudio();
 }
 
-async function go() {
+// ------------------------------------------------------------------ step 3: decode
+for (const [k, c] of Object.entries(CHANNELS)) $("channel").add(new Option(c.label, k));
+$("channel").value = "rpt40";
+$("run").onclick = () => doDecode().catch(fail);
+
+function fail(e) { console.error(e); status(e.message || String(e)); $("run").disabled = !source; }
+
+async function doDecode() {
   if (!source) return;
   const s = settings();
+  if (s.mark && !marked) await doEmbed();
+  stopAll();
   $("run").disabled = true;
-  stopAudio();
-  status(s.mark ? "Marking, sending and decoding…" : "Sending and decoding…");
+  status("Sending and decoding…");
   await pause();
-  run = await process(source, s);
-  run.name = sourceName;
+  const t0 = performance.now();
+  const heard = wm.channel(marked ? marked.y : source, s.channel, 1);
+  const rx = wm.receive(heard, s.band);
+  run = { x: source, s: { ...s, mark: !!marked, call: marked ? marked.s.call : s.call, code: marked ? marked.s.code : s.code },
+          marked, heard, rx, name: sourceName };
   analyse(run);
-  $("run").disabled = false; $("play").disabled = false; $("dl-mark").disabled = !run.marked; $("dl-rx").disabled = false;
-  status(`${run.marked ? `Marked in ${(run.ms[0] / 1000).toFixed(1)} s, then ` : ""}sent and decoded in ${(run.ms[1] / 1000).toFixed(1)} s. Press Play to hear it and watch the receiver.`);
+  $("run").disabled = false; $("play").disabled = false; $("dl-rx").disabled = false;
+  $("hear-mark").disabled = !marked;
+  if (!marked && hear === 1) setHear(2);
+  status(`Sent and decoded in ${((performance.now() - t0) / 1000).toFixed(1)} s. Press Play to hear it and watch the receiver.`);
   bufs = null;
   pos = dur(); playing = false;
   render();
@@ -506,7 +641,15 @@ wrap.addEventListener("pointerdown", ev => {
 // ------------------------------------------------------------------ display
 function layout(W) { const x0 = 64; return { x0, w: Math.max(10, W - x0 - 10) }; }
 function render() {
-  if (!run) return;
+  if (!run) {
+    $("idcard").classList.remove("found");
+    $("idbig").textContent = "waiting";
+    $("idsub").textContent = source ? "Press Decode to run the receiver." : "Choose or record audio in step 1.";
+    $("log").innerHTML = ""; $("stats").innerHTML = ""; $("time").textContent = "0.0 / 0.0 s";
+    $("play").disabled = $("dl-rx").disabled = true;
+    const cv = $("scope"); cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
+    return;
+  }
   const p = now(), D = dur();
   $("time").textContent = `${p.toFixed(1)} / ${D.toFixed(1)} s`;
   const ev = run.rx.events;
@@ -519,7 +662,8 @@ function render() {
     $("idbig").textContent = `${conf.call} · 0x${hex(conf.code)}`;
     $("idsub").textContent = `ID after ${conf.t.toFixed(2)} s of audio, quality ${conf.quality.toFixed(2)}, ${run.name}`;
   } else {
-    $("idbig").textContent = cur && cur.got ? `${cur.call}?` : "listening";
+    const done = p >= D - 0.01 && !run.rx.events.some(e => e.confirmed);
+    $("idbig").textContent = done ? "no ID" : cur && cur.got ? `${cur.call}?` : "listening";
     $("idsub").textContent = cur ? `${Math.round(100 * cur.cover)}% of the ${NCODE} coded bits heard${cur.cover >= 0.8 ? ", trying every start" : ""}` : "nothing heard yet";
   }
   $("log").innerHTML = run.log.map(l => `<li class="${l.t > p + 1e-9 ? "future" : ""}"><span>${l.t.toFixed(2)} s</span><span>${l.html}</span></li>`).join("");
@@ -618,7 +762,7 @@ function draw(p, cur) {
   g.strokeStyle = C.ink; g.lineWidth = 2;
   g.beginPath(); g.moveTo(X(p), 2); g.lineTo(X(p), lanes.bits[0] + lanes.bits[1] + 2); g.stroke();
 }
-window.addEventListener("resize", () => render());
+window.addEventListener("resize", () => { render(); drawClip(); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => render());
 
 // ------------------------------------------------------------------ downloads
@@ -637,8 +781,8 @@ function download(x, name) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
-const fname = s => (run.name || "clip").replace(/\.[a-z0-9]+$/i, "").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 32);
-$("dl-mark").onclick = () => run?.marked && download(run.marked.y, `${fname()}-marked-${run.s.call.trim()}-${hex(run.s.code)}.wav`);
+const fname = (n = run?.name) => (n || "clip").replace(/\.[a-z0-9]+$/i, "").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 32);
+$("dl-mark").onclick = () => marked && download(marked.y, `${fname(sourceName)}-marked-${marked.s.call.trim()}-${hex(marked.s.code)}.wav`);
 $("dl-rx").onclick = () => run && download(run.heard, `${fname()}-${run.s.channel}.wav`);
 
 // ------------------------------------------------------------------ results table and sweep
