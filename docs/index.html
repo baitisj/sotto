@@ -59,6 +59,18 @@
   table.cmp th { color: var(--muted); font-weight: 600; font-size: 0.88rem; }
   table.cmp td.num { text-align: right; font-variant-numeric: tabular-nums; }
   table.cmp tr.best td { background: var(--accent-soft); }
+  .pages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 18px 0 10px; }
+  .tile { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px 12px; background: var(--card); border: 1px solid var(--line);
+          border-radius: 10px; color: var(--fg); text-decoration: none; min-width: 0; transition: border-color 0.12s; }
+  .tile:hover { border-color: var(--accent); }
+  .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tile b { font-size: 1rem; color: var(--accent); }
+  .tile span:last-child { color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+  .tile .kind { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+  .tile .kind.new { color: var(--warn); font-weight: 600; }
+  .jump { font-size: 0.9rem; color: var(--muted); }
+  @media (max-width: 760px) { .pages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
   @media (max-width: 680px) {
     .grid2 { grid-template-columns: 1fr; }
     .grid2 .row { grid-template-columns: 1fr auto; }
@@ -71,25 +83,18 @@
 <main>
   <h1>sotto</h1>
   <p class="lede">Open 2400 bit/s digital voice for FM radios: a vocoder, error correction and a C4FM modem path, built for small fixed-point DSPs. Slower links get the same 48-bit frame stretched to 1200, 600 and 400 bit/s.</p>
-  <p>New to vocoders? <a href="course/">How sotto works</a> is a short illustrated course (written for high-school students) on pitch, envelopes, quantization, synthesis and the radio link.</p>
-
-  <div class="try" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between">
-    <p style="margin:0;flex:1 1 360px"><b>New: progressive sotto.</b> Watch and hear a clip arrive in scans, like a progressive JPEG: rough after a quarter of the bits, sharper as the rest comes in. Squeeze the link with a resistor, pause it, or feed it your own voice.</p>
-    <a class="dl" href="progressive.html" style="background:var(--accent);color:var(--card)">Open the progressive demo</a>
-  </div>
-  <div class="try" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between">
-    <p style="margin:0;flex:1 1 360px"><b>On the air: FuSotto.</b> sotto inside standard C4FM, DMR and M17 frames, sent and received by unmodified handhelds. Keep the frame, open the voice.</p>
-    <a class="dl" href="fusotto.html">Read the FuSotto manifesto</a>
-  </div>
-  <div class="try" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between">
-    <p style="margin:0;flex:1 1 360px"><b>Text to speech: sotto-tts.</b> Type anything and hear it spoken at 1200 bit/s. The engine writes sotto frames for the decoder a radio already has, from a 37 KB table of sound pairs. Callsigns come out in NATO phonetics. <a href="tts-course/">How sotto-tts talks</a> is a high-school course on how it works.</p>
-    <a class="dl" href="tts.html">Try sotto-tts</a>
-  </div>
-  <div class="try" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between">
-    <p style="margin:0;flex:1 1 360px"><b>A callsign hidden in the voice.</b> The phase of the talker's odd harmonics carries a repeating ID frame that rides through an FM repeater with the speech, where a CTCSS tone would be stripped. Mark your own recording and watch the receiver decode it as it plays.</p>
-    <a class="dl" href="watermark.html">Try the voice watermark</a>
-  </div>
-  <h2 style="margin-top:24px">Why sotto</h2>
+  <nav class="pages" aria-label="sotto pages">
+    <a class="tile" href="progressive.html"><span class="kind">Demo</span><b>Progressive sotto</b><span>A clip arrives in scans like a progressive JPEG. Squeeze the link and hear what has arrived.</span></a>
+    <a class="tile" href="tts.html"><span class="kind">Demo</span><b>sotto-tts</b><span>Type anything and hear it spoken at 1200 bit/s, from a 37 KB table of sound pairs.</span></a>
+    <a class="tile" href="watermark.html"><span class="kind new">New</span><b>Voice watermark</b><span>A callsign in the phase of the voice's harmonics, decoded after a repeater as it plays.</span></a>
+    <a class="tile" href="fusotto.html"><span class="kind">Manifesto</span><b>FuSotto</b><span>sotto inside standard C4FM, DMR and M17 frames, on unmodified handhelds.</span></a>
+    <a class="tile" href="course/"><span class="kind">Course</span><b>How sotto works</b><span>Pitch, envelopes, quantization, synthesis and the radio link, for high-school students.</span></a>
+    <a class="tile" href="tts-course/"><span class="kind">Course</span><b>How sotto-tts talks</b><span>From letters to sounds to sotto frames, step by step.</span></a>
+    <a class="tile" href="diphone-hunt.html"><span class="kind">Lab</span><b>Diphone hunt</b><span>Every sound pair of the speech table, heard four ways, worst first.</span></a>
+    <a class="tile" href="https://github.com/baitisj/sotto"><span class="kind">Code</span><b>baitisj/sotto</b><span>The codec, modem, C ports and these pages, MIT-licensed.</span></a>
+  </nav>
+  <p class="jump">On this page: <a href="#why">Why sotto</a> · <a href="#try">Try your own voice</a> · <a href="#rates">Four rates</a> · <a href="#part1">Codec 2 encoder</a> · <a href="#part2">More voices</a> · <a href="#part3">Channel protection</a> · <a href="#part4">Neural vocoder</a></p>
+  <h2 id="why" style="margin-top:24px">Why sotto</h2>
   <p>Open digital voice on ham radio mostly means Codec 2, whose low-rate modes are no longer being developed, while every Fusion, D-STAR and DMR radio carries a closed AMBE vocoder. The newest open voice codecs are neural networks, which need far more processing than the radios people already own. sotto is built for those radios: the TI C5517 DSP inside a Yaesu FTM-300D, and the 168 MHz Cortex-M4 in OpenRTX handhelds such as the TYT MD-UV380, which the M17 project uses. In simulation its v3.8 encoder and decoder fit both chips (on average, C5517: 137 and 55 MHz of 200; Cortex-M4: 118 and 36 MHz of 168), and it is MIT-licensed.</p>
   <p>Is a small codec giving up much? We tested sotto against FARGAN, the neural vocoder in Opus, decoding the same 2400 bit/s bits. Stock FARGAN came out level with sotto's own decoder, at several times the compute and eight times the memory, too much for either radio. Remove sotto's hiss index (the 4-8 kHz band carried in bits sotto already sends) and FARGAN gets worse, so that idea helps a neural decoder too. Listen in <a href="#part4">Part 4</a>; details in <a href="https://github.com/baitisj/sotto/blob/main/docs/fargan-study.md">fargan-study.md</a>.</p>
   <div class="tablewrap"><table class="cmp">
@@ -102,7 +107,7 @@
   </table></div>
   <p class="note">Wideband PESQ (0-8 kHz), mean of 10 clean voices, no radio channel. FARGAN fed the original speech's own features scores 2.72, but those take far more than 2400 bit/s to send; the gap is mostly sotto's 34-bit envelope, and closing it would mean retraining a network for each target, on hardware this project doesn't assume.</p>
 
-  <h2 style="margin-top:24px">Try it with your own voice</h2>
+  <h2 id="try" style="margin-top:24px">Try it with your own voice</h2>
   <section class="try" aria-labelledby="try-h">
     <p id="try-h" style="margin-top:0">Record up to 30 seconds, or pick an audio file, and the page encodes the same recording at all four rates (2400, 1200, 600 and 400 bit/s) and decodes each one, so you can switch between them. The encoders and decoders run here, in your browser, compiled to WebAssembly from the same C code that targets the radios; nothing is uploaded. A <code>.sot</code> file is the bitstream itself: 6 bytes per frame, so 300, 150, 75 or 50 bytes a second (the C tools decode it too: <code>c/sotto_dec -16 [-1200|-600|-400] file.sot out.raw</code>). Every rate here carries the 4-8 kHz hiss band; the menu also plays plain sotto 600 and 400, the 8 kHz streams the UV-K6 pager sends (<code>sotto_enc -600|-400</code>).</p>
     <div class="controls">
@@ -132,7 +137,7 @@
   <p class="note">PESQ is narrowband (0-4 kHz, mean of the six voices), so it can't hear the 4-8 kHz hiss band. Listening tests on other voices: sotto 1200 hiss beat plain sotto 1200 in all 6 pairs and came close to v3.8 (2 ties, 1 loss); sotto 600 beat Codec 2 700C (3-0) and Codec 2 1200 (2-0); sotto 400 split 1-1 with Codec 2 700C. Adding the hiss band to 600 and 400 won all 7 of its listening pairs against the plain modes, and sotto 600 hiss tied sotto 1200 hiss (2 of 2); with it, narrowband PESQ moves from 2.09 to 2.12 at 600 and from 1.76 to 1.79 at 400. Details: <a href="https://github.com/baitisj/sotto/blob/main/docs/sotto-1200-hiss.md">sotto-1200-hiss.md</a>, <a href="https://github.com/baitisj/sotto/blob/main/docs/sotto-vlr.md">sotto-vlr.md</a>.</p>
   <div id="rategrid" class="grid2"></div>
 
-  <h2>Part 1: sotto's encoder against Codec 2's</h2>
+  <h2 id="part1">Part 1: sotto's encoder against Codec 2's</h2>
   <p>Both encoders run at 2400 bit/s (48 bits every 20 ms). Each pair went through exactly the same chain: the same System Fusion (C4FM) frames and error protection, the same simulated radio channel with the same fading, and the same software receiver. The only difference is the encoder and decoder.</p>
   <p>
     <span class="cond">no radio channel</span>
@@ -144,11 +149,11 @@
 
   <div id="encoders"></div>
 
-  <h2>Part 2: more voices, no radio channel</h2>
+  <h2 id="part2">Part 2: more voices, no radio channel</h2>
   <p>Eight LibriSpeech readers whose voices were kept out of the codebook's training (the same 12 s clips sotto's tests score), at 16 kHz. No radio channel, so this is the codec alone. The sotto rows are decoded here from the encoder's 3600 bytes per clip.</p>
   <div id="more" class="grid2"></div>
 
-  <h2>Part 3: same encoder (Codec 2), different channel protection</h2>
+  <h2 id="part3">Part 3: same encoder (Codec 2), different channel protection</h2>
   <p>These clips all use the stock Codec 2 2400 encoder. The rows differ only in how the voice bits are protected and where they sit in the Fusion frame.</p>
   <p>
     <span class="cond">UHF 446 MHz, 60 km/h, 52 dB-Hz</span>
