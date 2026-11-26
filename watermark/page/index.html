@@ -1,0 +1,304 @@
+<title>Harmonic Phase Watermark</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; listening cards in a two-up grid that stacks on phones. */
+:root {
+  --bg: #eef1f4;
+  --panel: #ffffff;
+  --ink: #15202a;
+  --muted: #56636f;
+  --rule: #d3dae1;
+  --clean: #5b6b7a;
+  --mark: #c25e00;
+  --mark-soft: #fbe9d7;
+  --good: #1f7a4d;
+  --warn: #9a6a00;
+  --bad: #b23a3a;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --panel: #172029; --ink: #e4eaef; --muted: #98a6b3; --rule: #2a3642;
+    --clean: #9fb0c0; --mark: #f29a45; --mark-soft: #3a2817; --good: #5fc690; --warn: #e2b340; --bad: #ec7b7b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --panel: #172029; --ink: #e4eaef; --muted: #98a6b3; --rule: #2a3642;
+  --clean: #9fb0c0; --mark: #f29a45; --mark-soft: #3a2817; --good: #5fc690; --warn: #e2b340; --bad: #ec7b7b;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 2.5rem 4rem;
+}
+main { max-width: 60rem; margin: 0 auto; display: flex; flex-direction: column; gap: 2.75rem; }
+h1, h2, h3 { font-family: var(--display); font-stretch: 112%; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.8rem); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; font-weight: 700; }
+h3 { font-size: 1rem; font-weight: 700; }
+p { margin: 0; max-width: 65ch; }
+.eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+header { display: flex; flex-direction: column; gap: 0.9rem; }
+.lede { font-size: 1.12rem; color: var(--ink); }
+section { display: flex; flex-direction: column; gap: 1rem; }
+.note { color: var(--muted); font-size: 0.92rem; }
+code, .num { font-family: var(--mono); font-size: 0.88em; }
+.num { font-variant-numeric: tabular-nums; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; }
+.ab { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; }
+.ab-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.ab-head .eyebrow { font-size: 0.7rem; }
+.ab-controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+button { font: inherit; cursor: pointer; border-radius: 7px; border: 1px solid var(--rule); background: transparent; color: var(--ink); padding: 0.45rem 0.8rem; }
+button:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+.play { min-width: 5.2rem; font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 0.45rem 0.85rem; font-family: var(--mono); font-size: 0.85rem; }
+.seg button[aria-pressed="true"].a { background: var(--clean); color: var(--panel); }
+.seg button[aria-pressed="true"].b { background: var(--mark); color: var(--panel); }
+.bar { position: relative; height: 34px; border-radius: 6px; background: var(--bg); cursor: pointer; overflow: hidden; touch-action: none; }
+.bar canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bar .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); left: 0; }
+.time { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; }
+.status { font-size: 0.8rem; color: var(--muted); min-height: 1.2em; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: right; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--rule); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+tbody tr:last-child td { border-bottom: 0; }
+td .sub { color: var(--muted); font-size: 0.8rem; }
+.pill { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 99px; font-family: var(--mono); font-size: 0.8rem; }
+.pill.good { color: var(--good); border: 1px solid currentColor; }
+.pill.warn { color: var(--warn); border: 1px solid currentColor; }
+.pill.bad { color: var(--bad); border: 1px solid currentColor; }
+
+.how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+@media (max-width: 720px) { .how { grid-template-columns: minmax(0, 1fr); } }
+.how ol { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.55rem; max-width: 65ch; }
+.diagram { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 0.8rem; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; height: auto; min-width: 300px; }
+.formula { font-family: var(--mono); background: var(--mark-soft); padding: 0.6rem 0.8rem; border-radius: 8px; font-size: 0.9rem; overflow-x: auto; }
+ul.plain { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.45rem; max-width: 65ch; }
+footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--rule); padding-top: 1rem; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">sotto lab · FM voice · AG7EW · prototype, simulation only</span>
+    <h1>Harmonic phase watermark</h1>
+    <p class="lede">Data riding inside the voice itself, so it passes through a repeater the way the speech does. The sender locks to the talker's pitch and turns the phase of the odd harmonics between 500 and 2600 Hz so each 32 ms slot carries four bits. Here it carries a repeating ID frame: callsign <code>AG7EW</code> and a one-byte "tone" code, protected by a CRC.</p>
+    <p class="note">Listen first: does B sound different from A? Toggle while it plays; both stay in sync. Headphones help.</p>
+  </header>
+
+  <section aria-labelledby="h-listen">
+    <h2 id="h-listen">Listen</h2>
+    <div class="grid" id="players"></div>
+    <p class="note">Voices: LibriSpeech dev-clean speakers 251 (male) and 3536 (female), 8 kHz, CC BY 4.0. "Through a repeater" means two simulated FM hops at a strong 40 dB carrier-to-noise ratio, with the same noise in A and B.</p>
+  </section>
+
+  <section aria-labelledby="h-results">
+    <h2 id="h-results">Does the ID get through?</h2>
+    <p>Each channel was run on both voices. <b>Raw bits</b> are slot bits the receiver read where the sender had marked, with the share it got wrong. <b>ID decoded</b> is how many seconds of talking passed before the receiver decoded the full frame (and confirmed it on the next try). Unmarked speech was decoded through every channel as a control.</p>
+    <div class="table-wrap"><table id="results"></table></div>
+    <p class="note" id="control-note"></p>
+  </section>
+
+  <section aria-labelledby="h-how">
+    <h2 id="h-how">How it works</h2>
+    <div class="how">
+      <ol>
+        <li>sotto's pitch tracker follows the talker's fundamental, F0. The sender tracks the 300-3000 Hz version of its own speech, which is what a receiver will hear, and marks only where that agrees with the full-band pitch.</li>
+        <li>Each harmonic <i>k</i> is mixed down by <i>k</i>·F0 and low-passed at 30 Hz, giving its slowly varying amplitude and phase.</li>
+        <li>For an odd harmonic and its even neighbours, the second phase difference ignores timing, delay and small pitch errors entirely. The sender rotates the odd harmonic by at most 90° to set it to 0° (bit 0) or 180° (bit 1). The even harmonics stay untouched as the reference.</li>
+        <li>The receiver tracks pitch on what it hears, reads the same quantity, finds slot timing and the repeater's filter phase bend blindly, and feeds soft bits to a K=7 rate-1/2 Viterbi decoder.</li>
+      </ol>
+      <div class="diagram">
+        <svg viewBox="0 0 420 210" role="img" aria-label="Harmonic comb: odd harmonics in the data band are rotated, even ones are the reference">
+          <line x1="20" y1="170" x2="410" y2="170" stroke="var(--rule)" stroke-width="1.5" fill="none"/>
+          <rect x="66" y="30" width="300" height="140" fill="var(--mark-soft)" stroke="none"/>
+          <text x="216" y="22" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">data band 500-2600 Hz</text>
+          <g id="comb"></g>
+          <text x="20" y="190" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">0</text>
+          <text x="404" y="190" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">3 kHz</text>
+          <rect x="20" y="198" width="10" height="8" fill="var(--mark)"/>
+          <text x="34" y="205" font-family="Archivo, sans-serif" font-size="10" fill="var(--ink)">rotated (odd k)</text>
+          <rect x="130" y="198" width="10" height="8" fill="var(--clean)"/>
+          <text x="144" y="205" font-family="Archivo, sans-serif" font-size="10" fill="var(--ink)">reference (even k)</text>
+        </svg>
+      </div>
+    </div>
+    <p class="formula">D<sub>k</sub> = arg( z<sub>k+1</sub> · z<sub>k−1</sub> / z<sub>k</sub>² ) = ψ<sub>k+1</sub> − 2ψ<sub>k</sub> + ψ<sub>k−1</sub> &nbsp;→&nbsp; 0° or 180°</p>
+  </section>
+
+  <section aria-labelledby="h-limits">
+    <h2 id="h-limits">What it can and can't do yet</h2>
+    <ul class="plain" id="limits">
+      <li>Nothing gets through in pauses or unvoiced sounds: only about 40% of slots carry data, so the four bits per slot work out to roughly 20-50 usable raw bits per second while someone talks.</li>
+      <li>The rotation has to be the full amount. At 60% strength the speech's own phase pattern leaks through and a repeater pushes bit errors past 15%; at 40% even a clean wire gives 25% errors.</li>
+      <li>The receiver is offline: whole-utterance pitch tracking and zero-phase filters. A live receiver needs a causal tracker and about 50 ms of delay.</li>
+      <li>Everything here is simulated. An over-the-air test through the Pluto on 70 cm is the next step.</li>
+    </ul>
+  </section>
+
+  <footer>Code: <code>watermark/</code> in baitisj/sotto (harmonic.py, fmchan.py, fec.py). Generated <span class="num" id="gen"></span>.</footer>
+</main>
+
+<script>
+const RESULTS = __RESULTS__;
+const PLAYERS = [
+  { voice: "251_m", label: "Male · speaker 251", cond: "Direct", a: "librispeech_251_m-clean.wav", b: "librispeech_251_m-marked.wav" },
+  { voice: "3536_f", label: "Female · speaker 3536", cond: "Direct", a: "librispeech_3536_f-clean.wav", b: "librispeech_3536_f-marked.wav" },
+  { voice: "251_m", label: "Male · speaker 251", cond: "Through a repeater", a: "librispeech_251_m-clean-rpt.wav", b: "librispeech_251_m-marked-rpt.wav" },
+  { voice: "3536_f", label: "Female · speaker 3536", cond: "Through a repeater", a: "librispeech_3536_f-clean-rpt.wav", b: "librispeech_3536_f-marked-rpt.wav" },
+  { voice: "251_m", label: "Male · speaker 251", cond: "Narrow band 900-2000 Hz", a: "librispeech_251_m-clean.wav", b: "librispeech_251_m-narrow.wav" },
+  { voice: "3536_f", label: "Female · speaker 3536", cond: "Narrow band 900-2000 Hz", a: "librispeech_3536_f-clean.wav", b: "librispeech_3536_f-narrow.wav" },
+];
+
+let ctx = null;
+const cache = new Map();
+function audioCtx() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; }
+async function load(url) {
+  if (!cache.has(url)) cache.set(url, fetch(url).then(r => { if (!r.ok) throw new Error(url + " " + r.status); return r.arrayBuffer(); }).then(b => audioCtx().decodeAudioData(b)));
+  return cache.get(url);
+}
+let current = null;
+
+function makePlayer(cfg, i) {
+  const el = document.createElement("div");
+  el.className = "ab";
+  el.innerHTML = `
+    <div class="ab-head"><h3>${cfg.label}</h3><span class="eyebrow">${cfg.cond}</span></div>
+    <div class="ab-controls">
+      <button class="play" id="play-${i}" type="button">Play</button>
+      <div class="seg" role="group" aria-label="Choose A or B">
+        <button class="a" id="a-${i}" type="button" aria-pressed="true">A clean</button>
+        <button class="b" id="b-${i}" type="button" aria-pressed="false">B marked</button>
+      </div>
+      <span class="time" id="t-${i}">0.0 / 12.0 s</span>
+    </div>
+    <div class="bar" id="bar-${i}"><canvas></canvas><div class="head"></div></div>
+    <div class="status" id="s-${i}"></div>`;
+  const st = { cfg, el, playing: false, which: "a", offset: 0, start: 0, srcs: [], gains: null, bufs: null, dur: 12 };
+  const $ = s => el.querySelector(s);
+  const playBtn = $(".play"), aBtn = $(".a"), bBtn = $(".b"), bar = $(".bar"), head = $(".head"), time = $(".time"), status = $(".status");
+
+  async function ensure() {
+    if (st.bufs) return true;
+    status.textContent = "Loading…";
+    try {
+      st.bufs = await Promise.all([load(cfg.a), load(cfg.b)]);
+      st.dur = Math.min(st.bufs[0].duration, st.bufs[1].duration);
+      status.textContent = "";
+      drawWave();
+      return true;
+    } catch (e) { status.textContent = "Could not load the audio: " + e.message; return false; }
+  }
+  function drawWave() {
+    const c = $("canvas"), r = bar.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    c.width = Math.max(1, r.width * dpr); c.height = r.height * dpr;
+    const g = c.getContext("2d"), d = st.bufs[0].getChannelData(0), n = c.width, step = Math.floor(d.length / n) || 1;
+    const css = getComputedStyle(document.documentElement);
+    g.fillStyle = css.getPropertyValue(st.which === "a" ? "--clean" : "--mark").trim();
+    let peak = 1e-6; for (let k = 0; k < d.length; k += 4) peak = Math.max(peak, Math.abs(d[k]));
+    for (let x = 0; x < n; x++) {
+      let m = 0; for (let k = x * step; k < (x + 1) * step && k < d.length; k++) m = Math.max(m, Math.abs(d[k]));
+      const h = (m / peak) * c.height * 0.45;
+      g.fillRect(x, c.height / 2 - h, 1, Math.max(1, 2 * h));
+    }
+  }
+  function stopSrcs() { st.srcs.forEach(s => { try { s.stop(); } catch (e) {} }); st.srcs = []; }
+  function startAt(t) {
+    const ac = audioCtx();
+    stopSrcs();
+    st.gains = st.bufs.map((b, k) => { const g = ac.createGain(); g.gain.value = (k === 0) === (st.which === "a") ? 1 : 0; g.connect(ac.destination); return g; });
+    st.srcs = st.bufs.map((b, k) => { const s = ac.createBufferSource(); s.buffer = b; s.connect(st.gains[k]); s.start(0, t); return s; });
+    st.srcs[0].onended = () => { if (st.playing && pos() >= st.dur - 0.05) { st.playing = false; st.offset = 0; playBtn.textContent = "Play"; } };
+    st.start = ac.currentTime - t;
+  }
+  function pos() { return st.playing ? Math.min(audioCtx().currentTime - st.start, st.dur) : st.offset; }
+  function tick() {
+    const p = pos();
+    head.style.left = (100 * p / st.dur) + "%";
+    time.textContent = p.toFixed(1) + " / " + st.dur.toFixed(1) + " s";
+    if (st.playing) requestAnimationFrame(tick);
+  }
+  async function play() {
+    if (!(await ensure())) return;
+    await audioCtx().resume();
+    if (current && current !== st) current.pause();
+    current = st;
+    st.playing = true; playBtn.textContent = "Pause";
+    startAt(st.offset >= st.dur - 0.05 ? 0 : st.offset);
+    tick();
+  }
+  st.pause = () => { if (!st.playing) return; st.offset = pos(); st.playing = false; stopSrcs(); playBtn.textContent = "Play"; tick(); };
+  function choose(w) {
+    st.which = w;
+    aBtn.setAttribute("aria-pressed", w === "a"); bBtn.setAttribute("aria-pressed", w === "b");
+    if (st.gains) {
+      const ac = audioCtx(), t = ac.currentTime;
+      st.gains.forEach((g, k) => { const v = (k === 0) === (w === "a") ? 1 : 0; g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(v, t + 0.015); });
+    }
+    if (st.bufs) drawWave();
+  }
+  playBtn.addEventListener("click", () => st.playing ? st.pause() : play());
+  aBtn.addEventListener("click", () => choose("a"));
+  bBtn.addEventListener("click", () => choose("b"));
+  bar.addEventListener("pointerdown", async ev => {
+    const r = bar.getBoundingClientRect(), t = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * st.dur;
+    if (!(await ensure())) return;
+    st.offset = t;
+    if (st.playing) startAt(t); else tick();
+  });
+  el.addEventListener("keydown", ev => { if (ev.key === "a" || ev.key === "A") choose("a"); if (ev.key === "b" || ev.key === "B") choose("b"); });
+  return el;
+}
+const host = document.getElementById("players");
+PLAYERS.forEach((c, i) => host.appendChild(makePlayer(c, i)));
+
+// results table
+const CH = [
+  ["bandpass", "300-3000 Hz filter only"],
+  ["simplex-25dB", "Simplex FM, 25 dB"],
+  ["repeater-40dB", "Repeater, strong (40 dB)"],
+  ["repeater-25dB", "Repeater, 25 dB"],
+  ["repeater-hot", "Repeater, loud talker (limiter)"],
+  ["repeater-15dB", "Repeater, noisy input (15 dB)"],
+  ["repeater-10dB", "Repeater, weak input (10 dB)"],
+];
+function berPill(b) { const cls = b < 0.08 ? "good" : b < 0.15 ? "warn" : "bad"; return `<span class="pill ${cls}">${(100 * b).toFixed(1)}%</span>`; }
+function cell(r) {
+  if (!r) return "<td>–</td><td>–</td>";
+  const dec = r.first_decode_s == null ? `<span class="pill bad">no</span>` : `<span class="num">${r.first_decode_s.toFixed(1)} s</span>`;
+  return `<td><span class="num">${r.raw_bps.toFixed(0)}</span> <span class="sub">bit/s</span> ${berPill(r.raw_ber)}</td><td>${dec}</td>`;
+}
+const voices = Object.keys(RESULTS.full);
+let html = `<thead><tr><th>Channel</th>${voices.map(v => `<th>${v} raw bits</th><th>${v} ID decoded</th>`).join("")}</tr></thead><tbody>`;
+for (const [k, label] of CH) html += `<tr><td>${label}</td>${voices.map(v => cell(RESULTS.full[v].channels[k])).join("")}</tr>`;
+html += "</tbody>";
+document.getElementById("results").innerHTML = html;
+document.getElementById("control-note").textContent = RESULTS.control_note;
+document.getElementById("gen").textContent = RESULTS.generated;
+
+// comb diagram: F0 = 130 Hz
+(function () {
+  const g = document.getElementById("comb"), f0 = 130, x = f => 20 + f / 3000 * 390;
+  let s = "";
+  for (let k = 1; k * f0 < 3000; k++) {
+    const f = k * f0, inband = f >= 500 && f <= 2600, h = 120 * Math.exp(-Math.pow((f - 600) / 900, 2)) + 18;
+    const col = inband && k % 2 ? "var(--mark)" : "var(--clean)";
+    s += `<rect x="${(x(f) - 3).toFixed(1)}" y="${(170 - h).toFixed(1)}" width="6" height="${h.toFixed(1)}" fill="${col}" opacity="${f < 300 ? 0.35 : 1}"/>`;
+  }
+  g.innerHTML = s;
+})();
+</script>
