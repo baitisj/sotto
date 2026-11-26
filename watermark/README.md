@@ -5,7 +5,7 @@ the speech does (a CTCSS tone or subaudible data is filtered off by the repeater
 high-pass and regenerated). The use in mind is a digital "tone squelch": a short ID frame
 (callsign plus a one-byte code) that a receiver decodes after a few seconds of talking.
 
-Simulation only so far. Try it in the browser: [docs/watermark.html](../docs/watermark.html)
+Try it in the browser: [docs/watermark.html](../docs/watermark.html)
 (https://baitisj.github.io/sotto/watermark.html), which runs the C port below as WebAssembly.
 
 ## How it works
@@ -68,6 +68,26 @@ Strength sweep (rotation as a fraction of the full amount, 2 sub-bands): 0.6 lea
 errors through a 25 dB repeater, 0.4 gives 24-27% even on a clean wire, because the speech's own
 phase pattern leaks through. Full rotation stays.
 
+## Over the air (2026-11-26)
+
+`ota.py prep` writes the transmit WAVs and `ota.py read` decodes a capture. Bench jobs went
+through the blowfang bench inbox on 441.850 MHz with an AG7EW ident.
+
+- **wmota-1** (Pluto sends, the same Pluto listens in the background): only noise came back.
+  A Pluto can't hear its own transmission, because transmit and receive share one baseband
+  sample rate and `send` sets it to 2.4 MS/s under the running capture. Not a watermark
+  result.
+- **wmota-2** (IC-7100 sends, Pluto listens): the IC-7100 sent the plain marked speech at RF
+  power 0 through its own FM transmit chain (data-mode USB audio, its pre-emphasis, limiter and
+  filters), then the unmarked speech as a control. The Pluto received the flat discriminator
+  audio, and `ota.py read --audio` de-emphasised it and band-limited it to 300-3000 Hz.
+  The IC-7100 was used because a second transmitter was needed.
+
+| Sent | 251 raw | 251 ID | 3536 raw | 3536 ID |
+|---|---|---|---|---|
+| Marked | 41 bit/s, 8.1% | 3.6 s, AG7EW | 42 bit/s, 11.0% | 4.1 s, AG7EW |
+| Unmarked control | 47% wrong | none | 45% wrong | none |
+
 ## Run it
 
 The pitch tracker imports `sim/audio_race.py`, which needs `pesq`, and runs `c2sim`, so build
@@ -84,7 +104,7 @@ python watermark/selftest.py                               # synthetic vowel, nu
 
 ## Next
 
-- Over the air through the Pluto on 70 cm (bench runner, AG7EW ident), then a real repeater.
+- A handheld's own receiver (UV-380 FM tap) and a real repeater.
 - A causal receiver: fixed-lag pitch tracking and causal heterodyne filters (about 50 ms delay).
 - Fewer audible changes for the same bits: choose among several equivalent codewords the one
   closest to the speech's own phases (wet-paper or syndrome-trellis coding), and weight the
