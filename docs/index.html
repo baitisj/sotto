@@ -85,6 +85,10 @@
     <p style="margin:0;flex:1 1 360px"><b>Text to speech: sotto-tts.</b> Type anything and hear it spoken at 1200 bit/s. The engine writes sotto frames for the decoder a radio already has, from a 37 KB table of sound pairs. Callsigns come out in NATO phonetics. <a href="tts-course/">How sotto-tts talks</a> is a high-school course on how it works.</p>
     <a class="dl" href="tts.html">Try sotto-tts</a>
   </div>
+  <div class="try" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between">
+    <p style="margin:0;flex:1 1 360px"><b>A callsign hidden in the voice.</b> The phase of the talker's odd harmonics carries a repeating ID frame that rides through an FM repeater with the speech, where a CTCSS tone would be stripped. Mark your own recording and watch the receiver decode it as it plays.</p>
+    <a class="dl" href="watermark.html">Try the voice watermark</a>
+  </div>
   <h2 style="margin-top:24px">Why sotto</h2>
   <p>Open digital voice on ham radio mostly means Codec 2, whose low-rate modes are no longer being developed, while every Fusion, D-STAR and DMR radio carries a closed AMBE vocoder. The newest open voice codecs are neural networks, which need far more processing than the radios people already own. sotto is built for those radios: the TI C5517 DSP inside a Yaesu FTM-300D, and the 168 MHz Cortex-M4 in OpenRTX handhelds such as the TYT MD-UV380, which the M17 project uses. In simulation its v3.8 encoder and decoder fit both chips (on average, C5517: 137 and 55 MHz of 200; Cortex-M4: 118 and 36 MHz of 168), and it is MIT-licensed.</p>
   <p>Is a small codec giving up much? We tested sotto against FARGAN, the neural vocoder in Opus, decoding the same 2400 bit/s bits. Stock FARGAN came out level with sotto's own decoder, at several times the compute and eight times the memory, too much for either radio. Remove sotto's hiss index (the 4-8 kHz band carried in bits sotto already sends) and FARGAN gets worse, so that idea helps a neural decoder too. Listen in <a href="#part4">Part 4</a>; details in <a href="https://github.com/baitisj/sotto/blob/main/docs/fargan-study.md">fargan-study.md</a>.</p>

@@ -1,16 +1,25 @@
-# The harmonic-phase voice watermark prototype (watermark/): a synthetic-vowel round trip
-# through the simulated FM repeater, numpy and scipy only, about ten seconds. It needs no
-# codec build, so it runs only when watermark/ or this file changes.
+# The harmonic-phase voice watermark (watermark/) and its browser page (docs/watermark.*). Python:
+# a synthetic-vowel round trip through the simulated FM repeater (numpy and scipy, about ten
+# seconds). C port (watermark/c): its tables match the generator, and the core library (built
+# with cc alone, no codec build) matches the Python step for step. Page: the committed
+# docs/watermark.wasm marks, sends and decodes a synthetic voice under node. Nothing here builds
+# the codec, so it runs only when these paths change. One path per line.
 name: Watermark
 on:
   push:
     branches: [main]
     paths:
       - 'watermark/**'
+      - 'docs/watermark.html'
+      - 'docs/watermark.js'
+      - 'docs/watermark.wasm'
       - '.github/workflows/watermark.yml'
   pull_request:
     paths:
       - 'watermark/**'
+      - 'docs/watermark.html'
+      - 'docs/watermark.js'
+      - 'docs/watermark.wasm'
       - '.github/workflows/watermark.yml'
 
 jobs:
@@ -28,3 +37,14 @@ jobs:
             scipy
       - name: synthetic round trip through the repeater
         run: python watermark/selftest.py
+      - name: C tables match the generator
+        run: python watermark/c/gen_tables.py --check
+      - name: C port against the Python
+        run: |
+          make -C watermark/c
+          python watermark/check_c.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: page's WebAssembly round trip
+        run: node watermark/check_wasm.mjs
