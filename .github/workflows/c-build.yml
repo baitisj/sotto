@@ -6,10 +6,12 @@ on:
     branches: [main]
   pull_request:
     # watermark/ (the prototype and its C port) and its page docs/watermark.* use nothing this
-    # workflow builds or tests; they have their own light workflow (watermark.yml). One path per line.
+    # workflow builds or tests; they have their own light workflow (watermark.yml). The pages'
+    # HTML (docs/*.html) isn't built or tested here either; the scripts and .wasm they load are.
+    # One path per line.
     paths-ignore:
       - 'watermark/**'
-      - 'docs/watermark.html'
+      - 'docs/*.html'
       - 'docs/watermark.js'
       - 'docs/watermark.wasm'
 
