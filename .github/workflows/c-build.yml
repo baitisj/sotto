@@ -5,10 +5,13 @@ on:
   push:
     branches: [main]
   pull_request:
-    # watermark/ is a Python-only prototype that imports from sim/ but nothing here builds or
-    # tests it; it has its own light workflow (watermark.yml). One path per line.
+    # watermark/ (the prototype and its C port) and its page docs/watermark.* use nothing this
+    # workflow builds or tests; they have their own light workflow (watermark.yml). One path per line.
     paths-ignore:
       - 'watermark/**'
+      - 'docs/watermark.html'
+      - 'docs/watermark.js'
+      - 'docs/watermark.wasm'
 
 jobs:
   build-without-python:

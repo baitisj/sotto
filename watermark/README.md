@@ -5,8 +5,8 @@ the speech does (a CTCSS tone or subaudible data is filtered off by the repeater
 high-pass and regenerated). The use in mind is a digital "tone squelch": a short ID frame
 (callsign plus a one-byte code) that a receiver decodes after a few seconds of talking.
 
-Listening page with A/B players and the numbers below:
-https://claude.ai/artifact/6ethpzQAqWV4V3rpaXcCxM
+Try it in the browser: [docs/watermark.html](../docs/watermark.html)
+(https://baitisj.github.io/sotto/watermark.html), which runs the C port below as WebAssembly.
 
 ## How it works
 
@@ -111,3 +111,28 @@ python watermark/selftest.py                               # synthetic vowel, nu
   rotation by masking.
 - Receiver voicing: about a tenth of the slots the receiver reads were not marked; a better
   voicing match or a per-slot "marked?" test would cut those errors.
+
+## C port and the browser page (`c/`)
+
+`c/wm.c` is the sender, receiver, ID frame and FM channel in C, step for step as the Python
+(`check_c.py` holds them to 1e-11 on the synthetic vowel with a known pitch track).
+`c/wm_track.c` takes the pitch track from sotto's own C encoder (`c/sotto.c`); on the two test
+clips it agrees with `tracked4` within 5% on 99.6% and 100% of the frames both call voiced, and
+C-marked audio decodes with the Python receiver and the other way round. `c/wm_tables.h` (the
+filters and the whitening sequence) is written by `c/gen_tables.py`.
+
+The page's receiver works as the audio arrives: every 256 ms it re-reads everything heard so far
+(timing, equaliser, polarity) and tries the decode; an ID counts when the same frame decodes twice
+running. On the 8 kHz clips that gives the same ID times as `run.py` through a strong repeater
+(2.8 s male, 4.4 s female).
+
+Resampling matters: the page first used a short windowed-sinc to bring 16 kHz audio to 8 kHz, and
+the male clip's ID through the strong repeater took 5.1 s instead of 2.8 s. It now resamples as
+`scipy.signal.resample_poly` does (to 3e-8).
+
+```sh
+make -C watermark/c && python watermark/check_c.py              # core library against the Python
+make && make -C watermark/c full && python watermark/check_c.py --full CLIP.wav   # with sotto's tracker
+make -C watermark/c wasm install                                # docs/watermark.wasm (as c/wasm)
+node watermark/check_wasm.mjs [CLIP.wav ...]                     # the page's module under node
+```
